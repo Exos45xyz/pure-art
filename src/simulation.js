@@ -75,7 +75,8 @@ void main() {
   float d = min(gaps.x, min(gaps.y, gaps.z));
   vec3 gradD = gaps.x <= gaps.y && gaps.x <= gaps.z ? vec3(-sign(p.x), 0.0, 0.0)
              : gaps.y <= gaps.z ? vec3(0.0, -sign(p.y), 0.0) : vec3(0.0, 0.0, -sign(p.z));
-  float open = d < 0.0 ? 1.0 : openness(p, t);
+  // Sealed glass (escape 0) skips the holes entirely: one noise less for every grain, every frame.
+  float open = d < 0.0 ? 1.0 : uEscape < 0.001 ? 0.0 : openness(p, t);
   const float W = 0.35;
   float R = mix(ramp(d / W), 1.0, open);
   // The ramp's own term is softened: the flow still only runs along the glass, with gentler
@@ -85,7 +86,8 @@ void main() {
   // Calm smoke turns in bigger rolls; turbulent smoke in smaller ones.
   vec3 v = octave(p, mix(0.55, 0.95, uTurbulence), vec3(0.0, t * 0.06, t * 0.035), R, slope, gradD);
   v += octave(p, 1.9, vec3(t * 0.11, 3.7, -t * 0.08), R, slope, gradD) * 0.65 * uTurbulence;
-  v += octave(p, 4.3, vec3(-7.1, t * 0.19, t * 0.15), R, slope, gradD) * 0.4 * uTurbulence * uTurbulence;
+  // The finest swirls only once they'd show; below that they cost two noises for nothing.
+  if (uTurbulence > 0.15) v += octave(p, 4.3, vec3(-7.1, t * 0.19, t * 0.15), R, slope, gradD) * 0.4 * uTurbulence * uTurbulence;
   vec3 target = v * uSpeed;
   // Spread: each grain also wanders at random, a new direction every third of a second.
   // The flow alone stretches smoke into thin sheets; this puffs them back out into volumes.
@@ -183,7 +185,7 @@ void main() {
   // A grain only leaves through an open hole; elsewhere the glass holds it.
   float before = max(abs(pos.x), max(abs(pos.y), abs(pos.z)));
   float reach = max(abs(p.x), max(abs(p.y), abs(p.z)));
-  if (before < 1.0 && reach >= 0.995 && openness(p, uTime) < 0.5) {
+  if (before < 1.0 && reach >= 0.995 && (uEscape < 0.001 || openness(p, uTime) < 0.5)) {
     // Bounce off the glass instead of sticking to it.
     vec3 over = max(abs(p) - 0.985, 0.0);
     p -= sign(p) * over * 2.0;

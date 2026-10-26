@@ -16,13 +16,16 @@ export const controls = [
   { group: 'Light', key: 'glow', label: 'glow' },
   { group: 'Light', key: 'film', label: 'film grain' },
 
-  { group: 'Form', key: 'grain', label: 'grain size' },
+  { group: 'Particles', key: 'particles', label: 'count', type: 'choice', look: false,
+    options: [[256, '65k'], [512, '262k'], [1024, '1m'], [1448, '2m'], [2048, '4m']] },
+  { group: 'Particles', key: 'grain', label: 'size' },
+  { group: 'Particles', key: 'blur', label: 'blur' },
+  { group: 'Particles', key: 'focus', label: 'focus' },
+
   { group: 'Form', key: 'spin', label: 'spin' },
   { group: 'Form', key: 'lens', label: 'lens', type: 'choice', options: [['flat', 'flat'], ['depth', 'depth']] },
   { group: 'Form', key: 'edges', label: 'edges', type: 'choice',
     options: [['white', 'white'], ['red', 'red'], ['off', 'off']] },
-  { group: 'Form', key: 'particles', label: 'particles', type: 'choice', look: false,
-    options: [[256, '65k'], [512, '262k'], [1024, '1m']] },
 
   { group: 'Output', key: 'format', label: 'format', type: 'choice', look: false,
     options: [['screen', 'screen'], ['9:16', '9:16'], ['4:5', '4:5'], ['1:1', '1:1']] },
@@ -32,7 +35,7 @@ export const controls = [
 const base = {
   source: 'volume', flow: 0.45, turbulence: 0.5, spread: 0, gather: 0, pulse: 0, escape: 0.18,
   brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.35,
-  grain: 0.4, spin: 0.2, lens: 'depth', edges: 'white',
+  grain: 0.4, blur: 0, focus: 0.5, spin: 0.2, lens: 'depth', edges: 'white',
 };
 
 // "original" is the reference clip: its camera (flat lens, 16.85° down, 62.66°/s), its red edges,
@@ -81,6 +84,11 @@ export function shuffled(state) {
     shadows: r(0.35, 0.85),
     glow: r(0.15, 0.55),
     grain: r(0.2, 0.55),
+    spread: Math.random() < 0.5 ? 0 : r(0.2, 0.6),
+    gather: Math.random() < 0.6 ? 0 : r(0.5, 1),
+    pulse: Math.random() < 0.6 ? 0 : r(0.4, 1),
+    blur: Math.random() < 0.5 ? 0 : r(0.15, 0.6),
+    focus: r(0.3, 0.7),
   };
 }
 

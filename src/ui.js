@@ -151,14 +151,18 @@ export function createUI(app) {
 
   const head = h('div', { class: 'panel-head' },
     h('span', { class: 'micro micro-strong' }, 'Parameters'),
-    h('div', { class: 'panel-head-actions' },
-      h('button', { type: 'button', class: 'text-button micro', onclick: shuffle, 'aria-label': 'Shuffle (R)' }, 'Shuffle'),
-      h('button', { type: 'button', class: 'text-button micro', onclick: () => applyLook(presetValues('original'), 'original') }, 'Reset'),
-      h('button', { type: 'button', class: 'text-button micro', onclick: () => setOpen(false), 'aria-label': 'Hide parameters (H)' }, 'Hide')));
+    h('button', { type: 'button', class: 'text-button micro', onclick: () => setOpen(false), 'aria-label': 'Hide parameters (H)' }, 'Hide'));
+  // The two buttons people reach for first: a new random look, or back to the original.
+  const quick = h('div', { class: 'quick' },
+    h('button', { type: 'button', class: 'pill pill-randomize', onclick: shuffle, title: 'Randomize (R)' },
+      h('span', { class: 'die', 'aria-hidden': 'true' }), 'randomize'),
+    h('button', { type: 'button', class: 'pill', onclick: () => applyLook(presetValues('original'), 'original') }, 'reset'));
+  // A die face, drawn once.
+  quick.querySelector('.die').innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="1.5" width="13" height="13" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5.2" cy="5.2" r="1.15" fill="currentColor"/><circle cx="8" cy="8" r="1.15" fill="currentColor"/><circle cx="10.8" cy="10.8" r="1.15" fill="currentColor"/></svg>';
 
-  panel.append(head, look, ...groups,
+  panel.append(head, quick, look, ...groups,
     h('div', { class: 'actions' }, save, record, copy),
-    h('p', { class: 'micro keys' }, 'Space pause · R shuffle · H hide'));
+    h('p', { class: 'micro keys' }, 'Space pause · R randomize · H hide'));
   fields.forEach((f) => f.sync());
   refresh();
 

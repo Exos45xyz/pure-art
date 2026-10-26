@@ -2,7 +2,7 @@ import '@fontsource-variable/archivo/wdth.css';
 import '@fontsource-variable/inter';
 import './style.css';
 
-import { Plane, Raycaster, Scene, Vector2, Vector3, WebGLRenderer } from 'three';
+import { FloatType, HalfFloatType, Plane, Raycaster, Scene, Vector2, Vector3, WebGLRenderTarget, WebGLRenderer } from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
@@ -29,6 +29,8 @@ try {
   throw new Error('WebGL 2 is not available.');
 }
 renderer.autoClear = false;
+// Accumulate light in full floats where the GPU can blend into them (see smoke.js).
+const accumulate = renderer.extensions.has('EXT_color_buffer_float') && renderer.extensions.has('EXT_float_blend') ? FloatType : HalfFloatType;
 
 // ---- State ---------------------------------------------------------------------------------
 
@@ -40,7 +42,7 @@ if (reducedMotion && !location.hash.includes('spin=')) state.spin = 0;
 
 // The shaders read eased copies of the sliders, so every change glides instead of jumping.
 const live = { ...state };
-const eased = ['flow', 'turbulence', 'spread', 'gather', 'escape', 'brightness', 'shadows', 'glow', 'film', 'grain', 'spin'];
+const eased = ['flow', 'turbulence', 'spread', 'gather', 'pulse', 'escape', 'brightness', 'shadows', 'glow', 'film', 'grain', 'blur', 'focus', 'spin'];
 
 // ---- Scene ---------------------------------------------------------------------------------
 
@@ -64,7 +66,7 @@ function build(size) {
     smoke.dispose();
   }
   simulation = createSimulation(renderer, size);
-  smoke = createSmoke(size);
+  smoke = createSmoke(size, accumulate);
   scene.add(smoke.object);
   // Let the smoke settle before anyone sees it.
   const settle = clock;
@@ -75,7 +77,7 @@ build(state.particles);
 
 // ---- Post ----------------------------------------------------------------------------------
 
-const composer = new EffectComposer(renderer);
+const composer = new EffectComposer(renderer, new WebGLRenderTarget(1, 1, { type: accumulate }));
 const renderPass = new RenderPass(scene, view.camera);
 composer.addPass(renderPass);
 // A low threshold on purpose: the glow gives the grains a soft body of smoke around them.
@@ -170,7 +172,7 @@ let rendered = false;
 function render(dt) {
   const camera = view.camera;
   renderPass.camera = camera;
-  smoke.update(simulation, live, output.height * output.ratio);
+  smoke.update(simulation, live, output.height * output.ratio, camera);
   smoke.renderShadow(renderer);
 
   bloom.strength = live.glow * 0.85;
@@ -326,6 +328,16 @@ if (import.meta.env.DEV) {
     resume() { paused = false; },
     step(seconds) { for (let t = 0; t < seconds - 1e-6; t += 1 / 30) simStep(1 / 30, false); },
     setClock(t) { clock = t; },
+    // Milliseconds per frame (simulation + drawing) at the current screen size, synced with a pixel read.
+    bench(n = 30) {
+      const gl = renderer.getContext();
+      const px = new Uint8Array(4);
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      const t0 = performance.now();
+      for (let i = 0; i < n; i++) { simStep(1 / 60, false); render(1 / 60); }
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      return +((performance.now() - t0) / n).toFixed(2);
+    },
   };
 }
 

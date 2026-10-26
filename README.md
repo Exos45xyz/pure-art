@@ -12,7 +12,7 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 
 | Group | Control | What it does |
 | --- | --- | --- |
-| Look | original, smoke, storm, silk, plume, core | Starting points. **Shuffle** picks a random look that still reads well. |
+| Look | original, smoke, storm, silk, plume, core | Starting points. **Randomize** picks a random look that still reads well; **reset** goes back to the original. |
 | Smoke | source | Where the smoke is born: wandering clouds, a plume at the bottom, or a core in the middle. |
 | | flow | How fast the current moves. |
 | | turbulence | How many small eddies ride on the big swirls. Calm smoke also turns in bigger rolls. |
@@ -21,12 +21,17 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 | | pulse | The breath: every 1.994 s the masses swell until they fill the cube, then pull back in. |
 | | escape | How much smoke finds its way out through the glass. |
 | Light | brightness, shadows, glow, film grain | Exposure, how much the smoke shades itself, the soft glow around it, and grain. |
-| Form | grain size, spin, lens, edges, particles | Grain size, how fast the cube turns, a flat (orthographic) or depth lens, the edge colour, and 65k / 262k / 1M particles. |
+| Particles | count | 65k, 262k, 1M, 2M or 4M grains. Computers start at 1M and step down to 262k if they can't keep 45 fps. |
+| | size | How big each grain is. |
+| | blur, focus | Depth of field: away from the focus plane grains open into soft discs with the same total light. Focus 0.5 is the middle of the cube. |
+| Form | spin, lens, edges | How fast the cube turns, a flat (orthographic) or depth lens, and the edge colour. |
 | Output | format | screen, 9:16, 4:5 or 1:1. A frame on screen shows what the file will hold. Images are 4K on the long side, videos 1080 wide. |
 
 Double-click a slider to reset it. Hold Shift while dragging for fine steps. Every change goes into the address bar, so **copy link** shares the exact look.
 
-Keys: `Space` pause · `R` shuffle · `S` save image · `H` hide the panel.
+Keys: `Space` pause · `R` randomize · `S` save image · `H` hide the panel.
+
+Measured on an Apple M5 at 2560 × 1600: 1M grains take about 8 ms a frame, 2M about 23 ms, 4M about 36 ms (50 ms with blur). Recording films in real time, so 4M videos come out at the frame rate your machine reaches.
 
 ## The original look
 
@@ -55,7 +60,7 @@ Every grain is one texel in two float textures (position and age, velocity and s
 - **Flow:** curl noise built from the cross product of two simplex-noise gradients, in three octaves. It has no divergence, so the smoke folds and stretches without bunching up.
 - **The glass:** the noise is multiplied by a ramp that reaches zero at the cube's faces (Bridson et al., *Curl-Noise for Procedural Fluid Flow*, 2007). Near a wall the flow can only run along it. Slow-moving holes in that ramp let some smoke escape.
 - **Light:** the grains are also splatted into 16 horizontal density slices, summed from the top down. Each grain reads how much smoke sits above it and dims to match, so the smoke shades itself.
-- **Image:** grains are drawn as soft dots into a half-float buffer. Below 1.6 px they keep their size and lose brightness instead, so nothing shimmers. Bloom, a film-like highlight roll-off, grain and dithering finish the image.
+- **Image:** grains are drawn as soft dots into a float buffer (full floats where the GPU can blend them, so millions of faint grains add up without banding). Below 1.6 px they keep their size and lose brightness instead, so nothing shimmers. Bloom, a film-like highlight roll-off, grain and dithering finish the image.
 - **Edges:** the cube is drawn with `LineSegments2` after the grade, so its lines stay crisp. Edges at the back are drawn fainter.
 
 All of it is in `src/`. Start with `settings.js` for the controls and looks, and `simulation.js` for the flow.

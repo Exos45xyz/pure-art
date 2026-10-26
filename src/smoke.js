@@ -65,7 +65,9 @@ const additive = {
   blendDst: OneFactor,
 };
 
-export function createSmoke(size) {
+// type: FloatType where the GPU can blend into it. With millions of faint grains, half floats lose the
+// small additions once a pixel is bright, so dense smoke would band.
+export function createSmoke(size, type = HalfFloatType) {
   const count = size * size;
   const geometry = grainGeometry(size);
   // Keep the look the same at any particle count: more grains, each a little fainter.
@@ -73,7 +75,7 @@ export function createSmoke(size) {
 
   // 1. Density, sliced along the light.
   const densityTarget = new WebGLRenderTarget(ATLAS, ATLAS, {
-    type: HalfFloatType, depthBuffer: false, minFilter: LinearFilter, magFilter: LinearFilter,
+    type, depthBuffer: false, minFilter: LinearFilter, magFilter: LinearFilter,
   });
   const densityMaterial = new ShaderMaterial({
     ...additive,
@@ -105,7 +107,7 @@ export function createSmoke(size) {
 
   // 2. Light reaching each slice: the sum of everything above it, softened a little.
   const shadowTarget = new WebGLRenderTarget(ATLAS, ATLAS, {
-    type: HalfFloatType, depthBuffer: false, minFilter: LinearFilter, magFilter: LinearFilter,
+    type, depthBuffer: false, minFilter: LinearFilter, magFilter: LinearFilter,
   });
   const sumMaterial = new ShaderMaterial({
     depthTest: false,
@@ -159,6 +161,8 @@ export function createSmoke(size) {
       uHeight: { value: 1000 },
       uAlpha: { value: 0.1 },
       uShadow: { value: 1 },
+      uBlur: { value: 0 },
+      uFocusDepth: { value: 11.5 },
     },
     vertexShader: /* glsl */ `
       uniform sampler2D tPosition;
@@ -167,8 +171,11 @@ export function createSmoke(size) {
       uniform float uHeight;
       uniform float uAlpha;
       uniform float uShadow;
+      uniform float uBlur;
+      uniform float uFocusDepth;
       varying float vAlpha;
       varying float vLight;
+      varying float vSoft;
       ${fade}
       ${shadowLookup}
       void main() {
@@ -185,7 +192,14 @@ export function createSmoke(size) {
         float alpha = uAlpha * lifeFade(pos.w) * (1.0 - smoothstep(1.0, 1.7, reach));
         // Below 1.6 px a dot would shimmer; keep the size and dim it by the area it lost instead.
         if (px < 1.6) { alpha *= px * px / 2.56; px = 1.6; }
-        gl_PointSize = px;
+
+        // Depth of field: away from the focus plane a grain opens into a soft disc. It keeps the same
+        // total light, so blurred smoke gets softer, not brighter.
+        float coc = min(uBlur * abs(-view.z - uFocusDepth) * 18.0, 28.0) * uHeight / 1280.0;
+        float blurred = sqrt(px * px + coc * coc);
+        alpha *= (px * px) / (blurred * blurred);
+        vSoft = coc / blurred;
+        gl_PointSize = blurred;
 
         vLight = 0.06 + 0.94 * exp(-opticalDepth(p) * uShadow);
         vAlpha = alpha;
@@ -193,11 +207,15 @@ export function createSmoke(size) {
     fragmentShader: /* glsl */ `
       varying float vAlpha;
       varying float vLight;
+      varying float vSoft;
       void main() {
         vec2 c = gl_PointCoord - 0.5;
         float d = dot(c, c) * 4.0;
         if (d > 1.0) discard;
-        gl_FragColor = vec4(vec3(vLight * vAlpha * exp(-d * 3.0)), 1.0);
+        // In focus a soft dot; out of focus a flatter disc with a soft rim, scaled to the same light.
+        float dot_ = exp(-d * 3.0);
+        float disc = (1.0 - smoothstep(0.45, 1.0, d)) * 0.42;
+        gl_FragColor = vec4(vec3(vLight * vAlpha * mix(dot_, disc, vSoft)), 1.0);
       }`,
   });
   const points = new Points(geometry, material);
@@ -205,8 +223,11 @@ export function createSmoke(size) {
 
   return {
     object: points,
-    // live: eased control values. height: drawing-buffer height in pixels.
-    update(simulation, live, height) {
+    // live: eased control values. height: drawing-buffer height in pixels. camera: for the focus plane.
+    update(simulation, live, height, camera) {
+      material.uniforms.uBlur.value = live.blur;
+      // Focus 0.5 is the middle of the cube; 0 and 1 reach just past its front and back corners.
+      material.uniforms.uFocusDepth.value = camera.position.length() + (0.5 - live.focus) * -3.6;
       densityMaterial.uniforms.tPosition.value = simulation.positions;
       material.uniforms.tPosition.value = simulation.positions;
       material.uniforms.tVelocity.value = simulation.velocities;
