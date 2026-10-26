@@ -8,7 +8,8 @@ import { DataTexture, NearestFilter, RGBAFormat, UnsignedByteType } from 'three'
 
 const MAX_SIDE = 400; // about 160k pixels: every colour region is kept, the work stays instant
 
-export async function readImage(file) {
+// name: what the panel calls it (the file's name, or a bundled palette's).
+export async function readImage(file, name = file.name) {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * scale));
@@ -18,19 +19,23 @@ export async function readImage(file) {
   ctx.drawImage(bitmap, 0, 0, width, height);
   const data = ctx.getImageData(0, 0, width, height).data;
 
-  // Transparent pixels are not part of the picture.
+  // Transparent pixels are not part of the picture, and neither is black: the smoke is light on a
+  // black studio, so a black grain would only be a hole in it. The black around a picture is the studio.
+  // Anything darker than 8% counts as black, so a black with film grain in it is left out too.
   const pixels = new Uint8Array(width * height * 3);
   let n = 0;
   let luminance = 0;
   for (let i = 0; i < data.length; i += 4) {
     if (data[i + 3] < 128) continue;
+    const l = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+    if (l < 20) continue;
     pixels[n * 3] = data[i];
     pixels[n * 3 + 1] = data[i + 1];
     pixels[n * 3 + 2] = data[i + 2];
-    luminance += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+    luminance += l;
     n++;
   }
-  if (!n) throw new Error('This image has no visible pixels.');
+  if (!n) throw new Error('This image has no colours brighter than black.');
 
   const thumb = new OffscreenCanvas(56, 56);
   const tctx = thumb.getContext('2d');
@@ -40,7 +45,7 @@ export async function readImage(file) {
   bitmap.close();
 
   return {
-    name: file.name,
+    name,
     pixels: pixels.subarray(0, n * 3),
     count: n,
     meanLuminance: luminance / n / 255,

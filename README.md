@@ -13,7 +13,7 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 | Group | Control | What it does |
 | --- | --- | --- |
 | Look | pure, original, smoke, storm, silk, plume, core | Starting points. **Pure** is the default: the clip's breath through a depth lens, with fine filaments, sharp grains and sealed glass. **Randomize** picks a random look that still reads well; **reset** goes back to pure. |
-| Colour | white, image | **Upload an image** (or drop one anywhere on the page) and the smoke takes its colours like pigment in a fluid: each region of the cube wears one stretch of the image's colours, the flow folds the regions into strands, and over time a colour that covers 30% of the picture colours about 30% of the smoke. The panel shows the image's main colours at their real shares. |
+| Colour | white, dusk, image | **Dusk** is a grain gradient (orange, pink, lilac, pale mint) that ships with the app. **Upload an image** (or drop one anywhere on the page) and the smoke takes its colours like pigment in a fluid: each region of the cube wears one stretch of the image's colours, the flow folds the regions into strands, and over time a colour that covers 30% of the picture colours about 30% of the smoke. Black (under 8% brightness) is left out: the smoke is light on a black studio, so the black around a picture is the studio itself. The panel shows the colours' main shades at their real shares. |
 | Smoke | source | Where the smoke is born: wandering clouds, a plume at the bottom, or a core in the middle. |
 | | flow | How fast the current moves. |
 | | turbulence | How many small eddies ride on the big swirls. Calm smoke also turns in bigger rolls. |

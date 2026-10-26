@@ -3,7 +3,7 @@
 
 export const controls = [
   { group: 'Colour', key: 'colour', label: 'colour', type: 'choice', look: false,
-    options: [['white', 'white'], ['image', 'image']] },
+    options: [['white', 'white'], ['dusk', 'dusk'], ['image', 'image']] },
 
   { group: 'Smoke', key: 'source', label: 'source', type: 'choice',
     options: [['volume', 'volume'], ['plume', 'plume'], ['core', 'core']] },

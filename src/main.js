@@ -58,10 +58,24 @@ const cube = createCube(lighting);
 
 let simulation;
 let smoke;
-// The image whose colours the grains wear, if any.
-let image = null;
-let ribbon = null;
-const colourGain = () => Math.min(2.5, Math.max(1, 0.7 / Math.max(image.meanLuminance, 0.01)));
+// The colours the grains wear: white, a palette that ships with the app, or an uploaded image. Each is
+// read once into its colour ribbon (palette.js).
+const bundled = { dusk: new URL('./colours/dusk.webp', import.meta.url).href };
+const palettes = {}; // colour choice → { image, ribbon }
+let colours = null; // the palette the grains wear now, or null for white
+// Lifts dark images so the smoke keeps about the brightness it has in white.
+const colourGain = (image) => Math.min(2.5, Math.max(1, 0.7 / Math.max(image.meanLuminance, 0.01)));
+function wear(choice) {
+  colours = palettes[choice] ?? null;
+  if (colours) smoke.setColours(colours.ribbon, colourGain(colours.image));
+  ui.showColours(colours?.image ?? null);
+}
+async function loadBundled(choice) {
+  if (palettes[choice]) return;
+  const blob = await (await fetch(bundled[choice])).blob();
+  const image = await readImage(blob, choice);
+  palettes[choice] = { image, ribbon: ribbonTexture(image) };
+}
 // The clip's clock: zero when the original look starts, so its pulse lands on the clip's beats.
 let clock = 0;
 const towardCamera = new Vector3();
@@ -81,7 +95,7 @@ function build(size) {
   }
   simulation = createSimulation(renderer, size);
   smoke = createSmoke(size, lighting);
-  if (ribbon) smoke.setColours(ribbon, colourGain());
+  if (colours) smoke.setColours(colours.ribbon, colourGain(colours.image));
   scene.add(smoke.object);
   // Let the smoke settle before anyone sees it.
   const settle = clock;
@@ -252,7 +266,7 @@ function tick(now) {
 
   const k = 1 - Math.exp(-dt * 10);
   for (const key of eased) live[key] += (state[key] - live[key]) * k;
-  live.colourMix += ((state.colour === 'image' && image ? 1 : 0) - live.colourMix) * (1 - Math.exp(-dt * 6));
+  live.colourMix += ((state.colour !== 'white' && colours ? 1 : 0) - live.colourMix) * (1 - Math.exp(-dt * 6));
 
   if (!exporting) {
     const panK = 1 - Math.exp(-dt * 9);
@@ -309,11 +323,20 @@ const app = {
   set(key, value) {
     if (state[key] === value) return;
     // Image colours need an image first: ask for one instead.
-    if (key === 'colour' && value === 'image' && !image) {
+    if (key === 'colour' && value === 'image' && !palettes.image) {
       ui.pickImage();
       return;
     }
     state[key] = value;
+    if (key === 'colour') {
+      wear(value);
+      // A bundled palette is read the first time it is chosen; the smoke turns to it once it is ready.
+      if (bundled[value] && !palettes[value]) {
+        loadBundled(value)
+          .then(() => { if (state.colour === value) wear(value); })
+          .catch(() => ui.toast('those colours did not load'));
+      }
+    }
     if (key === 'particles') {
       qualityCheck = null;
       build(value);
@@ -338,11 +361,11 @@ const app = {
   },
   // Colour the grains from an image file, in the image's own proportions.
   async useImage(file) {
-    image = await readImage(file);
-    ribbon?.texture.dispose();
-    ribbon = ribbonTexture(image);
-    smoke.setColours(ribbon, colourGain());
+    const image = await readImage(file);
+    palettes.image?.ribbon.texture.dispose();
+    palettes.image = { image, ribbon: ribbonTexture(image) };
     state.colour = 'image';
+    wear('image');
     return image;
   },
   get paused() { return paused; },

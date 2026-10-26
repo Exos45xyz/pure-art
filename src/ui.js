@@ -167,20 +167,25 @@ export function createUI(app) {
   const upload = h('button', { type: 'button', class: 'pill pill-upload', onclick: () => fileInput.click() }, 'upload image');
   colourRows.append(imageRow, upload, fileInput);
 
+  // The colours in use (a bundled palette or an uploaded image), or none for white. The strip shows
+  // the picture's main colours at the share of it each one covers.
+  function showColours(picked) {
+    imageRow.hidden = !picked;
+    if (!picked) return;
+    thumb.src = picked.thumbnail;
+    imageName.textContent = picked.name;
+    strip.replaceChildren(...picked.swatches.map((sw) => {
+      const bar = h('i', { title: `${Math.round(sw.share * 100)}%` });
+      bar.style.background = sw.color;
+      bar.style.flexGrow = sw.share;
+      return bar;
+    }));
+  }
+
   async function loadImage(file) {
     if (!file.type.startsWith('image/')) return toast('that file is not an image');
     try {
-      const picked = await app.useImage(file);
-      thumb.src = picked.thumbnail;
-      imageName.textContent = picked.name;
-      // The strip shows the image's main colours at the share of the picture each one covers.
-      strip.replaceChildren(...picked.swatches.map((sw) => {
-        const bar = h('i', { title: `${Math.round(sw.share * 100)}%` });
-        bar.style.background = sw.color;
-        bar.style.flexGrow = sw.share;
-        return bar;
-      }));
-      imageRow.hidden = false;
+      await app.useImage(file);
       upload.textContent = 'change image';
       fields.forEach((f) => f.sync());
       toast('image colours · same proportions');
@@ -325,5 +330,5 @@ export function createUI(app) {
     if (ratio) guide.style.setProperty('--ratio', ratio);
   }
 
-  return { reserve, toast, showFormat, pickImage: () => fileInput.click(), sync: () => fields.forEach((f) => f.sync()) };
+  return { reserve, toast, showFormat, showColours, pickImage: () => fileInput.click(), sync: () => fields.forEach((f) => f.sync()) };
 }
