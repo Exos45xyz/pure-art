@@ -41,8 +41,8 @@ const base = {
   grain: 0.4, blur: 0, focus: 0.5, spin: 0.2, lens: 'depth', edges: 'white',
 };
 
-// "original" is the reference clip: its camera (flat lens, 16.85° down, 62.66°/s), its red edges,
-// no glow or grain on a pure black ground. See README › The original look.
+// "original" is the reference clip's camera (flat lens, 16.85° down, 62.66°/s) and red edges.
+// See README › The original look.
 export const presets = {
   // Romain's look: the clip's breath through a depth lens, fine filaments, soft focus, sealed glass.
   pure: {
@@ -50,12 +50,12 @@ export const presets = {
     brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.42,
     grain: 0.4, blur: 0.4, focus: 0.5, spin: 0.13, lens: 'depth', edges: 'white',
   },
-  // The reference clip's camera and movement, measured frame by frame, with the studio's particle
-  // texture: see README › The original look.
+  // The reference clip's camera, edges and breath, with pure's smoke and particles: the clip's own
+  // speed (flow 1) washes the strands into fog, so the smoke keeps pure's pace.
   original: {
-    flow: 1, turbulence: 0.3, spread: 0.45, gather: 1, pulse: 1, escape: 0,
-    brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.35,
-    grain: 0.4, spin: 0.5, lens: 'flat', edges: 'red',
+    flow: 0.45, turbulence: 0.51, spread: 0, gather: 0.98, pulse: 1, escape: 0,
+    brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.42,
+    grain: 0.4, blur: 0.4, focus: 0.5, spin: 0.5, lens: 'flat', edges: 'red',
   },
   smoke: {},
   storm: { flow: 0.82, turbulence: 0.92, shadows: 0.78, glow: 0.5, brightness: 0.46, grain: 0.32 },

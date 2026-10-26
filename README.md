@@ -36,12 +36,12 @@ Measured on an Apple M5 at 2560 × 1600: 1M grains take about 8 ms a frame, 2M a
 
 ## The original look
 
-The original look takes its camera and its movement from a reference clip (734 frames, 720 × 1280) of particle smoke in a turning wireframe cube, and keeps the studio's own particle texture.
+The original look takes its camera and its breath from a reference clip (734 frames, 720 × 1280) of particle smoke in a turning wireframe cube, and its smoke and particles from pure.
 
 - **Camera, exact.** Measured on every frame: an orthographic view looking 16.85° down, turning at 62.66° a second, with the cube's half-edge at 203 px on a 1280 px frame. When the look starts, its edges land on the clip's edges frame for frame.
 - **Movement, measured frame by frame.** Every one of the clip's 734 frames was analysed at full resolution with optical flow, with the camera's own motion taken out. Each frame's vertical motion splits into a swell (spreading apart or squeezing together), a drift, a swirl in the picture's plane, and turbulence. Folded over its 12 beats (one every 1.994 s), the breath goes: a burst right after the smallest point, easing out into the glass; a float at the fullest, when the smoke is calmest; then a collapse that gets faster and twists, sinking as it swells and rising as it collapses, and a bounce straight back. The pulse plays those measured curves on the clip's clock, and gather holds the mass together only while it collapses. Measured inside the simulation, its swell follows the clip's through the beat at a correlation of +0.88; on the picture, the cube fills and empties on the clip's beats.
 - **Always inside.** With escape at zero the glass is sealed: no grain ever leaves the cube.
-- **Texture, the studio's own.** Fine grains, a soft glow and film grain, not the clip's.
+- **Particles, pure's.** Fine strands, soft focus, a soft glow and film grain, not the clip's. The smoke moves at pure's pace: at the clip's own speed the strands wash out into an even fog.
 
 Use **9:16** to export in the clip's own frame.
 
