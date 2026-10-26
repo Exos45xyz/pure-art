@@ -5,6 +5,7 @@ import { hash, noise } from './glsl.js';
 // The smoke lives on the GPU: one texel per grain, in two textures.
 // position = xyz inside the cube (-1..1) and w = age (0 at birth, 1 at death)
 // velocity = xyz and w = a fixed random seed
+// dye = xy, the grain's place on the image's colour ribbon (see dyeShader)
 
 const sources = { volume: 0, plume: 1, core: 2 };
 
@@ -253,6 +254,37 @@ void main() {
 }
 `;
 
+// The image's colours, as pigment in the smoke. Each grain carries a place on the colour ribbon (smoke.js)
+// as a direction (cos, sin), so it can turn the short way round. A large, slow colour field gives every
+// region of the cube its own stretch of the ribbon, and a grain eases toward its region's colour over
+// about three seconds: the flow drags colours into strands and folds before they settle, so neighbouring
+// smoke shares a colour and colours meet in folds, not in confetti. A newborn grain takes its region's
+// colour at once. Half a turn of the field walks the whole ribbon, so over time every pixel of the image
+// gets about its share of the smoke.
+const dyeShader = /* glsl */ `
+uniform float uTime;
+uniform float uDt;
+
+${noise}
+
+float colourPhase(vec3 p, float t) {
+  vec3 g;
+  float n = snoise(p * 0.55 + vec3(t * 0.021, -t * 0.017, t * 0.013), g);
+  return n * 0.7 + t * 0.012;
+}
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / resolution.xy;
+  vec4 pos = texture2D(texturePosition, uv);
+  vec2 dye = texture2D(textureDye, uv).xy;
+  float a = colourPhase(pos.xyz, uTime) * 6.2831853;
+  vec2 target = vec2(cos(a), sin(a));
+  float k = pos.w < 0.02 ? 1.0 : 1.0 - exp(-uDt * 0.35);
+  vec2 next = mix(dye, target, k);
+  gl_FragColor = vec4(next / max(length(next), 1e-4), 0.0, 1.0);
+}
+`;
+
 export function createSimulation(renderer, size) {
   const gpu = new GPUComputationRenderer(size, size, renderer);
   if (!renderer.extensions.has('EXT_color_buffer_float')) gpu.setDataType(HalfFloatType);
@@ -269,10 +301,16 @@ export function createSimulation(renderer, size) {
     v[i + 3] = Math.random();
   }
 
+  const dye0 = gpu.createTexture();
+  for (let i = 0; i < dye0.image.data.length; i += 4) dye0.image.data[i] = 1;
+
   const velocity = gpu.addVariable('textureVelocity', velocityShader, velocity0);
   const position = gpu.addVariable('texturePosition', positionShader, position0);
+  const dye = gpu.addVariable('textureDye', dyeShader, dye0);
   gpu.setVariableDependencies(velocity, [velocity, position]);
   gpu.setVariableDependencies(position, [velocity, position]);
+  gpu.setVariableDependencies(dye, [dye, position]);
+  Object.assign(dye.material.uniforms, { uTime: { value: 0 }, uDt: { value: 0 } });
 
   Object.assign(velocity.material.uniforms, {
     uTime: { value: 0 },
@@ -315,6 +353,7 @@ export function createSimulation(renderer, size) {
 
   const vu = velocity.material.uniforms;
   const pu = position.material.uniforms;
+  const du = dye.material.uniforms;
   let time = Math.random() * 100;
 
   return {
@@ -327,8 +366,8 @@ export function createSimulation(renderer, size) {
       // The swirls change faster when the smoke moves faster, so fast smoke churns
       // instead of racing along fixed paths. At the studio's usual speed the pace is 1.
       time += dt * (0.5 + speed * 1.5);
-      vu.uTime.value = pu.uTime.value = time;
-      vu.uDt.value = pu.uDt.value = dt;
+      vu.uTime.value = pu.uTime.value = du.uTime.value = time;
+      vu.uDt.value = pu.uDt.value = du.uDt.value = dt;
       vu.uSource.value = pu.uSource.value = sources[source];
       vu.uSpeed.value = speed;
       vu.uTurbulence.value = live.turbulence;
@@ -363,6 +402,10 @@ export function createSimulation(renderer, size) {
     },
     get velocities() {
       return gpu.getCurrentRenderTarget(velocity).texture;
+    },
+    // Each grain's place on the colour ribbon, as (cos, sin) of its phase.
+    get dyes() {
+      return gpu.getCurrentRenderTarget(dye).texture;
     },
     dispose() {
       gpu.dispose();

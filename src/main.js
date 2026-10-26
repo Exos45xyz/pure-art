@@ -223,7 +223,6 @@ function render(dt) {
   smoke.update(simulation, live, output.height * output.ratio, camera);
   smoke.setOutline(cubeOutline(camera, output.width * output.ratio, output.height * output.ratio));
   smoke.colourMix = live.colourMix;
-  smoke.colourClock = clock;
   lighting.update(camera, live.shadows);
   smoke.renderShadow(renderer);
 

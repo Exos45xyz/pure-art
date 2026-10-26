@@ -33,8 +33,13 @@ export const GradeShader = {
 
     void main() {
       vec3 light = texture2D(tDiffuse, vUv).rgb * uExposure;
-      // Highlights roll off like film instead of clipping, then a gentle S-curve.
-      vec3 c = 1.0 - exp(-light);
+      // Highlights roll off like film instead of clipping, then a gentle S-curve. The roll-off follows
+      // the brightest channel, so dense coloured smoke keeps its colour instead of bleaching to white;
+      // a quarter of it goes channel by channel, so the hottest highlights still whiten a little, as on
+      // film. White smoke is the same either way.
+      float peak = max(light.r, max(light.g, light.b));
+      vec3 keep = light / max(peak, 1e-5) * (1.0 - exp(-peak));
+      vec3 c = mix(keep, 1.0 - exp(-light), 0.25);
       c = mix(c, c * c * (3.0 - 2.0 * c), 0.3);
 
       vec2 q = (vUv - uCenter) * vec2(uAspect, 1.0);

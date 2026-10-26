@@ -1,9 +1,10 @@
 import { DataTexture, NearestFilter, RGBAFormat, UnsignedByteType } from 'three';
 
 // Colours from an image, in the image's own proportions. Every pixel is read and laid out in a
-// ribbon, grouped by colour. A grain takes its colour from where the ribbon is at the moment it is
-// born, and the ribbon turns slowly: smoke born together shares one colour, like dye dripped into it,
-// and over a full turn every pixel colours its exact share of the smoke.
+// ribbon, grouped by colour, so neighbouring places on the ribbon are neighbouring colours. Each grain
+// carries a place on it like pigment (simulation.js): a region of smoke shares one stretch of the
+// ribbon, the flow folds the regions into each other, and over time every pixel colours about its
+// share of the smoke.
 
 const MAX_SIDE = 400; // about 160k pixels: every colour region is kept, the work stays instant
 
@@ -48,16 +49,34 @@ export async function readImage(file) {
   };
 }
 
-// The image's main colours and how much of it each covers, for the strip in the panel (k-means).
+// How far apart two colours look: green counts most, blue least, as the eye sees them.
+const distance = (a, b) => 2 * (a[0] - b[0]) ** 2 + 4 * (a[1] - b[1]) ** 2 + 3 * (a[2] - b[2]) ** 2;
+
+// The image's main colours and how much of it each covers (k-means). They group the ribbon's pixels and
+// fill the strip in the panel.
 function swatches(pixels, n, k = 8) {
   const sample = [];
   const step = Math.max(1, Math.floor(n / 6000));
   for (let i = 0; i < n; i += step) sample.push([pixels[i * 3], pixels[i * 3 + 1], pixels[i * 3 + 2]]);
-  let centres = Array.from({ length: k }, (_, j) => [...sample[Math.floor(((j + 0.5) / k) * sample.length)]]);
+  // k-means++: each starting colour is picked far from the ones already chosen, so distinct colours
+  // start apart and never merge into one muddy average. Seeded, so an image always gives the same strip.
+  let seed = 1;
+  const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  let centres = [[...sample[Math.floor(random() * sample.length)]]];
+  const gaps = sample.map((p) => distance(p, centres[0]));
+  while (centres.length < k) {
+    const total = gaps.reduce((a, b) => a + b, 0);
+    if (total === 0) break;
+    let pick = random() * total;
+    let i = 0;
+    while (pick > gaps[i] && i < gaps.length - 1) pick -= gaps[i++];
+    centres.push([...sample[i]]);
+    sample.forEach((p, j) => { gaps[j] = Math.min(gaps[j], distance(p, sample[i])); });
+  }
   const nearest = (p) => {
     let best = 0, dist = Infinity;
     centres.forEach((c, j) => {
-      const d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2;
+      const d = distance(p, c);
       if (d < dist) { dist = d; best = j; }
     });
     return best;
@@ -98,7 +117,7 @@ export function ribbonTexture(image) {
     const r = px[i * 3], g = px[i * 3 + 1], b = px[i * 3 + 2];
     let best = 0, dist = Infinity;
     centres.forEach((c, j) => {
-      const d = (r - c[0]) ** 2 + (g - c[1]) ** 2 + (b - c[2]) ** 2;
+      const d = distance([r, g, b], c);
       if (d < dist) { dist = d; best = j; }
     });
     keys[i] = order.get(best) * 1000 + (0.2126 * r + 0.7152 * g + 0.0722 * b);

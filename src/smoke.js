@@ -263,6 +263,7 @@ export function createSmoke(size, lighting) {
       ...lighting.uniforms,
       tPosition: { value: null },
       tVelocity: { value: null },
+      tDye: { value: null },
       uSize: { value: 0.006 },
       uHeight: { value: 1000 },
       uAlpha: { value: 0.1 },
@@ -272,13 +273,13 @@ export function createSmoke(size, lighting) {
       uOutlineSides: { value: 0 },
       tColour: { value: white },
       uRibbon: { value: new Vector3(1, 1, 1) },
-      uColourClock: { value: 0 },
       uColour: { value: 0 },
       uColourGain: { value: 1 },
     },
     vertexShader: /* glsl */ `
       uniform sampler2D tPosition;
       uniform sampler2D tVelocity;
+      uniform sampler2D tDye;
       uniform float uSize;
       uniform float uHeight;
       uniform float uAlpha;
@@ -286,7 +287,6 @@ export function createSmoke(size, lighting) {
       uniform float uFocusDepth;
       uniform sampler2D tColour;
       uniform vec3 uRibbon;
-      uniform float uColourClock;
       uniform float uColour;
       uniform float uColourGain;
       varying float vAlpha;
@@ -321,11 +321,13 @@ export function createSmoke(size, lighting) {
         // The lamp's light, shaded by the smoke on its way in; then hidden by the smoke in front of it.
         vLight = 0.06 + 0.94 * lampLight(p);
         vAlpha = alpha * seenThrough(p);
-        // The grain's colour: where the image's colour ribbon was when it was born. The ribbon turns
-        // once every 6 s, so smoke born together shares a colour; a little of the seed keeps it lively.
-        float birth = uColourClock - pos.w * mix(3.0, 7.0, seed);
-        float along = fract(birth / 6.0 + seed * 0.12);
-        float idx = floor(along * uRibbon.z);
+        // The grain's colour: the pigment it carries (simulation.js), a phase that walks the image's
+        // colour ribbon up and back down, so neighbouring phases are neighbouring colours. A touch of
+        // the seed gives each grain its own shade within its region's colour.
+        vec2 dye = texture2D(tDye, position.xy).xy;
+        float phase = atan(dye.y, dye.x) / 6.2831853 + 0.5 + (seed - 0.5) * 0.03;
+        float along = 1.0 - abs(2.0 * fract(phase) - 1.0);
+        float idx = min(floor(along * uRibbon.z), uRibbon.z - 1.0);
         vec2 ribbonUv = (vec2(mod(idx, uRibbon.x), floor(idx / uRibbon.x)) + 0.5) / uRibbon.xy;
         vColour = mix(vec3(1.0), texture2D(tColour, ribbonUv).rgb * uColourGain, uColour);
       }`,
@@ -365,6 +367,7 @@ export function createSmoke(size, lighting) {
       for (const { material: m } of Object.values(splats)) m.uniforms.tPosition.value = simulation.positions;
       material.uniforms.tPosition.value = simulation.positions;
       material.uniforms.tVelocity.value = simulation.velocities;
+      material.uniforms.tDye.value = simulation.dyes;
       material.uniforms.uHeight.value = height;
       // Linear up to 0.6, then steeper, so the top of the slider reaches the original's big grains.
       material.uniforms.uSize.value = 0.0035 + live.grain * 0.009 + 0.1944 * Math.max(live.grain - 0.6, 0) ** 2;
@@ -384,9 +387,6 @@ export function createSmoke(size, lighting) {
     setOutline(lines) {
       lines.forEach((l, i) => material.uniforms.uOutline.value[i].copy(l));
       material.uniforms.uOutlineSides.value = lines.length;
-    },
-    set colourClock(seconds) {
-      material.uniforms.uColourClock.value = seconds;
     },
     // 0 = white, 1 = the image's colours; eased by the caller.
     set colourMix(value) {
