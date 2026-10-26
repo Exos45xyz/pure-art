@@ -143,17 +143,31 @@ void main() {
   float sealed = (1.0 - open) * inside;
   float nearGlass = (1.0 - smoothstep(0.0, 0.15, d)) * sealed;
   target -= outward * max(dot(target, outward), 0.0) * nearGlass;
+  // Along the faces the smoke runs fast, quicker than inside, instead of dragging on the glass: within
+  // 0.05 of it the sideways current is 2.5 times stronger and never slower than 1 + 2.5 x the flow
+  // speed, fading back to normal 0.2 in.
+  vec3 alongFace = target - outward * dot(target, outward);
+  float sweep = length(alongFace);
+  vec3 sweepDir = sweep > 1e-4 ? alongFace / sweep : normalize(cross(outward, vec3(0.31, 0.83, 0.47)));
+  float faceSpeed = max(sweep * 2.5, 1.0 + 2.5 * uSpeed);
+  float onFace = (1.0 - smoothstep(0.05, 0.2, d)) * sealed;
+  target += (sweepDir * faceSpeed - alongFace) * onFace;
   vec3 bounced = vel.xyz;
   float into = dot(bounced, outward);
   if (d < 0.05 && into > 0.0 && sealed > 0.5) {
     vec3 along = p - outward * dot(p, outward);
     vec3 splash = length(along) > 1e-4 ? normalize(along) : vec3(0.0);
-    bounced += -outward * (into * 1.9 + 0.25) + splash * into * 0.6;
+    bounced += -outward * (into * 1.9 + 0.25) + splash * into * 1.2;
   }
 
-  // A grain that was just born takes the current at once; the others ease into it.
+  // A grain that was just born takes the current at once; the others ease into it. Near the glass the
+  // bounce off it eases out slowly, while the slide along it picks up speed quickly.
   float response = pos.w < 0.015 ? 1.0 : 1.0 - exp(-uDt * mix(9.0, 2.5, nearGlass));
-  gl_FragColor = vec4(mix(bounced, target, response), vel.w);
+  vec3 next = mix(bounced, target, response);
+  vec3 slide = next - outward * dot(next, outward);
+  vec3 slideTarget = target - outward * dot(target, outward);
+  next += (slideTarget - slide) * (1.0 - exp(-uDt * 10.0)) * onFace;
+  gl_FragColor = vec4(next, vel.w);
 }
 `;
 
