@@ -12,7 +12,7 @@ import { createCube } from './cube.js';
 import { GradeShader } from './grade.js';
 import { createSimulation } from './simulation.js';
 import { breathAt, readHash, spinRate, writeHash } from './settings.js';
-import { createSmoke } from './smoke.js';
+import { createLighting, createSmoke } from './smoke.js';
 import { createUI } from './ui.js';
 import { createView } from './view.js';
 import { readImage, ribbonTexture } from './palette.js';
@@ -52,7 +52,9 @@ const eased = ['flow', 'turbulence', 'spread', 'gather', 'pulse', 'escape', 'reb
 const scene = new Scene();
 const view = createView(canvas);
 view.setLens(state.lens);
-const cube = createCube();
+// One lamp lights the smoke and the cube's edges alike.
+const lighting = createLighting(accumulate);
+const cube = createCube(lighting);
 
 let simulation;
 let smoke;
@@ -78,7 +80,7 @@ function build(size) {
     smoke.dispose();
   }
   simulation = createSimulation(renderer, size);
-  smoke = createSmoke(size, accumulate);
+  smoke = createSmoke(size, lighting);
   if (ribbon) smoke.setColours(ribbon, colourGain());
   scene.add(smoke.object);
   // Let the smoke settle before anyone sees it.
@@ -222,6 +224,7 @@ function render(dt) {
   smoke.setOutline(cubeOutline(camera, output.width * output.ratio, output.height * output.ratio));
   smoke.colourMix = live.colourMix;
   smoke.colourClock = clock;
+  lighting.update(camera, live.shadows);
   smoke.renderShadow(renderer);
 
   bloom.strength = live.glow * 0.85;
@@ -231,10 +234,8 @@ function render(dt) {
   grade.uniforms.uLift.value = Math.min(1, live.glow * 4);
   grade.uniforms.uTime.value = time;
 
-  // The cube's frame is a plain stroke: no blur, no fade, no glow, the same line at any zoom.
-  cube.update(state.edges, 1, camera, exporting || !rendered ? Infinity : dt, {
-    blur: 0, focusDepth: 0, glow: 0, depthShade: 0,
-  });
+  // The cube's frame is a plain stroke, lit by the lamp and hidden by the smoke in front of it.
+  cube.update(state.edges, camera, exporting || !rendered ? Infinity : dt);
   rendered = true;
   renderer.setClearColor(0x000000, 1);
   composer.render(dt);

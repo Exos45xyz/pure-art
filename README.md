@@ -22,18 +22,18 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 | | pulse | The breath: every 1.994 s the masses swell until they fill the cube, then pull back in. |
 | | escape | How much smoke finds its way out through the glass. Every look and randomize keep it at 0, so the smoke stays in the cube unless you open it yourself. |
 | | rebound | How hard the smoke bounces off the glass. At 0 it settles against the faces; 50, every look's setting, springs back with 90% of its speed; 100 throws it back hard and far. |
-| Light | brightness, shadows, glow, film grain | Exposure, how much the smoke shades itself, the soft glow around it, and grain. |
+| Light | brightness, shadows, glow, film grain | Exposure, how dense the smoke is to the light (how deep its shadows fall, and how much thick smoke hides what is behind it), the soft glow around it, and grain. |
 | Particles | count | 65k, 262k, 1M, 2M or 4M grains. Computers start at 1M and step down to 262k if they can't keep 45 fps. |
 | | size | How big each grain is. |
 | | blur, focus | Depth of field: away from the focus plane grains open into soft discs with the same total light. Focus 0.5 is the middle of the cube. |
-| Form | spin, lens, edges | How fast the cube turns, a flat (orthographic) or depth lens, and the edge colour. |
+| Form | spin, lens, edges | How fast the cube turns, a flat (orthographic) or depth lens, and the edge colour. The edges are lit by the same lamp as the smoke, and smoke in front of them hides them. |
 | Output | format | screen, 9:16, 4:5 or 1:1. A frame on screen shows what the file will hold. Images are 4K on the long side, videos 1080 wide. |
 
 Double-click a slider to reset it. Hold Shift while dragging for fine steps. Every change goes into the address bar, so **copy link** shares the exact look.
 
 Keys: `Space` pause · `R` randomize · `S` save image · `H` hide the panel.
 
-Measured on an Apple M5 at 2560 × 1600: 1M grains take about 8 ms a frame, 2M about 23 ms, 4M about 36 ms (50 ms with blur). Recording films in real time, so 4M videos come out at the frame rate your machine reaches.
+Measured on an Apple M5 at 2560 × 1600: 1M grains take about 8 ms a frame, 2M about 23 ms, 4M about 36 ms (50 ms with blur). The lamp's two opacity maps add about 3 ms a frame at 1M (measured in a 560 × 1238 window). Recording films in real time, so 4M videos come out at the frame rate your machine reaches.
 
 ## The original look
 
@@ -61,10 +61,10 @@ Every grain is one texel in two float textures (position and age, velocity and s
 
 - **Flow:** curl noise built from the cross product of two simplex-noise gradients, in three octaves. It has no divergence, so the smoke folds and stretches without bunching up.
 - **The glass:** the noise is multiplied by a ramp that reaches zero at the cube's faces (Bridson et al., *Curl-Noise for Procedural Fluid Flow*, 2007). Near a wall the flow can only run along it. Smoke that reaches the glass bounces straight back (with 90% of its speed at the default rebound) and splashes sideways along it, then rolls back inward instead of lying flat on the faces. Rebound sets the bounce, the kick and how long it carries: measured right at the glass, smoke leaves at 0.18 units a second at 0, 0.85 at 50 and 1.67 at 100. On screen, nothing is drawn past the cube's outline: each grain keeps its shape, and only the part of a dot beyond the glass is trimmed. Slow-moving holes let some smoke escape when escape is turned up.
-- **Light:** the grains are also splatted into 16 horizontal density slices, summed from the top down. Each grain reads how much smoke sits above it and dims to match, so the smoke shades itself.
+- **Light:** one studio lamp, a point light up and to the left of the camera and a little in front of the cube, like the reference clip's key light. It turns with the camera, as if the cube turned under it. The light is physical: it falls off with the square of the distance, smoke between a grain and the lamp shades it, and smoke between a grain and the camera hides it. Both come from opacity maps (Kim & Neumann, *Opacity Shadow Maps*, 2001): every frame the grains are splatted into 16 depth slices of 64 × 64 seen from the lamp, and again seen from the camera, and each slice is summed with every slice in front of it. A grain reads how much smoke lies towards the lamp and towards the camera. On the reference clip's camera, the smoke comes out brighter on its top and left, as in the clip.
 - **Image:** grains are drawn as soft dots into a float buffer (full floats where the GPU can blend them, so millions of faint grains add up without banding). Below 1.6 px they keep their size and lose brightness instead, so nothing shimmers. Bloom, a film-like highlight roll-off, grain and dithering finish the image.
 - **Colours from an image:** every pixel is laid out in a ribbon grouped by colour. A grain takes its colour from where the ribbon is when it is born, and the ribbon turns once every 6 s: smoke born together shares a colour, like dye in smoke, and over a turn each pixel colours its exact share.
-- **Edges:** a plain stroke, one width and one brightness end to end, drawn as anti-aliased screen-space strips after the grade, with round joins at the corners. Back edges use max blending, so bright smoke in front hides them.
+- **Edges:** a plain stroke, one width end to end, drawn as anti-aliased screen-space strips after the grade, with round joins at the corners. Each point of an edge reads the same opacity maps as the grains: the lamp lights it (never below a third, so the frame always reads), smoke shades it, and smoke in front of it hides it.
 
 All of it is in `src/`. Start with `settings.js` for the controls and looks, and `simulation.js` for the flow.
 
