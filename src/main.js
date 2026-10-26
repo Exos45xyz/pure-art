@@ -235,7 +235,7 @@ function render(dt) {
   grade.uniforms.uTime.value = time;
 
   // The cube's frame is a plain stroke, lit by the lamp and hidden by the smoke in front of it.
-  cube.update(state.edges, camera, exporting || !rendered ? Infinity : dt);
+  cube.update(state.edges, camera, exporting || !rendered ? Infinity : dt, grade.uniforms.uExposure.value);
   rendered = true;
   renderer.setClearColor(0x000000, 1);
   composer.render(dt);

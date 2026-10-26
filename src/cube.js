@@ -16,12 +16,13 @@ import { opacityGlsl } from './smoke.js';
 // width without multisampling. Each edge is a plain stroke, one width from end to end, meeting the next
 // edge with a round join.
 //
-// The edges belong to the scene: the smoke's lamp lights them (brighter close to it, darker away from
-// it and where the smoke shades them), and smoke in front of an edge hides it, as much as it hides the
-// smoke behind it. They read the same opacity maps as the grains (smoke.js).
+// The edges belong to the scene: they take the smoke's light exactly as a grain would at the same
+// place (the lamp's light falling off with distance, shaded by the smoke on its way in), go through the
+// same exposure and film roll-off as the smoke, and smoke in front of an edge hides it as much as it
+// hides the smoke behind it. They read the same opacity maps as the grains (smoke.js).
 
-// sRGB, written straight to the screen. Red is the reference clip's edge colour.
-const colors = { white: new Color(0.95, 0.95, 0.95), red: new Color(0.78, 0.02, 0.1), off: new Color(0.95, 0.95, 0.95) };
+// The edge's own colour, sRGB, lit to at most about 0.98. Red is the reference clip's edge colour.
+const colors = { white: new Color(1, 1, 1), red: new Color(0.82, 0.021, 0.105), off: new Color(1, 1, 1) };
 
 const vertexShader = /* glsl */ `
   attribute vec3 other;
@@ -63,6 +64,7 @@ const vertexShader = /* glsl */ `
 const fragmentShader = /* glsl */ `
   uniform vec3 uColor;
   uniform float uOpacity;
+  uniform float uExposure;
   varying float vAcross;
   varying float vAlong;
   varying float vLength;
@@ -75,8 +77,13 @@ const fragmentShader = /* glsl */ `
             : vAlong > vLength ? length(vec2(vAlong - vLength, vAcross))
             : abs(vAcross);
     float core = (1.0 - smoothstep(vHalf - 0.5, vHalf + 0.5, d)) * min(vHalf * 2.0, 1.0);
-    // Lit by the lamp, never darker than a third: the frame always reads.
-    float shade = clamp(0.35 + 0.65 * lampLight(vPoint), 0.35, 1.0);
+    // The grains' light (0.06 + 0.94 x the lamp), with twice their ambient so an edge deep in shadow
+    // still reads faintly; then the smoke's exposure and film roll-off (grade.js). At 0.75 an edge at
+    // the cube's middle sits mid-curve like the smoke, so it brightens and darkens with the light as
+    // much as the smoke does: about 0.93 nearest the lamp, 0.66 at the middle, 0.42 at the far corner.
+    float light = (0.12 + 0.94 * lampLight(vPoint)) * uExposure * 0.75;
+    float shade = 1.0 - exp(-light);
+    shade = mix(shade, shade * shade * (3.0 - 2.0 * shade), 0.3);
     float a = clamp(core * seenThrough(vPoint) * uOpacity, 0.0, 1.0);
     if (a <= 0.002) discard;
     gl_FragColor = vec4(uColor * shade, a);
@@ -107,6 +114,7 @@ export function createCube(lighting) {
       ...lighting.uniforms,
       uColor: { value: new Color() },
       uOpacity: { value: 1 },
+      uExposure: { value: 1 },
       uWidth: { value: 1.4 },
       uResolution: { value: new Vector2(1, 1) },
     },
@@ -148,13 +156,15 @@ export function createCube(lighting) {
       material.uniforms.uResolution.value.set(width, height);
       material.uniforms.uWidth.value = lineWidth;
     },
-    // Called every frame with the edge choice and the camera. dt = Infinity jumps straight to the choice.
-    update(choice, camera, dt) {
+    // Called every frame with the edge choice, the camera and the smoke's exposure. dt = Infinity jumps
+    // straight to the choice.
+    update(choice, camera, dt, exposure) {
       const k = dt === Infinity ? 1 : 1 - Math.exp(-dt * 12);
       if (choice !== 'off') color.lerp(colors[choice], k);
       strength += ((choice === 'off' ? 0 : 1) - strength) * k;
       material.uniforms.uColor.value.copy(color);
       material.uniforms.uOpacity.value = strength;
+      material.uniforms.uExposure.value = exposure;
       group.visible = strength > 0.005;
       camera.getWorldDirection(view).negate();
       const orthographic = camera.isOrthographicCamera;

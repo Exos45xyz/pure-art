@@ -12,7 +12,7 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 
 | Group | Control | What it does |
 | --- | --- | --- |
-| Look | pure, original, smoke, storm, silk, plume, core | Starting points. **Pure** is the default: the clip's breath through a depth lens, with fine filaments, soft focus and sealed glass. **Randomize** picks a random look that still reads well; **reset** goes back to pure. |
+| Look | pure, original, smoke, storm, silk, plume, core | Starting points. **Pure** is the default: the clip's breath through a depth lens, with fine filaments, sharp grains and sealed glass. **Randomize** picks a random look that still reads well; **reset** goes back to pure. |
 | Colour | white, image | **Upload an image** (or drop one anywhere on the page) and the smoke takes its colours in the image's own proportions: every pixel is read, and a colour that covers 30% of the picture colours 30% of the smoke. The panel shows the image's main colours at their real shares. |
 | Smoke | source | Where the smoke is born: wandering clouds, a plume at the bottom, or a core in the middle. |
 | | flow | How fast the current moves. |
@@ -25,7 +25,7 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 | Light | brightness, shadows, glow, film grain | Exposure, how dense the smoke is to the light (how deep its shadows fall, and how much thick smoke hides what is behind it), the soft glow around it, and grain. |
 | Particles | count | 65k, 262k, 1M, 2M or 4M grains. Computers start at 1M and step down to 262k if they can't keep 45 fps. |
 | | size | How big each grain is. |
-| | blur, focus | Depth of field: away from the focus plane grains open into soft discs with the same total light. Focus 0.5 is the middle of the cube. |
+| | blur, focus | Depth of field: away from the focus plane grains open into soft discs with the same total light. Focus 0.5 is the middle of the cube. Every look and randomize keep blur at 0, so the grains stay sharp. |
 | Form | spin, lens, edges | How fast the cube turns, a flat (orthographic) or depth lens, and the edge colour. The edges are lit by the same lamp as the smoke, and smoke in front of them hides them. |
 | Output | format | screen, 9:16, 4:5 or 1:1. A frame on screen shows what the file will hold. Images are 4K on the long side, videos 1080 wide. |
 
@@ -42,7 +42,7 @@ The original look takes its camera and its breath from a reference clip (734 fra
 - **Camera, exact.** Measured on every frame: an orthographic view looking 16.85° down, turning at 62.66° a second, with the cube's half-edge at 203 px on a 1280 px frame. When the look starts, its edges land on the clip's edges frame for frame.
 - **Movement, measured frame by frame.** Every one of the clip's 734 frames was analysed at full resolution with optical flow, with the camera's own motion taken out. Each frame's vertical motion splits into a swell (spreading apart or squeezing together), a drift, a swirl in the picture's plane, and turbulence. Folded over its 12 beats (one every 1.994 s), the breath goes: a burst right after the smallest point, easing out into the glass; a float at the fullest, when the smoke is calmest; then a collapse that gets faster and twists, sinking as it swells and rising as it collapses, and a bounce straight back. The pulse plays those measured curves on the clip's clock, and gather holds the mass together only while it collapses. Measured inside the simulation, its swell follows the clip's through the beat at a correlation of +0.88; on the picture, the cube fills and empties on the clip's beats.
 - **Always inside.** With escape at zero the glass is sealed: no grain ever leaves the cube.
-- **Particles, pure's.** Fine strands, soft focus, a soft glow and film grain, not the clip's. The smoke moves at pure's pace: at the clip's own speed the strands wash out into an even fog.
+- **Particles, pure's.** Fine strands of sharp grains, a soft glow and film grain, not the clip's. The smoke moves at pure's pace: at the clip's own speed the strands wash out into an even fog.
 
 Use **9:16** to export in the clip's own frame.
 
@@ -64,7 +64,7 @@ Every grain is one texel in two float textures (position and age, velocity and s
 - **Light:** one studio lamp, a point light up and to the left of the camera and a little in front of the cube, like the reference clip's key light. It turns with the camera, as if the cube turned under it. The light is physical: it falls off with the square of the distance, smoke between a grain and the lamp shades it, and smoke between a grain and the camera hides it. Both come from opacity maps (Kim & Neumann, *Opacity Shadow Maps*, 2001): every frame the grains are splatted into 16 depth slices of 64 × 64 seen from the lamp, and again seen from the camera, and each slice is summed with every slice in front of it. A grain reads how much smoke lies towards the lamp and towards the camera. On the reference clip's camera, the smoke comes out brighter on its top and left, as in the clip.
 - **Image:** grains are drawn as soft dots into a float buffer (full floats where the GPU can blend them, so millions of faint grains add up without banding). Below 1.6 px they keep their size and lose brightness instead, so nothing shimmers. Bloom, a film-like highlight roll-off, grain and dithering finish the image.
 - **Colours from an image:** every pixel is laid out in a ribbon grouped by colour. A grain takes its colour from where the ribbon is when it is born, and the ribbon turns once every 6 s: smoke born together shares a colour, like dye in smoke, and over a turn each pixel colours its exact share.
-- **Edges:** a plain stroke, one width end to end, drawn as anti-aliased screen-space strips after the grade, with round joins at the corners. Each point of an edge reads the same opacity maps as the grains: the lamp lights it (never below a third, so the frame always reads), smoke shades it, and smoke in front of it hides it.
+- **Edges:** a plain stroke, one width end to end, drawn as anti-aliased screen-space strips after the grade, with round joins at the corners. Each point of an edge reads the same opacity maps as the grains and takes the light a grain would take there, through the same exposure and film roll-off: brightest nearest the lamp, darker away from it and where smoke shades it, and hidden by smoke in front of it.
 
 All of it is in `src/`. Start with `settings.js` for the controls and looks, and `simulation.js` for the flow.
 

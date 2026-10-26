@@ -45,18 +45,18 @@ const base = {
 // "original" is the reference clip's camera (flat lens, 16.85° down, 62.66°/s) and red edges.
 // See README › The original look.
 export const presets = {
-  // Romain's look: the clip's breath through a depth lens, fine filaments, soft focus, sealed glass.
+  // Romain's look: the clip's breath through a depth lens, fine filaments, sharp grains, sealed glass.
   pure: {
     flow: 0.45, turbulence: 0.51, spread: 0, gather: 0.98, pulse: 1, escape: 0,
     brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.42,
-    grain: 0.4, blur: 0.4, focus: 0.5, spin: 0.13, lens: 'depth', edges: 'white',
+    grain: 0.4, blur: 0, focus: 0.5, spin: 0.13, lens: 'depth', edges: 'white',
   },
   // The reference clip's camera, edges and breath, with pure's smoke and particles: the clip's own
   // speed (flow 1) washes the strands into fog, so the smoke keeps pure's pace.
   original: {
     flow: 0.45, turbulence: 0.51, spread: 0, gather: 0.98, pulse: 1, escape: 0,
     brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.42,
-    grain: 0.4, blur: 0.4, focus: 0.5, spin: 0.5, lens: 'flat', edges: 'red',
+    grain: 0.4, blur: 0, focus: 0.5, spin: 0.5, lens: 'flat', edges: 'red',
   },
   smoke: {},
   storm: { flow: 0.82, turbulence: 0.92, shadows: 0.78, glow: 0.5, brightness: 0.46, grain: 0.32 },
@@ -99,7 +99,8 @@ export function shuffled(state) {
     spread: Math.random() < 0.5 ? 0 : r(0.2, 0.6),
     gather: Math.random() < 0.6 ? 0 : r(0.5, 1),
     pulse: Math.random() < 0.6 ? 0 : r(0.4, 1),
-    blur: Math.random() < 0.5 ? 0 : r(0.15, 0.6),
+    // Every grain stays sharp: blur is a choice you make.
+    blur: 0,
     focus: r(0.3, 0.7),
   };
 }
