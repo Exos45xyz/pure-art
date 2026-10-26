@@ -18,6 +18,21 @@ float openness(vec3 p, float t) {
 }
 `;
 
+// Gather: two centres race around inside the cube on smooth, never-repeating paths. Each grain
+// belongs to one of them for life, so the smoke moves as whole bodies that chase their centre,
+// roll around it, and flatten against the glass when the centre comes close to a wall.
+const bodies = /* glsl */ `
+uniform float uGather;
+uniform float uPulse;
+vec3 centre(float k, float t) {
+  return 0.6 * vec3(
+    sin(t * (0.53 + 0.17 * k) + k * 2.1) * cos(t * 0.21 + k),
+    sin(t * (0.41 + 0.13 * k) + k * 4.3),
+    cos(t * (0.47 + 0.11 * k) + k * 1.7));
+}
+float body(float seed) { return floor(fract(seed * 7.13) * 2.0); }
+`;
+
 const velocityShader = /* glsl */ `
 uniform float uTime;
 uniform float uDt;
@@ -32,6 +47,7 @@ uniform vec3 uStir;
 ${noise}
 ${hash}
 ${holes}
+${bodies}
 
 // Curl-noise flow that respects the glass (Bridson et al., "Curl-Noise for Procedural Fluid Flow").
 // v = grad(a * R) x grad(b) has no divergence, and where the ramp R reaches 0 at a wall the flow
@@ -78,6 +94,23 @@ void main() {
   // Grains that brushed the glass are eased back into the body of the smoke.
   target += gradD * (1.0 - R) * (0.12 + 0.5 * uSpeed) * step(0.0, d);
 
+  if (uGather > 0.001 || uPulse > 0.001) {
+    float k = body(vel.w);
+    vec3 c = centre(k, t);
+    vec3 toCentre = c - p;
+    vec3 axis = normalize(vec3(sin(k * 2.3 + 1.0), 0.8, cos(k * 1.7)));
+    // While the pulse pushes, the bodies let go.
+    float hold = uGather * (1.0 - 0.95 * min(uPulse, 1.0));
+    target += toCentre * hold * 3.36 - cross(axis, toCentre) * hold * 2.24;
+    // The pulse: the mass swells until it fills the glass. Each grain moves in proportion to its
+    // distance from the middle, so the whole shape scales up and fills the cube instead of
+    // leaving it hollow; the glass then holds it flat against the faces.
+    vec3 swell = p - c * 0.4;
+    // About 2.6 per second over the push: the mass grows two to three times, just enough to reach
+    // the glass.
+    target += swell * uPulse * 2.6 * (1.0 - smoothstep(0.85, 1.0, max(a.x, max(a.y, a.z))));
+  }
+
   // Sources shape the current: a plume rises and pools under the lid, a core breathes outward.
   float inside = step(0.0, d);
   if (uSource > 0.5 && uSource < 1.5) target.y += 0.55 * uSpeed * mix(1.0, smoothstep(0.0, W, 1.0 - p.y), inside * (1.0 - open));
@@ -105,6 +138,7 @@ uniform float uSpread;
 ${noise}
 ${hash}
 ${holes}
+${bodies}
 
 // Four sources wander slowly through the cube. Grains are born around them, so the flow has
 // dense shapes to stretch into ribbons and sheets, with dark air in between.
@@ -125,6 +159,7 @@ vec3 spawn(float seed) {
   vec3 h = hash33(base);
   if (uSource < 0.5) {
     if (seed < 0.05) return (h * 2.0 - 1.0) * 0.95;
+    if (uGather > 0.001) return centre(body(seed), uTime) + ball(h) * (0.16 + 0.3 * uSpread);
     float k = floor(hash13(base + 5.3) * 4.0);
     return emitter(k, uTime) + ball(h) * (0.16 + 0.3 * uSpread);
   }
@@ -153,6 +188,11 @@ void main() {
     vec3 over = max(abs(p) - 0.985, 0.0);
     p -= sign(p) * over * 2.0;
     reach = max(abs(p.x), max(abs(p.y), abs(p.z)));
+  }
+  // With escape at zero the glass is sealed: whatever the speed, nothing ends up outside.
+  if (uEscape < 0.001 && before < 1.0) {
+    p = clamp(p, -0.995, 0.995);
+    reach = min(reach, 0.995);
   }
 
   // Smoke that got out fades three times faster.
@@ -192,6 +232,8 @@ export function createSimulation(renderer, size) {
     uSpeed: { value: 0 },
     uTurbulence: { value: 0 },
     uSpread: { value: 0 },
+    uGather: { value: 0 },
+    uPulse: { value: 0 },
     uEscape: { value: 0 },
     uSource: { value: 0 },
     uRayOrigin: { value: new Vector3(0, 0, 100) },
@@ -203,6 +245,8 @@ export function createSimulation(renderer, size) {
     uDt: { value: 0 },
     uSource: { value: 0 },
     uSpread: { value: 0 },
+    uGather: { value: 0 },
+    uPulse: { value: 0 },
     uEscape: { value: 0 },
   });
 
@@ -217,14 +261,20 @@ export function createSimulation(renderer, size) {
     size,
     count: size * size,
     // live: the eased control values. stir: { origin, direction, velocity } in cube space.
-    step(dt, live, source, stir) {
-      time += dt;
+    // pulse: how hard the smoke is pushed out right now (0 = not at all).
+    step(dt, live, source, stir, pulse = 0) {
+      const speed = 0.06 + live.flow * 0.62;
+      // The swirls change faster when the smoke moves faster, so fast smoke churns
+      // instead of racing along fixed paths. At the studio's usual speed the pace is 1.
+      time += dt * (0.5 + speed * 1.5);
       vu.uTime.value = pu.uTime.value = time;
       vu.uDt.value = pu.uDt.value = dt;
       vu.uSource.value = pu.uSource.value = sources[source];
-      vu.uSpeed.value = 0.06 + live.flow * 0.62;
+      vu.uSpeed.value = speed;
       vu.uTurbulence.value = live.turbulence;
       vu.uSpread.value = pu.uSpread.value = live.spread;
+      vu.uGather.value = pu.uGather.value = live.gather;
+      vu.uPulse.value = pu.uPulse.value = pulse;
       vu.uEscape.value = pu.uEscape.value = live.escape;
       if (stir) {
         vu.uRayOrigin.value.copy(stir.origin);
@@ -235,6 +285,9 @@ export function createSimulation(renderer, size) {
     },
     get positionTarget() {
       return gpu.getCurrentRenderTarget(position);
+    },
+    get velocityTarget() {
+      return gpu.getCurrentRenderTarget(velocity);
     },
     get positions() {
       return gpu.getCurrentRenderTarget(position).texture;

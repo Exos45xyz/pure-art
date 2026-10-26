@@ -17,6 +17,8 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 | | flow | How fast the current moves. |
 | | turbulence | How many small eddies ride on the big swirls. Calm smoke also turns in bigger rolls. |
 | | spread | How much each grain wanders on its own, which puffs thin sheets out into soft volumes. |
+| | gather | Pulls the smoke into bodies that chase two centres racing around the cube, so it moves as whole masses. |
+| | pulse | The breath: every 1.994 s the masses swell until they fill the cube, then pull back in. |
 | | escape | How much smoke finds its way out through the glass. |
 | Light | brightness, shadows, glow, film grain | Exposure, how much the smoke shades itself, the soft glow around it, and grain. |
 | Form | grain size, spin, lens, edges, particles | Grain size, how fast the cube turns, a flat (orthographic) or depth lens, the edge colour, and 65k / 262k / 1M particles. |
@@ -28,11 +30,12 @@ Keys: `Space` pause · `R` shuffle · `S` save image · `H` hide the panel.
 
 ## The original look
 
-The default look is fitted to a reference clip: 734 frames, 720 × 1280, of white particle smoke in a turning wireframe cube with red edges.
+The default look takes its camera and its movement from a reference clip (734 frames, 720 × 1280) of particle smoke in a turning wireframe cube, and keeps the studio's own particle texture.
 
-- **The camera is exact.** The clip's orthographic camera was measured on every frame: it looks 16.85° down, turns at 62.66° a second, and the cube's half-edge is 203 px on a 1280 px frame. The flat lens reproduces it, and from the moment the look is applied the edges land on the clip's edges, frame for frame.
-- **The smoke is matched by its numbers, not grain for grain.** A different simulation can't replay another one's grains. Its settings were fitted on rendered frames against the clip: average brightness, how much of the frame and of the cube it covers, how much of it is blown out to white, and how much large-scale contrast it has. All of these are within a few percent. The texture is still finer and grainier than the clip's.
-- **The edges** are the clip’s red, 2.8 px on a 1280 px frame. Back edges disappear behind bright smoke, as in the clip.
+- **Camera, exact.** Measured on every frame: an orthographic view looking 16.85° down, turning at 62.66° a second, with the cube's half-edge at 203 px on a 1280 px frame. When the look starts, its edges land on the clip's edges frame for frame.
+- **Movement, measured frame by frame.** With the camera's own motion taken out of the optical flow, the clip's smoke moves at about 0.47 cube half-edges a second (1.45 for the fastest tenth), as whole bodies (80% of the motion is coherent at body scale). It breathes on a strict beat: every 1.994 s it swells to fill the cube, holds against the glass, and pulls back into a swirling mass. Gather and pulse rebuild that. The pulse runs on the clip's clock, so the cube fills on the same frames as in the clip (fill follows the clip at a correlation of +0.76).
+- **Always inside.** With escape at zero the glass is sealed: no grain ever leaves the cube.
+- **Texture, the studio's own.** Fine grains, a soft glow and film grain, not the clip's.
 
 Use **9:16** to export in the clip's own frame.
 

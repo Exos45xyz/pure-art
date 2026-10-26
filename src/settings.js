@@ -7,6 +7,8 @@ export const controls = [
   { group: 'Smoke', key: 'flow', label: 'flow' },
   { group: 'Smoke', key: 'turbulence', label: 'turbulence' },
   { group: 'Smoke', key: 'spread', label: 'spread' },
+  { group: 'Smoke', key: 'gather', label: 'gather' },
+  { group: 'Smoke', key: 'pulse', label: 'pulse' },
   { group: 'Smoke', key: 'escape', label: 'escape' },
 
   { group: 'Light', key: 'brightness', label: 'brightness' },
@@ -28,7 +30,7 @@ export const controls = [
 
 // The studio look every other look starts from.
 const base = {
-  source: 'volume', flow: 0.45, turbulence: 0.5, spread: 0, escape: 0.18,
+  source: 'volume', flow: 0.45, turbulence: 0.5, spread: 0, gather: 0, pulse: 0, escape: 0.18,
   brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.35,
   grain: 0.4, spin: 0.2, lens: 'depth', edges: 'white',
 };
@@ -36,11 +38,12 @@ const base = {
 // "original" is the reference clip: its camera (flat lens, 16.85° down, 62.66°/s), its red edges,
 // no glow or grain on a pure black ground. See README › The original look.
 export const presets = {
-  // Fitted to the clip's measurements: see README › The original look.
+  // The reference clip's camera and movement, measured frame by frame, with the studio's particle
+  // texture: see README › The original look.
   original: {
-    flow: 0.25, turbulence: 0.1, spread: 0.45, escape: 0.12,
-    brightness: 0.87, shadows: 0.6, glow: 0, film: 0,
-    grain: 0.85, spin: 0.5, lens: 'flat', edges: 'red',
+    flow: 1, turbulence: 0.1, spread: 0.45, gather: 1, pulse: 1, escape: 0,
+    brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.35,
+    grain: 0.4, spin: 0.5, lens: 'flat', edges: 'red',
   },
   smoke: {},
   storm: { flow: 0.82, turbulence: 0.92, escape: 0.34, shadows: 0.78, glow: 0.5, brightness: 0.46, grain: 0.32 },
@@ -116,6 +119,19 @@ export const ORIGINAL_CAMERA = {
   tilt: 0.294, // 16.85° down
   halfHeight: 1 / 0.3171875, // the cube's half-edge is 203 px of the frame's 640 px half-height
 };
+
+// The reference breathes: every 1.994 s the smoke fills the cube and pulls back, first peak at 1.192 s.
+export const ORIGINAL_PULSE = { period: 1.994, firstPeak: 1.192 };
+
+// How hard the pulse pushes at a point of its cycle (phase 0.5 = the smoke at its fullest). The push
+// builds on the rising half and holds through the beat, so the smoke stays pressed against the glass
+// for about half a second, as in the clip, then lets go.
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+export function pulseAt(clock) {
+  const phase = ((((clock - ORIGINAL_PULSE.firstPeak) / ORIGINAL_PULSE.period + 0.5) % 1) + 1) % 1;
+  // The swell takes about 0.4 s to fill the cube, so it starts that much before the beat.
+  return smooth(0.02, 0.16, phase) * (1 - smooth(0.4, 0.52, phase));
+}
 
 // Spin 0.5 is the reference's exact speed.
 export const spinRate = (spin) => 4.374177773153739 * spin * spin;

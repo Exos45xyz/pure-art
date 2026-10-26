@@ -11,7 +11,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { createCube } from './cube.js';
 import { GradeShader } from './grade.js';
 import { createSimulation } from './simulation.js';
-import { readHash, spinRate, writeHash } from './settings.js';
+import { pulseAt, readHash, spinRate, writeHash } from './settings.js';
 import { createSmoke } from './smoke.js';
 import { createUI } from './ui.js';
 import { createView } from './view.js';
@@ -40,7 +40,7 @@ if (reducedMotion && !location.hash.includes('spin=')) state.spin = 0;
 
 // The shaders read eased copies of the sliders, so every change glides instead of jumping.
 const live = { ...state };
-const eased = ['flow', 'turbulence', 'spread', 'escape', 'brightness', 'shadows', 'glow', 'film', 'grain', 'spin'];
+const eased = ['flow', 'turbulence', 'spread', 'gather', 'escape', 'brightness', 'shadows', 'glow', 'film', 'grain', 'spin'];
 
 // ---- Scene ---------------------------------------------------------------------------------
 
@@ -51,6 +51,12 @@ const cube = createCube();
 
 let simulation;
 let smoke;
+// The clip's clock: zero when the original look starts, so its pulse lands on the clip's beats.
+let clock = 0;
+function simStep(dt, withStir = true) {
+  simulation.step(dt, live, state.source, withStir ? stir : null, live.pulse * pulseAt(clock));
+  clock += dt;
+}
 function build(size) {
   simulation?.dispose();
   if (smoke) {
@@ -61,7 +67,9 @@ function build(size) {
   smoke = createSmoke(size);
   scene.add(smoke.object);
   // Let the smoke settle before anyone sees it.
-  for (let i = 0; i < 90; i++) simulation.step(1 / 45, live, state.source, null);
+  const settle = clock;
+  for (let i = 0; i < 90; i++) simStep(1 / 45, false);
+  clock = settle;
 }
 build(state.particles);
 
@@ -205,7 +213,7 @@ function tick(now) {
   view.update(dt, paused ? 0 : spinRate(live.spin));
   updateStir(dt);
 
-  if (!paused) simulation.step(dt, live, state.source, stir);
+  if (!paused) simStep(dt);
   render(dt);
   checkQuality(dt);
   requestAnimationFrame(tick);
@@ -262,7 +270,10 @@ const app = {
     view.setLens(state.lens);
     applyFrame();
     // The original look starts the camera where the reference clip starts.
-    if (look === 'original') view.original();
+    if (look === 'original') {
+      view.original();
+      clock = 0;
+    }
     writeHash(state);
   },
   get paused() { return paused; },
@@ -313,7 +324,8 @@ if (import.meta.env.DEV) {
       });
     },
     resume() { paused = false; },
-    step(seconds) { for (let t = 0; t < seconds; t += 1 / 30) simulation.step(1 / 30, live, state.source, null); },
+    step(seconds) { for (let t = 0; t < seconds - 1e-6; t += 1 / 30) simStep(1 / 30, false); },
+    setClock(t) { clock = t; },
   };
 }
 
