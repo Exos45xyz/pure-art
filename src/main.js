@@ -197,10 +197,11 @@ function render(dt) {
   grade.uniforms.uLift.value = Math.min(1, live.glow * 4);
   grade.uniforms.uTime.value = time;
 
-  // The edges see through the same lens as the smoke: same focus, same blur. Depth shading and the glow
-  // belong to the depth lens and the glow slider, so the flat original keeps clean, even lines.
-  cube.update(state.edges, view.lens === 'flat' ? 1 : 0.8, camera, exporting || !rendered ? Infinity : dt, {
-    blur: live.blur,
+  // The cube's frame stays solid and crisp whatever the blur: it is the fixed reference the smoke moves
+  // in. Depth shading and the glow belong to the depth lens and the glow slider, so the flat original
+  // keeps clean, even lines.
+  cube.update(state.edges, 1, camera, exporting || !rendered ? Infinity : dt, {
+    blur: 0,
     focusDepth: camera.position.length() + (live.focus - 0.5) * 3.6,
     glow: live.glow * 0.35,
     depthShade: view.lens === 'depth' ? 1 : 0,

@@ -16,10 +16,9 @@ import {
 // width without multisampling. Front edges are laid over the smoke. Back edges use max blending:
 // over dark air they show, behind bright smoke they disappear, as if the smoke were in front.
 //
-// Each edge is drawn like a lens would see it: in focus it is a crisp line; away from the focus plane
-// it opens up and softens with the same total light, like the grains. It dims with distance, is a
-// touch thicker where it is near, meets the next edge with a round join, and carries a faint glow,
-// like light caught on the rim of glass.
+// Each edge is a crisp line (it can also take the lens's blur, though the app keeps the frame sharp).
+// It dims a little with distance, is a touch thicker where it is near, meets the next edge with a
+// round join, and carries a faint glow, like light caught on the rim of glass.
 
 // sRGB, written straight to the screen. Red is the reference clip's edge colour.
 const colors = { white: new Color(0.95, 0.95, 0.95), red: new Color(0.78, 0.02, 0.1), off: new Color(0.95, 0.95, 0.95) };
@@ -70,7 +69,7 @@ const vertexShader = /* glsl */ `
     vLength = len;
     vHalf = wide * 0.5;
     vSoft = coc / wide;
-    float fade = mix(1.0, 0.45, smoothstep(uCentreDepth - 1.5, uCentreDepth + 1.5, depth) * uDepthShade);
+    float fade = mix(1.0, 0.72, smoothstep(uCentreDepth - 1.5, uCentreDepth + 1.5, depth) * uDepthShade);
     vShade = (width / wide) * fade;
   }`;
 
