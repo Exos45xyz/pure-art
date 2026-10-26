@@ -38,7 +38,9 @@ const state = readHash();
 // Phones start light. Computers start at a million grains and step down if they can't keep up.
 state.particles = coarse ? 256 : 1024;
 let qualityCheck = coarse ? null : { frames: 0, time: 0 };
+// Reduced motion: no turning camera and no breathing blasts unless a shared link asks for them.
 if (reducedMotion && !location.hash.includes('spin=')) state.spin = 0;
+if (reducedMotion && !location.hash.includes('pulse=')) state.pulse = 0;
 
 // The shaders read eased copies of the sliders, so every change glides instead of jumping.
 const live = { ...state };
@@ -281,10 +283,14 @@ const app = {
   get paused() { return paused; },
   togglePause() { paused = !paused; return paused; },
   recording: null,
-  layoutChanged() {
+  layoutChanged(instant = false) {
     const reserve = app.recording ? { x: 0, y: 0 } : ui.reserve();
     pan.targetX = reserve.x / 2;
     pan.targetY = reserve.y / 2;
+    if (instant) {
+      pan.x = pan.targetX;
+      pan.y = pan.targetY;
+    }
   },
   saveImage() {
     const size = formatSize(state.format, 'image', innerWidth, innerHeight);
@@ -353,4 +359,6 @@ requestAnimationFrame((now) => {
   last = now;
   tick(now);
   document.body.classList.add('ready');
+  // After the one-time entrance, the panel opens and closes on its own, faster timing.
+  setTimeout(() => document.body.classList.add('settled'), 1000);
 });

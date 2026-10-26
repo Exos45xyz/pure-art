@@ -142,6 +142,8 @@ canvas:active { cursor: grabbing; }
   pointer-events: none;
   transition: opacity 180ms ease, transform 240ms var(--ease-drawer);
 }
+.settled .panel { transition: opacity 200ms ease, transform 260ms var(--ease-drawer); }
+.settled .panel[data-hidden] { transition: opacity 160ms ease, transform 220ms var(--ease-drawer); }
 .ready .panel:not([data-hidden]).instant,
 .ready .panel[data-hidden].instant { transition: none; }
 
@@ -154,7 +156,8 @@ canvas:active { cursor: grabbing; }
   padding: 2px 2px 0;
 }
 .panel-head-actions { display: flex; gap: 14px; }
-.text-button { transition: color 200ms ease; }
+.text-button { transition: color 200ms ease, transform 160ms var(--ease-pill); }
+.text-button:active { transform: scale(0.96); }
 
 .panel section { display: grid; gap: 8px; }
 .panel h2 { padding: 0 2px; }
@@ -222,8 +225,9 @@ canvas:active { cursor: grabbing; }
   flex: 1;
   border-radius: 5px;
   color: var(--muted);
-  transition: color 200ms ease;
+  transition: color 200ms ease, transform 160ms var(--ease-pill);
 }
+.choice-option:active { transform: scale(0.96); }
 .choice-option[aria-checked='true'] { color: var(--strong); }
 
 /* Look chips and action pills: Enact's pill, lowercase */
@@ -248,8 +252,7 @@ canvas:active { cursor: grabbing; }
 .quick { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
 .quick .pill { justify-content: center; }
 .pill-randomize { background: transparent; color: var(--strong); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22); }
-.die { display: inline-flex; transition: transform 300ms var(--ease-out); }
-.pill-randomize:active .die { transform: rotate(90deg); }
+.die { display: inline-flex; transition: transform 260ms var(--ease-out); }
 .pill { height: 28px; padding: 0 13px; background: #1a1a1a; color: var(--strong); }
 .pill-primary { background: #f2f2f2; color: #0b0b0b; }
 .pill:disabled { opacity: 0.5; cursor: progress; }

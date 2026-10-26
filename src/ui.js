@@ -37,6 +37,8 @@ function slider(control, app, onChange) {
   let start = null;
   el.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
+    // Direct manipulation is never animated, even if a look was applied a moment ago.
+    el.closest('.panel')?.classList.remove('gliding');
     el.setPointerCapture(e.pointerId);
     el.classList.add('dragging');
     const box = el.getBoundingClientRect();
@@ -85,7 +87,10 @@ function choice(control, app, onChange) {
         e.preventDefault();
         const next = buttons[(i + d + n) % n];
         next.focus();
+        // Keyboard changes land at once; only clicks glide.
+        thumb.style.transition = 'none';
         next.click();
+        requestAnimationFrame(() => requestAnimationFrame(() => { thumb.style.transition = ''; }));
       },
     }, label));
   const group = h('div', { class: 'choice', role: 'radiogroup', 'aria-label': control.label }, thumb, buttons);
@@ -113,22 +118,25 @@ export function createUI(app) {
     const active = matchingPreset(app.state);
     for (const [name, chip] of Object.entries(chips)) chip.setAttribute('aria-pressed', String(name === active));
   };
-  const syncAll = () => {
-    panel.classList.add('gliding');
+  let glideTimer;
+  const syncAll = (instant) => {
+    clearTimeout(glideTimer);
+    panel.classList.toggle('gliding', !instant);
     fields.forEach((f) => f.sync());
     refresh();
-    setTimeout(() => panel.classList.remove('gliding'), 260);
+    glideTimer = setTimeout(() => panel.classList.remove('gliding'), 260);
   };
-  const applyLook = (values, name) => {
+  // instant: from the keyboard, where an animation would only feel slow.
+  const applyLook = (values, name, instant = false) => {
     app.apply(values, name);
-    syncAll();
+    syncAll(instant);
   };
 
   // Looks
   for (const name of Object.keys(presets)) {
     chips[name] = h('button', { type: 'button', class: 'chip', onclick: () => applyLook(presetValues(name), name) }, name);
   }
-  const shuffle = () => applyLook(shuffled(app.state));
+  const shuffle = (instant = false) => applyLook(shuffled(app.state), undefined, instant);
   const look = h('section', {},
     h('h2', { class: 'micro' }, 'Look'),
     h('div', { class: 'chips' }, Object.values(chips)));
@@ -154,9 +162,17 @@ export function createUI(app) {
     h('button', { type: 'button', class: 'text-button micro', onclick: () => setOpen(false), 'aria-label': 'Hide parameters (H)' }, 'Hide'));
   // The two buttons people reach for first: a new random look, or back to the original.
   const quick = h('div', { class: 'quick' },
-    h('button', { type: 'button', class: 'pill pill-randomize', onclick: shuffle, title: 'Randomize (R)' },
+    h('button', { type: 'button', class: 'pill pill-randomize', onclick: (e) => { rollDie(e.detail === 0); shuffle(); }, title: 'Randomize (R)' },
       h('span', { class: 'die', 'aria-hidden': 'true' }), 'randomize'),
     h('button', { type: 'button', class: 'pill', onclick: () => applyLook(presetValues('original'), 'original') }, 'reset'));
+  // The die rolls a quarter turn per click (a die looks the same each quarter, so it reads as a roll).
+  let turns = 0;
+  function rollDie(instant) {
+    const die = quick.querySelector('.die');
+    turns += 1;
+    die.style.transition = instant ? 'none' : '';
+    die.style.transform = `rotate(${turns * 90}deg)`;
+  }
   // A die face, drawn once.
   quick.querySelector('.die').innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="1.5" width="13" height="13" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5.2" cy="5.2" r="1.15" fill="currentColor"/><circle cx="8" cy="8" r="1.15" fill="currentColor"/><circle cx="10.8" cy="10.8" r="1.15" fill="currentColor"/></svg>';
 
@@ -217,7 +233,7 @@ export function createUI(app) {
     panel.toggleAttribute('data-hidden', !open);
     panel.inert = !open;
     reopen.toggleAttribute('data-shown', !open);
-    app.layoutChanged();
+    app.layoutChanged(instant);
     document.body.style.setProperty('--reserve-x', `${reserve().x}px`);
   }
   reopen.addEventListener('click', () => setOpen(true));
@@ -238,7 +254,7 @@ export function createUI(app) {
     if (key === ' ') {
       e.preventDefault();
       toast(app.togglePause() ? 'paused' : 'playing');
-    } else if (key === 'r') shuffle();
+    } else if (key === 'r') shuffle(true);
     else if (key === 's') saveImage();
     else if (key === 'h') setOpen(panel.hasAttribute('data-hidden'), true);
   });
