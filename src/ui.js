@@ -151,6 +151,64 @@ export function createUI(app) {
         return field.el;
       }))));
 
+  // Colour from an image: the upload button, or drop one anywhere on the page.
+  const colourRows = groups[0].querySelector('.rows');
+  const fileInput = h('input', {
+    type: 'file', accept: 'image/*', hidden: true,
+    onchange: () => {
+      if (fileInput.files[0]) loadImage(fileInput.files[0]);
+      fileInput.value = '';
+    },
+  });
+  const thumb = h('img', { class: 'image-thumb', alt: '' });
+  const strip = h('div', { class: 'swatches', 'aria-hidden': 'true' });
+  const imageName = h('span', { class: 'image-name' });
+  const imageRow = h('div', { class: 'image-row', hidden: true }, thumb, h('div', { class: 'image-meta' }, imageName, strip));
+  const upload = h('button', { type: 'button', class: 'pill pill-upload', onclick: () => fileInput.click() }, 'upload image');
+  colourRows.append(imageRow, upload, fileInput);
+
+  async function loadImage(file) {
+    if (!file.type.startsWith('image/')) return toast('that file is not an image');
+    try {
+      const picked = await app.useImage(file);
+      thumb.src = picked.thumbnail;
+      imageName.textContent = picked.name;
+      // The strip shows the image's main colours at the share of the picture each one covers.
+      strip.replaceChildren(...picked.swatches.map((sw) => {
+        const bar = h('i', { title: `${Math.round(sw.share * 100)}%` });
+        bar.style.background = sw.color;
+        bar.style.flexGrow = sw.share;
+        return bar;
+      }));
+      imageRow.hidden = false;
+      upload.textContent = 'change image';
+      fields.forEach((f) => f.sync());
+      toast('image colours · same proportions');
+    } catch (e) {
+      toast(e.message);
+    }
+  }
+
+  let dragDepth = 0;
+  const hasFile = (e) => [...(e.dataTransfer?.items ?? [])].some((item) => item.kind === 'file');
+  addEventListener('dragenter', (e) => {
+    if (!hasFile(e)) return;
+    dragDepth++;
+    document.body.classList.add('dropping');
+  });
+  addEventListener('dragleave', () => {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) document.body.classList.remove('dropping');
+  });
+  addEventListener('dragover', (e) => e.preventDefault());
+  addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragDepth = 0;
+    document.body.classList.remove('dropping');
+    const file = [...e.dataTransfer.files].find((f) => f.type.startsWith('image/'));
+    if (file) loadImage(file);
+  });
+
   // Actions
   const save = h('button', { type: 'button', class: 'pill pill-primary', onclick: () => saveImage() }, 'save image');
   const recordLabel = h('span', {}, 'record 8s');
@@ -267,5 +325,5 @@ export function createUI(app) {
     if (ratio) guide.style.setProperty('--ratio', ratio);
   }
 
-  return { reserve, toast, showFormat, sync: () => fields.forEach((f) => f.sync()) };
+  return { reserve, toast, showFormat, pickImage: () => fileInput.click(), sync: () => fields.forEach((f) => f.sync()) };
 }

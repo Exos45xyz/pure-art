@@ -15,6 +15,7 @@ import { breathAt, readHash, spinRate, writeHash } from './settings.js';
 import { createSmoke } from './smoke.js';
 import { createUI } from './ui.js';
 import { createView } from './view.js';
+import { readImage, ribbonTexture } from './palette.js';
 import { formatSize, recordVideo, saveImage } from './capture.js';
 
 const canvas = document.querySelector('canvas');
@@ -43,7 +44,7 @@ if (reducedMotion && !location.hash.includes('spin=')) state.spin = 0;
 if (reducedMotion && !location.hash.includes('pulse=')) state.pulse = 0;
 
 // The shaders read eased copies of the sliders, so every change glides instead of jumping.
-const live = { ...state };
+const live = { ...state, colourMix: 0 };
 const eased = ['flow', 'turbulence', 'spread', 'gather', 'pulse', 'escape', 'brightness', 'shadows', 'glow', 'film', 'grain', 'blur', 'focus', 'spin'];
 
 // ---- Scene ---------------------------------------------------------------------------------
@@ -55,6 +56,10 @@ const cube = createCube();
 
 let simulation;
 let smoke;
+// The image whose colours the grains wear, if any.
+let image = null;
+let ribbon = null;
+const colourGain = () => Math.min(2.5, Math.max(1, 0.7 / Math.max(image.meanLuminance, 0.01)));
 // The clip's clock: zero when the original look starts, so its pulse lands on the clip's beats.
 let clock = 0;
 const towardCamera = new Vector3();
@@ -74,6 +79,7 @@ function build(size) {
   }
   simulation = createSimulation(renderer, size);
   smoke = createSmoke(size, accumulate);
+  if (ribbon) smoke.setColours(ribbon, colourGain());
   scene.add(smoke.object);
   // Let the smoke settle before anyone sees it.
   const settle = clock;
@@ -180,6 +186,8 @@ function render(dt) {
   const camera = view.camera;
   renderPass.camera = camera;
   smoke.update(simulation, live, output.height * output.ratio, camera);
+  smoke.colourMix = live.colourMix;
+  smoke.colourClock = clock;
   smoke.renderShadow(renderer);
 
   bloom.strength = live.glow * 0.85;
@@ -189,7 +197,14 @@ function render(dt) {
   grade.uniforms.uLift.value = Math.min(1, live.glow * 4);
   grade.uniforms.uTime.value = time;
 
-  cube.update(state.edges, view.lens === 'flat' ? 1 : 0.5, camera, exporting || !rendered ? Infinity : dt);
+  // The edges see through the same lens as the smoke: same focus, same blur. Depth shading and the glow
+  // belong to the depth lens and the glow slider, so the flat original keeps clean, even lines.
+  cube.update(state.edges, view.lens === 'flat' ? 1 : 0.8, camera, exporting || !rendered ? Infinity : dt, {
+    blur: live.blur,
+    focusDepth: camera.position.length() + (live.focus - 0.5) * 3.6,
+    glow: live.glow * 0.35,
+    depthShade: view.lens === 'depth' ? 1 : 0,
+  });
   rendered = true;
   renderer.setClearColor(0x000000, 1);
   composer.render(dt);
@@ -207,6 +222,7 @@ function tick(now) {
 
   const k = 1 - Math.exp(-dt * 10);
   for (const key of eased) live[key] += (state[key] - live[key]) * k;
+  live.colourMix += ((state.colour === 'image' && image ? 1 : 0) - live.colourMix) * (1 - Math.exp(-dt * 6));
 
   if (!exporting) {
     const panK = 1 - Math.exp(-dt * 9);
@@ -262,6 +278,11 @@ const app = {
   state,
   set(key, value) {
     if (state[key] === value) return;
+    // Image colours need an image first: ask for one instead.
+    if (key === 'colour' && value === 'image' && !image) {
+      ui.pickImage();
+      return;
+    }
     state[key] = value;
     if (key === 'particles') {
       qualityCheck = null;
@@ -284,6 +305,15 @@ const app = {
       clock = 0;
     }
     writeHash(state);
+  },
+  // Colour the grains from an image file, in the image's own proportions.
+  async useImage(file) {
+    image = await readImage(file);
+    ribbon?.texture.dispose();
+    ribbon = ribbonTexture(image);
+    smoke.setColours(ribbon, colourGain());
+    state.colour = 'image';
+    return image;
   },
   get paused() { return paused; },
   togglePause() { paused = !paused; return paused; },

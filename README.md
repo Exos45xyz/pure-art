@@ -13,6 +13,7 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 | Group | Control | What it does |
 | --- | --- | --- |
 | Look | pure, original, smoke, storm, silk, plume, core | Starting points. **Pure** is the default: the clip's breath through a depth lens, with fine filaments, soft focus and sealed glass. **Randomize** picks a random look that still reads well; **reset** goes back to pure. |
+| Colour | white, image | **Upload an image** (or drop one anywhere on the page) and the smoke takes its colours in the image's own proportions: every pixel is read, and a colour that covers 30% of the picture colours 30% of the smoke. The panel shows the image's main colours at their real shares. |
 | Smoke | source | Where the smoke is born: wandering clouds, a plume at the bottom, or a core in the middle. |
 | | flow | How fast the current moves. |
 | | turbulence | How many small eddies ride on the big swirls. Calm smoke also turns in bigger rolls. |
@@ -61,7 +62,8 @@ Every grain is one texel in two float textures (position and age, velocity and s
 - **The glass:** the noise is multiplied by a ramp that reaches zero at the cube's faces (Bridson et al., *Curl-Noise for Procedural Fluid Flow*, 2007). Near a wall the flow can only run along it. Slow-moving holes in that ramp let some smoke escape.
 - **Light:** the grains are also splatted into 16 horizontal density slices, summed from the top down. Each grain reads how much smoke sits above it and dims to match, so the smoke shades itself.
 - **Image:** grains are drawn as soft dots into a float buffer (full floats where the GPU can blend them, so millions of faint grains add up without banding). Below 1.6 px they keep their size and lose brightness instead, so nothing shimmers. Bloom, a film-like highlight roll-off, grain and dithering finish the image.
-- **Edges:** the cube is drawn with `LineSegments2` after the grade, so its lines stay crisp. Edges at the back are drawn fainter.
+- **Colours from an image:** every pixel is laid out in a ribbon grouped by colour. A grain takes its colour from where the ribbon is when it is born, and the ribbon turns once every 6 s: smoke born together shares a colour, like dye in smoke, and over a turn each pixel colours its exact share.
+- **Edges:** anti-aliased quads drawn after the grade, through the same lens as the smoke: in focus they are crisp, out of focus they soften with the same light. They fade with distance, join in round corners, and carry a faint glow. Back edges use max blending, so bright smoke in front hides them.
 
 All of it is in `src/`. Start with `settings.js` for the controls and looks, and `simulation.js` for the flow.
 
@@ -78,4 +80,4 @@ MIT. Use it, change it, ship it.
 
 ---
 
-Made by [Pure Studio](https://purestudio.art), a design studio for tech startups that need a brand and a landing page in a week.
+Designed by [Pure Studio](https://www.purestudio.art/), a design studio for tech startups that need a brand and a landing page in a week.

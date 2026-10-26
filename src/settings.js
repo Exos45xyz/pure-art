@@ -2,6 +2,9 @@
 // Ranges are 0–1 unless a control is a choice; the shaders map them to real units.
 
 export const controls = [
+  { group: 'Colour', key: 'colour', label: 'colour', type: 'choice', look: false,
+    options: [['white', 'white'], ['image', 'image']] },
+
   { group: 'Smoke', key: 'source', label: 'source', type: 'choice',
     options: [['volume', 'volume'], ['plume', 'plume'], ['core', 'core']] },
   { group: 'Smoke', key: 'flow', label: 'flow' },
@@ -65,7 +68,7 @@ export function presetValues(name) {
   return { ...base, ...presets[name] };
 }
 
-export const defaults = { ...presetValues('pure'), particles: 1024, format: 'screen' };
+export const defaults = { ...presetValues('pure'), particles: 1024, format: 'screen', colour: 'white' };
 for (const c of controls) c.default = defaults[c.key];
 
 const lookKeys = controls.filter((c) => c.look !== false).map((c) => c.key);

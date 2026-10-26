@@ -1,5 +1,6 @@
 import {
   BufferAttribute,
+  DataTexture,
   BufferGeometry,
   CustomBlending,
   HalfFloatType,
@@ -7,6 +8,7 @@ import {
   Mesh,
   OneFactor,
   OrthographicCamera,
+  Vector3,
   PlaneGeometry,
   Points,
   Scene,
@@ -35,6 +37,9 @@ float opticalDepth(vec3 p) {
   return d * smoothstep(1.04, 0.98, p.y);
 }
 `;
+
+const white = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+white.needsUpdate = true;
 
 const fade = /* glsl */ `
 // Fade in slowly, so a newborn cloud is already spreading by the time it shows.
@@ -163,6 +168,11 @@ export function createSmoke(size, type = HalfFloatType) {
       uShadow: { value: 1 },
       uBlur: { value: 0 },
       uFocusDepth: { value: 11.5 },
+      tColour: { value: white },
+      uRibbon: { value: new Vector3(1, 1, 1) },
+      uColourClock: { value: 0 },
+      uColour: { value: 0 },
+      uColourGain: { value: 1 },
     },
     vertexShader: /* glsl */ `
       uniform sampler2D tPosition;
@@ -173,9 +183,15 @@ export function createSmoke(size, type = HalfFloatType) {
       uniform float uShadow;
       uniform float uBlur;
       uniform float uFocusDepth;
+      uniform sampler2D tColour;
+      uniform vec3 uRibbon;
+      uniform float uColourClock;
+      uniform float uColour;
+      uniform float uColourGain;
       varying float vAlpha;
       varying float vLight;
       varying float vSoft;
+      varying vec3 vColour;
       ${fade}
       ${shadowLookup}
       void main() {
@@ -203,11 +219,19 @@ export function createSmoke(size, type = HalfFloatType) {
 
         vLight = 0.06 + 0.94 * exp(-opticalDepth(p) * uShadow);
         vAlpha = alpha;
+        // The grain's colour: where the image's colour ribbon was when it was born. The ribbon turns
+        // once every 6 s, so smoke born together shares a colour; a little of the seed keeps it lively.
+        float birth = uColourClock - pos.w * mix(3.0, 7.0, seed);
+        float along = fract(birth / 6.0 + seed * 0.12);
+        float idx = floor(along * uRibbon.z);
+        vec2 ribbonUv = (vec2(mod(idx, uRibbon.x), floor(idx / uRibbon.x)) + 0.5) / uRibbon.xy;
+        vColour = mix(vec3(1.0), texture2D(tColour, ribbonUv).rgb * uColourGain, uColour);
       }`,
     fragmentShader: /* glsl */ `
       varying float vAlpha;
       varying float vLight;
       varying float vSoft;
+      varying vec3 vColour;
       void main() {
         vec2 c = gl_PointCoord - 0.5;
         float d = dot(c, c) * 4.0;
@@ -215,11 +239,12 @@ export function createSmoke(size, type = HalfFloatType) {
         // In focus a soft dot; out of focus a flatter disc with a soft rim, scaled to the same light.
         float dot_ = exp(-d * 3.0);
         float disc = (1.0 - smoothstep(0.45, 1.0, d)) * 0.42;
-        gl_FragColor = vec4(vec3(vLight * vAlpha * mix(dot_, disc, vSoft)), 1.0);
+        gl_FragColor = vec4(vColour * (vLight * vAlpha * mix(dot_, disc, vSoft)), 1.0);
       }`,
   });
   const points = new Points(geometry, material);
   points.frustumCulled = false;
+  let colours = null;
 
   return {
     object: points,
@@ -237,6 +262,21 @@ export function createSmoke(size, type = HalfFloatType) {
       // Bigger grains cover more pixels each; keep the total light the same.
       material.uniforms.uAlpha.value = (0.8 * share * 0.0071 * 0.0071) / (material.uniforms.uSize.value ** 2);
       material.uniforms.uShadow.value = live.shadows * 2.4;
+    },
+    // ribbon: the image's colour ribbon (palette.js), or null for white. gain: lifts dark images so
+    // the smoke keeps about the brightness it has in white.
+    setColours(ribbon, gain = 1) {
+      colours = ribbon?.texture ?? null;
+      material.uniforms.tColour.value = colours ?? white;
+      if (ribbon) material.uniforms.uRibbon.value.set(ribbon.width, ribbon.height, ribbon.count);
+      material.uniforms.uColourGain.value = gain;
+    },
+    set colourClock(seconds) {
+      material.uniforms.uColourClock.value = seconds;
+    },
+    // 0 = white, 1 = the image's colours; eased by the caller.
+    set colourMix(value) {
+      material.uniforms.uColour.value = colours ? value : 0;
     },
     renderShadow(renderer) {
       renderer.setRenderTarget(densityTarget);
