@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Pure Smoke</title>
+    <meta name="description" content="Particle smoke in a glass cube. A free, open-source three.js toy by Pure Studio." />
+    <meta name="theme-color" content="#000000" />
+    <meta property="og:title" content="Pure Smoke" />
+    <meta property="og:description" content="Particle smoke in a glass cube. Free and open source, made with three.js by Pure Studio." />
+    <meta property="og:image" content="/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <canvas aria-label="Particle smoke inside a turning glass cube. Drag to turn it, hover to stir the smoke."></canvas>
+
+    <header class="brand">
+      <h1 class="wordmark">Pure <span class="dim">Smoke</span></h1>
+      <p class="micro"><b>Particle smoke</b> in a glass cube, <b>three.js</b></p>
+    </header>
+
+    <aside class="panel" aria-label="Parameters"></aside>
+    <button type="button" class="pill reopen">parameters</button>
+
+    <footer class="foot">
+      <p class="micro hint">Drag to turn · hover to stir · scroll to zoom</p>
+      <p class="micro">
+        Free &amp; open source by <a href="https://purestudio.art" target="_blank" rel="noopener"><b>Pure Studio</b></a>
+        · <a href="https://github.com/Exos45xyz/pure-smoke" target="_blank" rel="noopener"><b>GitHub</b></a>
+      </p>
+    </footer>
+
+    <div class="toast" role="status" aria-live="polite"></div>
+
+    <div class="fallback">
+      <p class="wordmark">Pure <span class="dim">Smoke</span></p>
+      <p class="micro">This needs WebGL 2. Try a recent Chrome, Safari or Firefox with hardware acceleration on.</p>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

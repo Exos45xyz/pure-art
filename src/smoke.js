@@ -1,0 +1,234 @@
+import {
+  BufferAttribute,
+  BufferGeometry,
+  CustomBlending,
+  HalfFloatType,
+  LinearFilter,
+  Mesh,
+  OneFactor,
+  OrthographicCamera,
+  PlaneGeometry,
+  Points,
+  Scene,
+  ShaderMaterial,
+  WebGLRenderTarget,
+} from 'three';
+
+// How the grains are drawn: each one is a soft dot, lit from above. The light is dimmed by
+// the smoke above it, read from a stack of 16 horizontal density slices (an opacity shadow map).
+
+const TILE = 64;
+const GRID = 4;
+const ATLAS = TILE * GRID;
+
+const shadowLookup = /* glsl */ `
+uniform sampler2D tShadow;
+vec2 sliceUv(float slice, vec2 local) {
+  return (vec2(mod(slice, 4.0), floor(slice / 4.0)) + local) / 4.0;
+}
+float opticalDepth(vec3 p) {
+  vec2 local = clamp(p.xz * 0.5 + 0.5, 0.5 / 64.0, 63.5 / 64.0);
+  float s = clamp((1.0 - p.y) * 8.0 - 0.5, 0.0, 15.0);
+  float s0 = floor(s);
+  float s1 = min(s0 + 1.0, 15.0);
+  float d = mix(texture2D(tShadow, sliceUv(s0, local)).r, texture2D(tShadow, sliceUv(s1, local)).r, s - s0);
+  return d * smoothstep(1.04, 0.98, p.y);
+}
+`;
+
+const fade = /* glsl */ `
+// Fade in slowly, so a newborn cloud is already spreading by the time it shows.
+float lifeFade(float age) { return smoothstep(0.0, 0.25, age) * (1.0 - smoothstep(0.7, 1.0, age)); }
+`;
+
+function grainGeometry(size) {
+  // Each point only carries where its grain lives in the simulation textures.
+  const refs = new Float32Array(size * size * 3);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 3;
+      refs[i] = (x + 0.5) / size;
+      refs[i + 1] = (y + 0.5) / size;
+    }
+  }
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(refs, 3));
+  return geometry;
+}
+
+const additive = {
+  transparent: true,
+  depthTest: false,
+  depthWrite: false,
+  blending: CustomBlending,
+  blendSrc: OneFactor,
+  blendDst: OneFactor,
+};
+
+export function createSmoke(size) {
+  const count = size * size;
+  const geometry = grainGeometry(size);
+  // Keep the look the same at any particle count: more grains, each a little fainter.
+  const share = 262144 / count;
+
+  // 1. Density, sliced along the light.
+  const densityTarget = new WebGLRenderTarget(ATLAS, ATLAS, {
+    type: HalfFloatType, depthBuffer: false, minFilter: LinearFilter, magFilter: LinearFilter,
+  });
+  const densityMaterial = new ShaderMaterial({
+    ...additive,
+    uniforms: { tPosition: { value: null }, uWeight: { value: 0.03 * share } },
+    vertexShader: /* glsl */ `
+      uniform sampler2D tPosition;
+      uniform float uWeight;
+      varying float vWeight;
+      ${fade}
+      void main() {
+        vec4 pos = texture2D(tPosition, position.xy);
+        vec3 p = pos.xyz;
+        float inside = step(max(abs(p.x), max(abs(p.y), abs(p.z))), 1.0);
+        float slice = floor(clamp((1.0 - p.y) * 8.0, 0.0, 15.999));
+        vec2 local = clamp(p.xz * 0.5 + 0.5, 0.0, 0.999);
+        vec2 atlas = (vec2(mod(slice, 4.0), floor(slice / 4.0)) + local) / 4.0;
+        gl_Position = vec4(atlas * 2.0 - 1.0, 0.0, 1.0);
+        gl_PointSize = 1.0;
+        vWeight = uWeight * lifeFade(pos.w) * inside;
+      }`,
+    fragmentShader: /* glsl */ `
+      varying float vWeight;
+      void main() { gl_FragColor = vec4(vWeight, 0.0, 0.0, 1.0); }`,
+  });
+  const densityScene = new Scene();
+  const densityPoints = new Points(geometry, densityMaterial);
+  densityPoints.frustumCulled = false;
+  densityScene.add(densityPoints);
+
+  // 2. Light reaching each slice: the sum of everything above it, softened a little.
+  const shadowTarget = new WebGLRenderTarget(ATLAS, ATLAS, {
+    type: HalfFloatType, depthBuffer: false, minFilter: LinearFilter, magFilter: LinearFilter,
+  });
+  const sumMaterial = new ShaderMaterial({
+    depthTest: false,
+    depthWrite: false,
+    uniforms: { tDensity: { value: densityTarget.texture } },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D tDensity;
+      varying vec2 vUv;
+      float tap(vec2 tile, vec2 local) {
+        vec2 lo = (tile * 64.0 + 0.5) / 256.0;
+        vec2 hi = (tile * 64.0 + 63.5) / 256.0;
+        vec2 uv = (tile + local) / 4.0;
+        vec2 o = vec2(1.5 / 256.0, 0.0);
+        return texture2D(tDensity, clamp(uv, lo, hi)).r * 0.4
+          + texture2D(tDensity, clamp(uv + o.xy, lo, hi)).r * 0.15
+          + texture2D(tDensity, clamp(uv - o.xy, lo, hi)).r * 0.15
+          + texture2D(tDensity, clamp(uv + o.yx, lo, hi)).r * 0.15
+          + texture2D(tDensity, clamp(uv - o.yx, lo, hi)).r * 0.15;
+      }
+      void main() {
+        vec2 px = vUv * 256.0;
+        vec2 tile = floor(px / 64.0);
+        vec2 local = (px - tile * 64.0) / 64.0;
+        float slice = tile.x + tile.y * 4.0;
+        float sum = 0.0;
+        for (int i = 0; i < 16; i++) {
+          float fi = float(i);
+          if (fi > slice) break;
+          sum += tap(vec2(mod(fi, 4.0), floor(fi / 4.0)), local) * (fi == slice ? 0.5 : 1.0);
+        }
+        gl_FragColor = vec4(sum, 0.0, 0.0, 1.0);
+      }`,
+  });
+  const sumScene = new Scene();
+  const sumQuad = new Mesh(new PlaneGeometry(2, 2), sumMaterial);
+  sumQuad.frustumCulled = false;
+  sumScene.add(sumQuad);
+  const flatCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+  // 3. The grains themselves, accumulated as light in a float buffer.
+  const material = new ShaderMaterial({
+    ...additive,
+    uniforms: {
+      tPosition: { value: null },
+      tVelocity: { value: null },
+      tShadow: { value: shadowTarget.texture },
+      uSize: { value: 0.006 },
+      uHeight: { value: 1000 },
+      uAlpha: { value: 0.1 },
+      uShadow: { value: 1 },
+    },
+    vertexShader: /* glsl */ `
+      uniform sampler2D tPosition;
+      uniform sampler2D tVelocity;
+      uniform float uSize;
+      uniform float uHeight;
+      uniform float uAlpha;
+      uniform float uShadow;
+      varying float vAlpha;
+      varying float vLight;
+      ${fade}
+      ${shadowLookup}
+      void main() {
+        vec4 pos = texture2D(tPosition, position.xy);
+        float seed = texture2D(tVelocity, position.xy).w;
+        vec3 p = pos.xyz;
+        vec4 view = modelViewMatrix * vec4(p, 1.0);
+        gl_Position = projectionMatrix * view;
+
+        float px = uSize * (0.6 + 0.8 * seed) * uHeight * projectionMatrix[1][1] * 0.5 / -view.z;
+        float reach = max(abs(p.x), max(abs(p.y), abs(p.z)));
+        float alpha = uAlpha * lifeFade(pos.w) * (1.0 - smoothstep(1.0, 1.7, reach));
+        // Below 1.6 px a dot would shimmer; keep the size and dim it by the area it lost instead.
+        if (px < 1.6) { alpha *= px * px / 2.56; px = 1.6; }
+        gl_PointSize = px;
+
+        vLight = 0.06 + 0.94 * exp(-opticalDepth(p) * uShadow);
+        vAlpha = alpha;
+      }`,
+    fragmentShader: /* glsl */ `
+      varying float vAlpha;
+      varying float vLight;
+      void main() {
+        vec2 c = gl_PointCoord - 0.5;
+        float d = dot(c, c) * 4.0;
+        if (d > 1.0) discard;
+        gl_FragColor = vec4(vec3(vLight * vAlpha * exp(-d * 3.0)), 1.0);
+      }`,
+  });
+  const points = new Points(geometry, material);
+  points.frustumCulled = false;
+
+  return {
+    object: points,
+    // live: eased control values. height: drawing-buffer height in pixels.
+    update(simulation, live, height) {
+      densityMaterial.uniforms.tPosition.value = simulation.positions;
+      material.uniforms.tPosition.value = simulation.positions;
+      material.uniforms.tVelocity.value = simulation.velocities;
+      material.uniforms.uHeight.value = height;
+      material.uniforms.uSize.value = 0.0035 + live.grain * 0.009;
+      // Bigger grains cover more pixels each; keep the total light the same.
+      material.uniforms.uAlpha.value = (0.8 * share * 0.0071 * 0.0071) / (material.uniforms.uSize.value ** 2);
+      material.uniforms.uShadow.value = live.shadows * 2.4;
+    },
+    renderShadow(renderer) {
+      renderer.setRenderTarget(densityTarget);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear();
+      renderer.render(densityScene, flatCamera);
+      renderer.setRenderTarget(shadowTarget);
+      renderer.render(sumScene, flatCamera);
+    },
+    dispose() {
+      geometry.dispose();
+      material.dispose();
+      densityMaterial.dispose();
+      sumMaterial.dispose();
+      densityTarget.dispose();
+      shadowTarget.dispose();
+    },
+  };
+}
