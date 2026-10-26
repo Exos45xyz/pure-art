@@ -183,10 +183,43 @@ let paused = false;
 let time = 0;
 let rendered = false;
 
+// The cube's outline on screen: the convex hull of its 8 projected corners, as inward-facing lines in
+// drawing-buffer pixels (bottom-left origin, like gl_FragCoord).
+const corners = [-1, 1].flatMap((x) => [-1, 1].flatMap((y) => [-1, 1].map((z) => new Vector3(x, y, z))));
+const projected = corners.map(() => new Vector3());
+function cubeOutline(camera, width, height) {
+  // The camera may have just moved (spin, drag, an export's own framing): use where it is now.
+  camera.updateMatrixWorld();
+  const pts = corners.map((c, i) => {
+    const p = projected[i].copy(c).project(camera);
+    return [(p.x * 0.5 + 0.5) * width, (p.y * 0.5 + 0.5) * height];
+  }).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower = [];
+  for (const p of pts) {
+    while (lower.length >= 2 && cross(lower.at(-2), lower.at(-1), p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper = [];
+  for (const p of [...pts].reverse()) {
+    while (upper.length >= 2 && cross(upper.at(-2), upper.at(-1), p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  const hull = [...lower.slice(0, -1), ...upper.slice(0, -1)]; // counter-clockwise
+  return hull.slice(0, 6).map((a, i) => {
+    const b = hull[(i + 1) % hull.length];
+    // Inside is to the left of each counter-clockwise side; half a pixel of room for anti-aliasing.
+    const nx = -(b[1] - a[1]), ny = b[0] - a[0];
+    const len = Math.hypot(nx, ny) || 1;
+    return new Vector3(nx / len, ny / len, -(nx * a[0] + ny * a[1]) / len + 0.5);
+  });
+}
+
 function render(dt) {
   const camera = view.camera;
   renderPass.camera = camera;
   smoke.update(simulation, live, output.height * output.ratio, camera);
+  smoke.setOutline(cubeOutline(camera, output.width * output.ratio, output.height * output.ratio));
   smoke.colourMix = live.colourMix;
   smoke.colourClock = clock;
   smoke.renderShadow(renderer);

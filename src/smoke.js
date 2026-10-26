@@ -168,6 +168,8 @@ export function createSmoke(size, type = HalfFloatType) {
       uShadow: { value: 1 },
       uBlur: { value: 0 },
       uFocusDepth: { value: 11.5 },
+      uOutline: { value: Array.from({ length: 6 }, () => new Vector3(0, 0, 1)) },
+      uOutlineSides: { value: 0 },
       tColour: { value: white },
       uRibbon: { value: new Vector3(1, 1, 1) },
       uColourClock: { value: 0 },
@@ -213,13 +215,8 @@ export function createSmoke(size, type = HalfFloatType) {
         // total light, so blurred smoke gets softer, not brighter.
         float coc = min(uBlur * abs(-view.z - uFocusDepth) * 18.0, 28.0) * uHeight / 1280.0;
         float blurred = sqrt(px * px + coc * coc);
-        // Never wider than the grain's distance to the glass: a grain against a wall stays a point,
-        // so nothing drawn spills past the cube's outline.
-        float pxPerUnit = uHeight * projectionMatrix[1][1] * 0.5 * perspective;
-        float gap = max(1.0 - reach, 0.0);
-        blurred = min(blurred, max(1.6, 2.0 * gap * pxPerUnit + 1.0));
         alpha *= (px * px) / (blurred * blurred);
-        vSoft = sqrt(max(blurred * blurred - px * px, 0.0)) / blurred;
+        vSoft = coc / blurred;
         gl_PointSize = blurred;
 
         vLight = 0.06 + 0.94 * exp(-opticalDepth(p) * uShadow);
@@ -233,11 +230,18 @@ export function createSmoke(size, type = HalfFloatType) {
         vColour = mix(vec3(1.0), texture2D(tColour, ribbonUv).rgb * uColourGain, uColour);
       }`,
     fragmentShader: /* glsl */ `
+      uniform vec3 uOutline[6];
+      uniform float uOutlineSides;
       varying float vAlpha;
       varying float vLight;
       varying float vSoft;
       varying vec3 vColour;
       void main() {
+        // The cube's outline on screen: any part of a dot beyond it is not drawn, so the smoke never
+        // shows outside the glass, and every grain keeps its own shape and softness.
+        for (int i = 0; i < 6; i++) {
+          if (float(i) < uOutlineSides && dot(uOutline[i], vec3(gl_FragCoord.xy, 1.0)) < 0.0) discard;
+        }
         vec2 c = gl_PointCoord - 0.5;
         float d = dot(c, c) * 4.0;
         if (d > 1.0) discard;
@@ -275,6 +279,11 @@ export function createSmoke(size, type = HalfFloatType) {
       material.uniforms.tColour.value = colours ?? white;
       if (ribbon) material.uniforms.uRibbon.value.set(ribbon.width, ribbon.height, ribbon.count);
       material.uniforms.uColourGain.value = gain;
+    },
+    // The cube's outline in drawing-buffer pixels: up to 6 lines a*x + b*y + c >= 0 inside.
+    setOutline(lines) {
+      lines.forEach((l, i) => material.uniforms.uOutline.value[i].copy(l));
+      material.uniforms.uOutlineSides.value = lines.length;
     },
     set colourClock(seconds) {
       material.uniforms.uColourClock.value = seconds;

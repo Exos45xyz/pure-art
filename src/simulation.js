@@ -136,23 +136,23 @@ void main() {
   target += uStir * exp(-dot(across, across) * 16.0);
 
   // Rebound off the glass. Near a closed wall the current may only run along it, never into it;
-  // a grain that reaches the glass moving outward bounces back with 55% of its speed, and part of
-  // the impact splashes sideways along the glass, away from where it hit. Close to the glass the
-  // smoke eases back into the current more slowly, so the bounce rolls the smoke back inward.
+  // a grain that reaches the glass moving outward bounces straight back with 90% of its speed (and a
+  // small kick, so even slow smoke springs off), and part of the impact splashes sideways along the
+  // glass. Close to the glass the smoke eases back into the current slowly, so the bounce carries.
   vec3 outward = -gradD;
   float sealed = (1.0 - open) * inside;
   float nearGlass = (1.0 - smoothstep(0.0, 0.15, d)) * sealed;
   target -= outward * max(dot(target, outward), 0.0) * nearGlass;
   vec3 bounced = vel.xyz;
   float into = dot(bounced, outward);
-  if (d < 0.04 && into > 0.0 && sealed > 0.5) {
+  if (d < 0.05 && into > 0.0 && sealed > 0.5) {
     vec3 along = p - outward * dot(p, outward);
     vec3 splash = length(along) > 1e-4 ? normalize(along) : vec3(0.0);
-    bounced += -outward * into * 1.55 + splash * into * 0.5;
+    bounced += -outward * (into * 1.9 + 0.25) + splash * into * 0.6;
   }
 
   // A grain that was just born takes the current at once; the others ease into it.
-  float response = pos.w < 0.015 ? 1.0 : 1.0 - exp(-uDt * mix(9.0, 3.5, nearGlass));
+  float response = pos.w < 0.015 ? 1.0 : 1.0 - exp(-uDt * mix(9.0, 2.5, nearGlass));
   gl_FragColor = vec4(mix(bounced, target, response), vel.w);
 }
 `;
