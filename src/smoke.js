@@ -178,7 +178,9 @@ export function createSmoke(size) {
         vec4 view = modelViewMatrix * vec4(p, 1.0);
         gl_Position = projectionMatrix * view;
 
-        float px = uSize * (0.6 + 0.8 * seed) * uHeight * projectionMatrix[1][1] * 0.5 / -view.z;
+        // Perspective grains shrink with distance; orthographic ones (the flat lens) don't.
+        float perspective = projectionMatrix[3][3] == 0.0 ? 1.0 / -view.z : 1.0;
+        float px = uSize * (0.6 + 0.8 * seed) * uHeight * projectionMatrix[1][1] * 0.5 * perspective;
         float reach = max(abs(p.x), max(abs(p.y), abs(p.z)));
         float alpha = uAlpha * lifeFade(pos.w) * (1.0 - smoothstep(1.0, 1.7, reach));
         // Below 1.6 px a dot would shimmer; keep the size and dim it by the area it lost instead.
@@ -209,7 +211,8 @@ export function createSmoke(size) {
       material.uniforms.tPosition.value = simulation.positions;
       material.uniforms.tVelocity.value = simulation.velocities;
       material.uniforms.uHeight.value = height;
-      material.uniforms.uSize.value = 0.0035 + live.grain * 0.009;
+      // Linear up to 0.6, then steeper, so the top of the slider reaches the original's big grains.
+      material.uniforms.uSize.value = 0.0035 + live.grain * 0.009 + 0.1944 * Math.max(live.grain - 0.6, 0) ** 2;
       // Bigger grains cover more pixels each; keep the total light the same.
       material.uniforms.uAlpha.value = (0.8 * share * 0.0071 * 0.0071) / (material.uniforms.uSize.value ** 2);
       material.uniforms.uShadow.value = live.shadows * 2.4;

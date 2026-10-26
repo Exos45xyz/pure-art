@@ -12,17 +12,29 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 
 | Group | Control | What it does |
 | --- | --- | --- |
-| Look | smoke, storm, silk, plume, core | Starting points. **Shuffle** picks a random look that still reads well. |
+| Look | original, smoke, storm, silk, plume, core | Starting points. **Shuffle** picks a random look that still reads well. |
 | Smoke | source | Where the smoke is born: wandering clouds, a plume at the bottom, or a core in the middle. |
 | | flow | How fast the current moves. |
-| | turbulence | How many small eddies ride on the big swirls. |
+| | turbulence | How many small eddies ride on the big swirls. Calm smoke also turns in bigger rolls. |
+| | spread | How much each grain wanders on its own, which puffs thin sheets out into soft volumes. |
 | | escape | How much smoke finds its way out through the glass. |
 | Light | brightness, shadows, glow, film grain | Exposure, how much the smoke shades itself, the soft glow around it, and grain. |
-| Form | grain size, spin, edges, particles | Grain size, how fast the cube turns, the edge colour, and 65k / 262k / 1M particles. |
+| Form | grain size, spin, lens, edges, particles | Grain size, how fast the cube turns, a flat (orthographic) or depth lens, the edge colour, and 65k / 262k / 1M particles. |
+| Output | format | screen, 9:16, 4:5 or 1:1. A frame on screen shows what the file will hold. Images are 4K on the long side, videos 1080 wide. |
 
 Double-click a slider to reset it. Hold Shift while dragging for fine steps. Every change goes into the address bar, so **copy link** shares the exact look.
 
 Keys: `Space` pause · `R` shuffle · `S` save image · `H` hide the panel.
+
+## The original look
+
+The default look is fitted to a reference clip: 734 frames, 720 × 1280, of white particle smoke in a turning wireframe cube with red edges.
+
+- **The camera is exact.** The clip's orthographic camera was measured on every frame: it looks 16.85° down, turns at 62.66° a second, and the cube's half-edge is 203 px on a 1280 px frame. The flat lens reproduces it, and from the moment the look is applied the edges land on the clip's edges, frame for frame.
+- **The smoke is matched by its numbers, not grain for grain.** A different simulation can't replay another one's grains. Its settings were fitted on rendered frames against the clip: average brightness, how much of the frame and of the cube it covers, how much of it is blown out to white, and how much large-scale contrast it has. All of these are within a few percent. The texture is still finer and grainier than the clip's.
+- **The edges** are the clip’s red, 2.8 px on a 1280 px frame. Back edges disappear behind bright smoke, as in the clip.
+
+Use **9:16** to export in the clip's own frame.
 
 ## Run it locally
 

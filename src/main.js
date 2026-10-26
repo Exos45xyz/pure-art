@@ -2,8 +2,7 @@ import '@fontsource-variable/archivo/wdth.css';
 import '@fontsource-variable/inter';
 import './style.css';
 
-import { PerspectiveCamera, Plane, Raycaster, Scene, Vector2, Vector3, WebGLRenderer } from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Plane, Raycaster, Scene, Vector2, Vector3, WebGLRenderer } from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
@@ -12,10 +11,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { createCube } from './cube.js';
 import { GradeShader } from './grade.js';
 import { createSimulation } from './simulation.js';
-import { readHash, writeHash } from './settings.js';
+import { readHash, spinRate, writeHash } from './settings.js';
 import { createSmoke } from './smoke.js';
 import { createUI } from './ui.js';
-import { recordVideo, saveImage } from './capture.js';
+import { createView } from './view.js';
+import { formatSize, recordVideo, saveImage } from './capture.js';
 
 const canvas = document.querySelector('canvas');
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -40,23 +40,13 @@ if (reducedMotion && !location.hash.includes('spin=')) state.spin = 0;
 
 // The shaders read eased copies of the sliders, so every change glides instead of jumping.
 const live = { ...state };
-const eased = ['flow', 'turbulence', 'escape', 'brightness', 'shadows', 'glow', 'film', 'grain', 'spin'];
+const eased = ['flow', 'turbulence', 'spread', 'escape', 'brightness', 'shadows', 'glow', 'film', 'grain', 'spin'];
 
 // ---- Scene ---------------------------------------------------------------------------------
 
 const scene = new Scene();
-const camera = new PerspectiveCamera(26, 1, 0.1, 100);
-camera.position.setFromSphericalCoords(10.5, Math.PI / 2 - 0.36, 0.7);
-
-const controls = new OrbitControls(camera, canvas);
-controls.enableDamping = true;
-controls.dampingFactor = 0.07;
-controls.rotateSpeed = 0.55;
-controls.enablePan = false;
-controls.minDistance = 5.5;
-controls.maxDistance = 18;
-controls.autoRotate = true;
-
+const view = createView(canvas);
+view.setLens(state.lens);
 const cube = createCube();
 
 let simulation;
@@ -78,7 +68,8 @@ build(state.particles);
 // ---- Post ----------------------------------------------------------------------------------
 
 const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene, camera));
+const renderPass = new RenderPass(scene, view.camera);
+composer.addPass(renderPass);
 // A low threshold on purpose: the glow gives the grains a soft body of smoke around them.
 const bloom = new UnrealBloomPass(new Vector2(256, 256), 0.4, 0.45, 0.08);
 composer.addPass(bloom);
@@ -89,40 +80,43 @@ composer.addPass(grade);
 const edgeScene = new Scene();
 edgeScene.add(cube.object);
 
-// ---- Layout --------------------------------------------------------------------------------
+// ---- Output --------------------------------------------------------------------------------
 
+// What the renderer draws into: the screen, or for a moment an export size.
+const output = { width: 0, height: 0, ratio: 1, offsetX: 0, offsetY: 0 };
 // The cube sits in the middle of the space the panel leaves free.
-const frame = { offsetX: 0, offsetY: 0, targetX: 0, targetY: 0 };
-let width = 0;
-let height = 0;
+const pan = { x: 0, y: 0, targetX: 0, targetY: 0 };
+let exporting = false;
 
-function resize() {
-  // A page opened in a background tab can start with no size; wait for a real one.
-  if (!innerWidth || !innerHeight) return;
-  width = innerWidth;
-  height = innerHeight;
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  renderer.setSize(width, height, false);
-  composer.setPixelRatio(renderer.getPixelRatio());
-  composer.setSize(width, height);
-  cube.setResolution(width, height);
-  camera.aspect = width / height;
-  // Narrow screens widen the lens so the whole cube stays in view.
-  camera.fov = camera.aspect < 0.8 ? 2 * Math.atan(Math.tan((13 * Math.PI) / 180) * (0.8 / camera.aspect)) * (180 / Math.PI) : 26;
-  app.layoutChanged();
+function applyOutput() {
+  renderer.setPixelRatio(output.ratio);
+  renderer.setSize(output.width, output.height, false);
+  composer.setPixelRatio(output.ratio);
+  composer.setSize(output.width, output.height);
   applyFrame();
 }
 
 function applyFrame() {
-  camera.setViewOffset(width, height, frame.offsetX, frame.offsetY, width, height);
-  camera.updateProjectionMatrix();
-  grade.uniforms.uAspect.value = width / height;
-  grade.uniforms.uCenter.value = [0.5 - frame.offsetX / width, 0.5 + frame.offsetY / height];
+  const pixelsHigh = output.height * output.ratio;
+  // Edges are 2.8 px on a 1280 px frame with the flat lens (the reference's weight), 1.4 px with depth.
+  const lineWidth = ((view.lens === 'flat' ? 2.8 : 1.4) * pixelsHigh) / 1280;
+  cube.setOutput(output.width * output.ratio, pixelsHigh, Math.max(1, lineWidth));
+  view.frame(output.width, output.height, output.offsetX, output.offsetY);
+  grade.uniforms.uAspect.value = output.width / output.height;
+  grade.uniforms.uCenter.value = [0.5 - output.offsetX / output.width, 0.5 + output.offsetY / output.height];
+}
+
+function fitScreen() {
+  // A page opened in a background tab can start with no size; wait for a real one.
+  if (!innerWidth || !innerHeight || exporting) return;
+  Object.assign(output, { width: innerWidth, height: innerHeight, ratio: Math.min(devicePixelRatio, 2), offsetX: pan.x, offsetY: pan.y });
+  app.layoutChanged();
+  applyOutput();
 }
 
 // ---- Stir: hovering moves the smoke -------------------------------------------------------
 
-const pointer = { x: 0, y: 0, inside: false, dragging: false };
+const pointer = { x: 0, y: 0, inside: false };
 const raycaster = new Raycaster();
 const facing = new Plane();
 const hit = new Vector3();
@@ -131,17 +125,16 @@ const stir = { origin: new Vector3(), direction: new Vector3(), velocity: new Ve
 let hasLastHit = false;
 
 canvas.addEventListener('pointermove', (e) => {
-  pointer.x = (e.clientX / width) * 2 - 1;
-  pointer.y = -(e.clientY / height) * 2 + 1;
+  pointer.x = (e.clientX / innerWidth) * 2 - 1;
+  pointer.y = -(e.clientY / innerHeight) * 2 + 1;
   pointer.inside = e.pointerType === 'mouse';
 });
 canvas.addEventListener('pointerleave', () => { pointer.inside = false; hasLastHit = false; });
-controls.addEventListener('start', () => { pointer.dragging = true; });
-controls.addEventListener('end', () => { pointer.dragging = false; hasLastHit = false; });
 
 function updateStir(dt) {
-  const active = pointer.inside && !pointer.dragging && dt > 0;
+  const active = pointer.inside && !view.dragging && !exporting && dt > 0;
   if (active) {
+    const camera = view.camera;
     raycaster.setFromCamera(new Vector2(pointer.x, pointer.y), camera);
     facing.setFromNormalAndCoplanarPoint(camera.getWorldDirection(hit).negate(), new Vector3());
     if (raycaster.ray.intersectPlane(facing, hit)) {
@@ -154,6 +147,8 @@ function updateStir(dt) {
     }
     stir.origin.copy(raycaster.ray.origin);
     stir.direction.copy(raycaster.ray.direction);
+  } else {
+    hasLastHit = hasLastHit && !view.dragging;
   }
   if (!active || !hasLastHit) stir.velocity.multiplyScalar(Math.exp(-dt * 6));
 }
@@ -162,16 +157,23 @@ function updateStir(dt) {
 
 let paused = false;
 let time = 0;
+let rendered = false;
 
 function render(dt) {
-  smoke.update(simulation, live, height * renderer.getPixelRatio());
+  const camera = view.camera;
+  renderPass.camera = camera;
+  smoke.update(simulation, live, output.height * output.ratio);
   smoke.renderShadow(renderer);
 
   bloom.strength = live.glow * 0.85;
-  grade.uniforms.uExposure.value = 0.35 + live.brightness * 1.9;
+  // Linear up to 0.6, then steeper: the original look (0.85) needs about four times the light.
+  grade.uniforms.uExposure.value = 0.35 + live.brightness * 1.9 + 56.24 * Math.max(live.brightness - 0.6, 0) ** 2;
   grade.uniforms.uFilm.value = live.film;
+  grade.uniforms.uLift.value = Math.min(1, live.glow * 4);
   grade.uniforms.uTime.value = time;
 
+  cube.update(state.edges, view.lens === 'flat' ? 1 : 0.5, camera, exporting || !rendered ? Infinity : dt);
+  rendered = true;
   renderer.setClearColor(0x000000, 1);
   composer.render(dt);
   renderer.setRenderTarget(null);
@@ -182,24 +184,26 @@ let last = performance.now();
 function tick(now) {
   const dt = Math.min((now - last) / 1000, 1 / 20);
   last = now;
-  if (innerWidth !== width || innerHeight !== height) resize();
-  if (!width || !height) return requestAnimationFrame(tick);
+  if (!exporting && (innerWidth !== output.width || innerHeight !== output.height)) fitScreen();
+  if (!output.width || !output.height) return requestAnimationFrame(tick);
   time += dt;
 
   const k = 1 - Math.exp(-dt * 10);
   for (const key of eased) live[key] += (state[key] - live[key]) * k;
 
-  const panK = 1 - Math.exp(-dt * 9);
-  const before = frame.offsetX + frame.offsetY;
-  frame.offsetX += (frame.targetX - frame.offsetX) * panK;
-  frame.offsetY += (frame.targetY - frame.offsetY) * panK;
-  if (Math.abs(frame.offsetX + frame.offsetY - before) > 0.01) applyFrame();
+  if (!exporting) {
+    const panK = 1 - Math.exp(-dt * 9);
+    pan.x += (pan.targetX - pan.x) * panK;
+    pan.y += (pan.targetY - pan.y) * panK;
+    if (Math.abs(pan.x - output.offsetX) + Math.abs(pan.y - output.offsetY) > 0.01) {
+      output.offsetX = pan.x;
+      output.offsetY = pan.y;
+      applyFrame();
+    }
+  }
 
-  controls.autoRotate = !paused && live.spin > 0.002;
-  controls.autoRotateSpeed = -live.spin * 6;
-  controls.update(dt);
+  view.update(dt, paused ? 0 : spinRate(live.spin));
   updateStir(dt);
-  cube.update(state.edges, camera, dt);
 
   if (!paused) simulation.step(dt, live, state.source, stir);
   render(dt);
@@ -224,17 +228,16 @@ function checkQuality(dt) {
 
 // ---- Capture -------------------------------------------------------------------------------
 
-// Exports are framed on the cube, not on the screen with the panel beside it.
-async function withCentredFrame(task) {
-  const saved = { x: frame.offsetX, y: frame.offsetY };
-  frame.offsetX = frame.offsetY = 0;
-  applyFrame();
+// Draw into a size of its own (an export), centred on the cube, then go back to the screen.
+async function atSize(width, height, ratio, task) {
+  exporting = true;
+  Object.assign(output, { width, height, ratio, offsetX: 0, offsetY: 0 });
+  applyOutput();
   try {
     return await task();
   } finally {
-    frame.offsetX = saved.x;
-    frame.offsetY = saved.y;
-    applyFrame();
+    exporting = false;
+    fitScreen();
   }
 }
 
@@ -243,12 +246,23 @@ const app = {
   set(key, value) {
     if (state[key] === value) return;
     state[key] = value;
-    if (key === 'particles') qualityCheck = null;
-    if (key === 'particles') build(value);
+    if (key === 'particles') {
+      qualityCheck = null;
+      build(value);
+    }
+    if (key === 'lens') {
+      view.setLens(value);
+      applyFrame();
+    }
+    if (key === 'format') ui.showFormat(value);
     writeHash(state);
   },
-  apply(values) {
-    for (const [key, value] of Object.entries(values)) if (key !== 'particles') state[key] = value;
+  apply(values, look) {
+    for (const [key, value] of Object.entries(values)) if (key !== 'particles' && key !== 'format') state[key] = value;
+    view.setLens(state.lens);
+    applyFrame();
+    // The original look starts the camera where the reference clip starts.
+    if (look === 'original') view.original();
     writeHash(state);
   },
   get paused() { return paused; },
@@ -256,16 +270,22 @@ const app = {
   recording: null,
   layoutChanged() {
     const reserve = app.recording ? { x: 0, y: 0 } : ui.reserve();
-    frame.targetX = reserve.x / 2;
-    frame.targetY = reserve.y / 2;
+    pan.targetX = reserve.x / 2;
+    pan.targetY = reserve.y / 2;
   },
-  saveImage: () => withCentredFrame(() => saveImage({ renderer, composer, render, width, height })),
+  saveImage() {
+    const size = formatSize(state.format, 'image', innerWidth, innerHeight);
+    return atSize(size.width, size.height, 1, () => saveImage({ canvas, render, ...size }));
+  },
   async recordVideo(onProgress) {
-    app.recording = { renderer, composer, canvas, width, height, onProgress, seconds: 8, cancelled: false };
+    const size = formatSize(state.format, 'video', innerWidth, innerHeight);
+    app.recording = { canvas, onProgress, seconds: 8, cancelled: false };
     app.layoutChanged();
+    document.body.classList.add('recording-frame');
     try {
-      return await recordVideo(app.recording);
+      return await atSize(size.width, size.height, 1, () => recordVideo(app.recording));
     } finally {
+      document.body.classList.remove('recording-frame');
       app.recording = null;
       app.layoutChanged();
     }
@@ -276,12 +296,34 @@ const app = {
 };
 
 const ui = createUI(app);
-if (import.meta.env.DEV) window.pureSmoke = { renderer, camera, state, live, stir, get simulation() { return simulation; } };
-resize();
-frame.offsetX = frame.targetX;
-frame.offsetY = frame.targetY;
+ui.showFormat(state.format);
+
+if (import.meta.env.DEV) {
+  window.pureSmoke = {
+    renderer, view, state, live, stir, app,
+    get simulation() { return simulation; },
+    // Draw frame n of the original timing at width × height and hand back a PNG blob.
+    async frame(n, width = 720, height = 1280, fps = 30) {
+      paused = true;
+      return atSize(width, height, 1, () => {
+        view.atOriginalTime(n / fps);
+        view.update(0, 0);
+        render(0);
+        return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      });
+    },
+    resume() { paused = false; },
+    step(seconds) { for (let t = 0; t < seconds; t += 1 / 30) simulation.step(1 / 30, live, state.source, null); },
+  };
+}
+
+fitScreen();
+pan.x = pan.targetX;
+pan.y = pan.targetY;
+output.offsetX = pan.x;
+output.offsetY = pan.y;
 applyFrame();
-addEventListener('resize', resize);
+addEventListener('resize', fitScreen);
 
 requestAnimationFrame((now) => {
   last = now;

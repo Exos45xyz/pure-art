@@ -23,12 +23,14 @@ uniform float uTime;
 uniform float uDt;
 uniform float uSpeed;
 uniform float uTurbulence;
+uniform float uSpread;
 uniform float uSource;
 uniform vec3 uRayOrigin;
 uniform vec3 uRayDirection;
 uniform vec3 uStir;
 
 ${noise}
+${hash}
 ${holes}
 
 // Curl-noise flow that respects the glass (Bridson et al., "Curl-Noise for Procedural Fluid Flow").
@@ -64,10 +66,15 @@ void main() {
   // currents next to it.
   float slope = (1.0 - open) * rampSlope(clamp(d / W, 0.0, 1.0)) / W * 0.6;
 
-  vec3 v = octave(p, 0.8, vec3(0.0, t * 0.06, t * 0.035), R, slope, gradD);
+  // Calm smoke turns in bigger rolls; turbulent smoke in smaller ones.
+  vec3 v = octave(p, mix(0.55, 0.95, uTurbulence), vec3(0.0, t * 0.06, t * 0.035), R, slope, gradD);
   v += octave(p, 1.9, vec3(t * 0.11, 3.7, -t * 0.08), R, slope, gradD) * 0.65 * uTurbulence;
   v += octave(p, 4.3, vec3(-7.1, t * 0.19, t * 0.15), R, slope, gradD) * 0.4 * uTurbulence * uTurbulence;
   vec3 target = v * uSpeed;
+  // Spread: each grain also wanders at random, a new direction every third of a second.
+  // The flow alone stretches smoke into thin sheets; this puffs them back out into volumes.
+  vec3 wander = hash33(vec3(gl_FragCoord.xy, floor(t * 3.0 + vel.w * 7.0))) * 2.0 - 1.0;
+  target += wander * uSpread * (0.15 + 0.9 * uSpeed);
   // Grains that brushed the glass are eased back into the body of the smoke.
   target += gradD * (1.0 - R) * (0.12 + 0.5 * uSpeed) * step(0.0, d);
 
@@ -93,6 +100,7 @@ const positionShader = /* glsl */ `
 uniform float uTime;
 uniform float uDt;
 uniform float uSource;
+uniform float uSpread;
 
 ${noise}
 ${hash}
@@ -118,7 +126,7 @@ vec3 spawn(float seed) {
   if (uSource < 0.5) {
     if (seed < 0.05) return (h * 2.0 - 1.0) * 0.95;
     float k = floor(hash13(base + 5.3) * 4.0);
-    return emitter(k, uTime) + ball(h) * 0.16;
+    return emitter(k, uTime) + ball(h) * (0.16 + 0.3 * uSpread);
   }
   if (uSource < 1.5) {
     float r = sqrt(h.x) * 0.28;
@@ -183,6 +191,7 @@ export function createSimulation(renderer, size) {
     uDt: { value: 0 },
     uSpeed: { value: 0 },
     uTurbulence: { value: 0 },
+    uSpread: { value: 0 },
     uEscape: { value: 0 },
     uSource: { value: 0 },
     uRayOrigin: { value: new Vector3(0, 0, 100) },
@@ -193,6 +202,7 @@ export function createSimulation(renderer, size) {
     uTime: { value: 0 },
     uDt: { value: 0 },
     uSource: { value: 0 },
+    uSpread: { value: 0 },
     uEscape: { value: 0 },
   });
 
@@ -214,6 +224,7 @@ export function createSimulation(renderer, size) {
       vu.uSource.value = pu.uSource.value = sources[source];
       vu.uSpeed.value = 0.06 + live.flow * 0.62;
       vu.uTurbulence.value = live.turbulence;
+      vu.uSpread.value = pu.uSpread.value = live.spread;
       vu.uEscape.value = pu.uEscape.value = live.escape;
       if (stir) {
         vu.uRayOrigin.value.copy(stir.origin);

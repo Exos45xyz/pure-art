@@ -119,14 +119,14 @@ export function createUI(app) {
     refresh();
     setTimeout(() => panel.classList.remove('gliding'), 260);
   };
-  const applyLook = (values) => {
-    app.apply(values);
+  const applyLook = (values, name) => {
+    app.apply(values, name);
     syncAll();
   };
 
   // Looks
   for (const name of Object.keys(presets)) {
-    chips[name] = h('button', { type: 'button', class: 'chip', onclick: () => applyLook(presetValues(name)) }, name);
+    chips[name] = h('button', { type: 'button', class: 'chip', onclick: () => applyLook(presetValues(name), name) }, name);
   }
   const shuffle = () => applyLook(shuffled(app.state));
   const look = h('section', {},
@@ -153,7 +153,7 @@ export function createUI(app) {
     h('span', { class: 'micro micro-strong' }, 'Parameters'),
     h('div', { class: 'panel-head-actions' },
       h('button', { type: 'button', class: 'text-button micro', onclick: shuffle, 'aria-label': 'Shuffle (R)' }, 'Shuffle'),
-      h('button', { type: 'button', class: 'text-button micro', onclick: () => applyLook(presetValues('smoke')) }, 'Reset'),
+      h('button', { type: 'button', class: 'text-button micro', onclick: () => applyLook(presetValues('original'), 'original') }, 'Reset'),
       h('button', { type: 'button', class: 'text-button micro', onclick: () => setOpen(false), 'aria-label': 'Hide parameters (H)' }, 'Hide')));
 
   panel.append(head, look, ...groups,
@@ -239,5 +239,13 @@ export function createUI(app) {
     else if (key === 'h') setOpen(panel.hasAttribute('data-hidden'), true);
   });
 
-  return { reserve, toast, sync: () => fields.forEach((f) => f.sync()) };
+  // The export frame drawn on screen, so you see what a 9:16, 4:5 or 1:1 file will hold.
+  const guide = document.querySelector('.format-guide');
+  function showFormat(format) {
+    const ratio = { '9:16': 9 / 16, '4:5': 4 / 5, '1:1': 1 }[format];
+    guide.toggleAttribute('data-shown', Boolean(ratio));
+    if (ratio) guide.style.setProperty('--ratio', ratio);
+  }
+
+  return { reserve, toast, showFormat, sync: () => fields.forEach((f) => f.sync()) };
 }

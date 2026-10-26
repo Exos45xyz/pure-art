@@ -286,6 +286,26 @@ canvas:active { cursor: grabbing; }
 .reopen[data-shown] { opacity: 1; transform: none; pointer-events: auto; transition-delay: 80ms; }
 .reopen.instant { transition: none; }
 
+/* The export frame for 9:16, 4:5 and 1:1: two hairlines and corner ticks around the cube */
+.format-guide {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: calc((100% - var(--reserve-x, 0px)) / 2);
+  width: calc(100vh * var(--ratio, 1));
+  max-width: calc(100% - var(--reserve-x, 0px));
+  transform: translateX(-50%);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.format-guide[data-shown] { opacity: 1; }
+.recording-frame .format-guide { opacity: 0; }
+/* While recording a format, the canvas holds that format; show it whole instead of stretched. */
+.recording-frame canvas { object-fit: contain; }
+
 /* Toast, centred in the space the panel leaves */
 .toast {
   position: fixed;
@@ -337,7 +357,7 @@ canvas:active { cursor: grabbing; }
     gap: 14px;
   }
   .ready .panel[data-hidden] { transform: translateY(calc(100% + 24px)); }
-  .foot, .keys { display: none; }
+  .foot, .keys, .format-guide { display: none; }
   .brand { top: max(16px, env(safe-area-inset-top)); left: 16px; }
   .reopen { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); }
   .toast { top: max(16px, env(safe-area-inset-top)); bottom: auto; left: 50%; }

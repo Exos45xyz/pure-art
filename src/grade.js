@@ -7,6 +7,7 @@ export const GradeShader = {
     tDiffuse: { value: null },
     uExposure: { value: 1 },
     uFilm: { value: 0.35 },
+    uLift: { value: 1 },
     uTime: { value: 0 },
     uAspect: { value: 1 },
     uCenter: { value: [0.5, 0.5] },
@@ -18,6 +19,7 @@ export const GradeShader = {
     uniform sampler2D tDiffuse;
     uniform float uExposure;
     uniform float uFilm;
+    uniform float uLift;
     uniform float uTime;
     uniform float uAspect;
     uniform vec2 uCenter;
@@ -37,7 +39,8 @@ export const GradeShader = {
 
       vec2 q = (vUv - uCenter) * vec2(uAspect, 1.0);
       float r = length(q);
-      c += vec3(0.022) * (1.0 - smoothstep(0.0, 0.85, r)) * (1.0 - c);
+      // A faint studio lift behind the cube, which comes with the glow (none means pure black).
+      c += vec3(0.022) * uLift * (1.0 - smoothstep(0.0, 0.85, r)) * (1.0 - c);
       c *= 1.0 - 0.35 * smoothstep(0.35, 1.3, r);
 
       // Film grain, strongest in the mid-tones, new every frame.
@@ -45,7 +48,7 @@ export const GradeShader = {
       float n = hash(seed) + hash(seed + 71.3) - 1.0;
       c += n * uFilm * 0.075 * (0.25 + c * (1.0 - c) * 3.0);
       // Dither so the dark gradient never bands.
-      c += (hash(gl_FragCoord.xy + 13.7) - 0.5) / 255.0;
+      c += (hash(gl_FragCoord.xy + 13.7) - 0.5) / 255.0 * min(1.0, uLift + uFilm);
 
       gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
     }`,

@@ -2,29 +2,46 @@
 // Ranges are 0–1 unless a control is a choice; the shaders map them to real units.
 
 export const controls = [
-  { group: 'Smoke', key: 'source', label: 'source', type: 'choice', default: 'volume',
+  { group: 'Smoke', key: 'source', label: 'source', type: 'choice',
     options: [['volume', 'volume'], ['plume', 'plume'], ['core', 'core']] },
-  { group: 'Smoke', key: 'flow', label: 'flow', default: 0.45 },
-  { group: 'Smoke', key: 'turbulence', label: 'turbulence', default: 0.5 },
-  { group: 'Smoke', key: 'escape', label: 'escape', default: 0.18 },
+  { group: 'Smoke', key: 'flow', label: 'flow' },
+  { group: 'Smoke', key: 'turbulence', label: 'turbulence' },
+  { group: 'Smoke', key: 'spread', label: 'spread' },
+  { group: 'Smoke', key: 'escape', label: 'escape' },
 
-  { group: 'Light', key: 'brightness', label: 'brightness', default: 0.5 },
-  { group: 'Light', key: 'shadows', label: 'shadows', default: 0.6 },
-  { group: 'Light', key: 'glow', label: 'glow', default: 0.35 },
-  { group: 'Light', key: 'film', label: 'film grain', default: 0.35 },
+  { group: 'Light', key: 'brightness', label: 'brightness' },
+  { group: 'Light', key: 'shadows', label: 'shadows' },
+  { group: 'Light', key: 'glow', label: 'glow' },
+  { group: 'Light', key: 'film', label: 'film grain' },
 
-  { group: 'Form', key: 'grain', label: 'grain size', default: 0.4 },
-  { group: 'Form', key: 'spin', label: 'spin', default: 0.25 },
-  { group: 'Form', key: 'edges', label: 'edges', type: 'choice', default: 'white',
+  { group: 'Form', key: 'grain', label: 'grain size' },
+  { group: 'Form', key: 'spin', label: 'spin' },
+  { group: 'Form', key: 'lens', label: 'lens', type: 'choice', options: [['flat', 'flat'], ['depth', 'depth']] },
+  { group: 'Form', key: 'edges', label: 'edges', type: 'choice',
     options: [['white', 'white'], ['red', 'red'], ['off', 'off']] },
-  { group: 'Form', key: 'particles', label: 'particles', type: 'choice', default: 1024,
+  { group: 'Form', key: 'particles', label: 'particles', type: 'choice', look: false,
     options: [[256, '65k'], [512, '262k'], [1024, '1m']] },
+
+  { group: 'Output', key: 'format', label: 'format', type: 'choice', look: false,
+    options: [['screen', 'screen'], ['9:16', '9:16'], ['4:5', '4:5'], ['1:1', '1:1']] },
 ];
 
-export const defaults = Object.fromEntries(controls.map((c) => [c.key, c.default]));
+// The studio look every other look starts from.
+const base = {
+  source: 'volume', flow: 0.45, turbulence: 0.5, spread: 0, escape: 0.18,
+  brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.35,
+  grain: 0.4, spin: 0.2, lens: 'depth', edges: 'white',
+};
 
-// Looks only set the controls they name; particles stay as the device chose.
+// "original" is the reference clip: its camera (flat lens, 16.85° down, 62.66°/s), its red edges,
+// no glow or grain on a pure black ground. See README › The original look.
 export const presets = {
+  // Fitted to the clip's measurements: see README › The original look.
+  original: {
+    flow: 0.25, turbulence: 0.1, spread: 0.45, escape: 0.12,
+    brightness: 0.87, shadows: 0.6, glow: 0, film: 0,
+    grain: 0.85, spin: 0.5, lens: 'flat', edges: 'red',
+  },
   smoke: {},
   storm: { flow: 0.82, turbulence: 0.92, escape: 0.34, shadows: 0.78, glow: 0.5, brightness: 0.46, grain: 0.32 },
   silk: { flow: 0.22, turbulence: 0.12, escape: 0, shadows: 0.42, glow: 0.22, brightness: 0.58, grain: 0.22, spin: 0.15 },
@@ -32,13 +49,14 @@ export const presets = {
   core: { source: 'core', flow: 0.6, turbulence: 0.72, escape: 0.3, shadows: 0.72, glow: 0.45, brightness: 0.55 },
 };
 
-const lookKeys = controls.filter((c) => c.key !== 'particles').map((c) => c.key);
-
 export function presetValues(name) {
-  const values = {};
-  for (const key of lookKeys) values[key] = defaults[key];
-  return { ...values, ...presets[name] };
+  return { ...base, ...presets[name] };
 }
+
+export const defaults = { ...presetValues('original'), particles: 1024, format: 'screen' };
+for (const c of controls) c.default = defaults[c.key];
+
+const lookKeys = controls.filter((c) => c.look !== false).map((c) => c.key);
 
 export function matchingPreset(state) {
   return Object.keys(presets).find((name) => {
@@ -63,7 +81,7 @@ export function shuffled(state) {
   };
 }
 
-// The link carries every control that differs from its default: #flow=0.62&edges=red
+// The link carries every look control that differs from its default: #flow=0.62&edges=red
 export function readHash() {
   const state = { ...defaults };
   const params = new URLSearchParams(location.hash.slice(1));
@@ -84,9 +102,20 @@ export function readHash() {
 export function writeHash(state) {
   const params = new URLSearchParams();
   for (const c of controls) {
-    if (c.key === 'particles') continue;
+    if (c.look === false) continue;
     if (state[c.key] !== c.default) params.set(c.key, String(state[c.key]));
   }
   const hash = params.toString();
   history.replaceState(null, '', hash ? `#${hash}` : location.pathname + location.search);
 }
+
+// The reference clip's camera, measured on all 734 frames.
+export const ORIGINAL_CAMERA = {
+  theta0: -0.19549770093239827, // azimuth at the first frame
+  rate: 1.0935444432884347, // radians per second (62.66° a second)
+  tilt: 0.294, // 16.85° down
+  halfHeight: 1 / 0.3171875, // the cube's half-edge is 203 px of the frame's 640 px half-height
+};
+
+// Spin 0.5 is the reference's exact speed.
+export const spinRate = (spin) => 4.374177773153739 * spin * spin;

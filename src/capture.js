@@ -1,4 +1,23 @@
-// Save a 4K still, or record the canvas to a video file.
+// Save a still or record a video, at the size the format asks for.
+
+// Image: 4K on the long side. Video: what X and Instagram play (1080 wide, or 1920 long for screen).
+const sizes = {
+  '9:16': { image: [2160, 3840], video: [1080, 1920] },
+  '4:5': { image: [3072, 3840], video: [1080, 1350] },
+  '1:1': { image: [3840, 3840], video: [1080, 1080] },
+};
+
+const even = (n) => Math.round(n / 2) * 2;
+
+export function formatSize(format, kind, screenWidth, screenHeight) {
+  if (sizes[format]) {
+    const [width, height] = sizes[format][kind];
+    return { width, height };
+  }
+  const long = kind === 'image' ? 3840 : 1920;
+  const scale = long / Math.max(screenWidth, screenHeight);
+  return { width: even(screenWidth * scale), height: even(screenHeight * scale) };
+}
 
 function download(blob, name) {
   const url = URL.createObjectURL(blob);
@@ -13,45 +32,25 @@ function stamp() {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
-function setRatio({ renderer, composer, width, height }, ratio) {
-  renderer.setPixelRatio(ratio);
-  renderer.setSize(width, height, false);
-  composer.setPixelRatio(ratio);
-  composer.setSize(width, height);
-}
-
-// The long side becomes 3840 px. The frame is drawn once more at that size, read, then the
-// canvas goes back to screen size before the next frame.
-export function saveImage(ctx) {
-  const { renderer, render, width, height } = ctx;
-  const screen = renderer.getPixelRatio();
-  const ratio = 3840 / Math.max(width, height);
-  setRatio(ctx, ratio);
+// Draws one frame at the export size and reads it in the same task, before the browser clears it.
+export function saveImage({ canvas, render, width, height }) {
   render(0);
   return new Promise((resolve, reject) => {
-    renderer.domElement.toBlob((blob) => {
+    canvas.toBlob((blob) => {
       if (!blob) return reject(new Error('Could not read the image.'));
-      download(blob, `pure-smoke-${stamp()}.png`);
-      resolve(`${Math.round(width * ratio)} × ${Math.round(height * ratio)}`);
+      download(blob, `pure-smoke-${width}x${height}-${stamp()}.png`);
+      resolve(`${width} × ${height}`);
     }, 'image/png');
-    setRatio(ctx, screen);
   });
 }
 
 const types = ['video/mp4;codecs=avc1.640033', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
 
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-
-// Records what the canvas shows, at up to 1920 px on the long side (the size X plays).
+// Records what the canvas draws while the render loop keeps running at the export size.
 export async function recordVideo(ctx) {
-  const { renderer, canvas, width, height, onProgress, seconds } = ctx;
+  const { canvas, onProgress, seconds } = ctx;
   const type = types.find((t) => window.MediaRecorder?.isTypeSupported(t));
   if (!type) throw new Error('This browser cannot record video.');
-
-  // Give the cube time to glide back to the centre before the first frame.
-  await wait(450);
-  const screen = renderer.getPixelRatio();
-  setRatio(ctx, Math.min(screen, 1920 / Math.max(width, height)));
 
   const stream = canvas.captureStream(60);
   const recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 24_000_000 });
@@ -73,9 +72,8 @@ export async function recordVideo(ctx) {
   recorder.stop();
   await stopped;
   stream.getTracks().forEach((track) => track.stop());
-  setRatio(ctx, screen);
 
   const extension = type.startsWith('video/mp4') ? 'mp4' : 'webm';
-  download(new Blob(chunks, { type: type.split(';')[0] }), `pure-smoke-${stamp()}.${extension}`);
+  download(new Blob(chunks, { type: type.split(';')[0] }), `pure-smoke-${canvas.width}x${canvas.height}-${stamp()}.${extension}`);
   return extension;
 }
