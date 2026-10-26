@@ -3,6 +3,7 @@ import {
   BufferGeometry,
   Color,
   CustomBlending,
+  DoubleSide,
   Group,
   MaxEquation,
   Mesh,
@@ -16,9 +17,9 @@ import {
 // width without multisampling. Front edges are laid over the smoke. Back edges use max blending:
 // over dark air they show, behind bright smoke they disappear, as if the smoke were in front.
 //
-// Each edge is a crisp line (it can also take the lens's blur, though the app keeps the frame sharp).
-// It dims a little with distance, is a touch thicker where it is near, meets the next edge with a
-// round join, and carries a faint glow, like light caught on the rim of glass.
+// Each edge is a plain stroke: one width and one brightness from end to end, meeting the next edge
+// with a round join. (The shader can also blur, fade with distance and glow; the app keeps all three
+// off, so the frame reads as a clean line at any zoom.)
 
 // sRGB, written straight to the screen. Red is the reference clip's edge colour.
 const colors = { white: new Color(0.95, 0.95, 0.95), red: new Color(0.78, 0.02, 0.1), off: new Color(0.95, 0.95, 0.95) };
@@ -46,20 +47,22 @@ const vertexShader = /* glsl */ `
     vec4 b = projectionMatrix * modelViewMatrix * vec4(other, 1.0);
     vec2 sa = a.xy / a.w * 0.5 * uResolution;
     vec2 sb = b.xy / b.w * 0.5 * uResolution;
-    vec2 along = normalize(sb - sa);
+    // One direction for the whole edge, start to end, so both ends agree which side is which and the
+    // strip is a true rectangle (worked out from each end separately, it twisted into a bow tie).
+    vec2 along = end < 0.5 ? normalize(sb - sa) : normalize(sa - sb);
     vec2 across = vec2(-along.y, along.x);
 
     float depth = -va.z;
-    // A touch thicker near the camera, thinner far away (perspective lens only).
-    float near = projectionMatrix[3][3] == 0.0 ? pow(uCentreDepth / depth, 0.7) : 1.0;
-    float width = uWidth * near;
+    // A plain stroke: the same width from end to end, near or far.
+    float width = uWidth;
     // The same circle of confusion as the grains: the line widens and keeps its light.
     float coc = min(uBlur * abs(depth - uFocusDepth) * 18.0, 28.0) * uResolution.y / 1280.0;
     float wide = sqrt(width * width + coc * coc);
 
     // Half the width, the glow and a pixel for the soft edge, on both sides and past each end.
     float reach = wide * 0.5 + uGlowRadius + 1.0;
-    vec2 s = sa + across * side * reach - along * reach;
+    // Past each end by the same reach, so the round joins have room.
+    vec2 s = sa + across * side * reach + along * reach * (end < 0.5 ? -1.0 : 1.0);
     // w = 1 keeps every varying linear on screen, so distances stay in true pixels.
     gl_Position = vec4(s / (0.5 * uResolution), a.z / a.w, 1.0);
 
@@ -71,6 +74,7 @@ const vertexShader = /* glsl */ `
     vSoft = coc / wide;
     float fade = mix(1.0, 0.72, smoothstep(uCentreDepth - 1.5, uCentreDepth + 1.5, depth) * uDepthShade);
     vShade = (width / wide) * fade;
+    vShade = uDepthShade > 0.0 ? vShade : width / wide;
   }`;
 
 const fragmentShader = /* glsl */ `
@@ -103,6 +107,7 @@ function edgeGeometry(a, b) {
   // Two vertices at each end, one either side of the line.
   const positions = [...a, ...a, ...b, ...b];
   const others = [...b, ...b, ...a, ...a];
+  // Corners in order around the strip: start right, start left, end left, end right.
   const sides = [-1, 1, 1, -1];
   const ends = [0, 0, 1, 1];
   const geometry = new BufferGeometry();
@@ -128,12 +133,13 @@ export function createCube() {
     uGlow: { value: 0 },
     uGlowRadius: { value: 3 },
   });
+  // DoubleSide: the strips are flat on the screen, so which way they wind must never hide them.
   const front = new ShaderMaterial({
-    vertexShader, fragmentShader, uniforms: uniforms(),
+    vertexShader, fragmentShader, uniforms: uniforms(), side: DoubleSide,
     transparent: true, depthTest: false, depthWrite: false, blending: NormalBlending,
   });
   const back = new ShaderMaterial({
-    vertexShader, fragmentShader, uniforms: uniforms(),
+    vertexShader, fragmentShader, uniforms: uniforms(), side: DoubleSide,
     transparent: true, depthTest: false, depthWrite: false,
     blending: CustomBlending, blendEquation: MaxEquation, blendEquationAlpha: MaxEquation,
   });

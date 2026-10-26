@@ -63,7 +63,7 @@ Every grain is one texel in two float textures (position and age, velocity and s
 - **Light:** the grains are also splatted into 16 horizontal density slices, summed from the top down. Each grain reads how much smoke sits above it and dims to match, so the smoke shades itself.
 - **Image:** grains are drawn as soft dots into a float buffer (full floats where the GPU can blend them, so millions of faint grains add up without banding). Below 1.6 px they keep their size and lose brightness instead, so nothing shimmers. Bloom, a film-like highlight roll-off, grain and dithering finish the image.
 - **Colours from an image:** every pixel is laid out in a ribbon grouped by colour. A grain takes its colour from where the ribbon is when it is born, and the ribbon turns once every 6 s: smoke born together shares a colour, like dye in smoke, and over a turn each pixel colours its exact share.
-- **Edges:** anti-aliased quads drawn after the grade. They stay crisp at any blur, the fixed frame the smoke moves in; they fade a little with distance, join in round corners, and carry a faint glow. Back edges use max blending, so bright smoke in front hides them.
+- **Edges:** a plain stroke, one width and one brightness end to end, drawn as anti-aliased screen-space strips after the grade, with round joins at the corners. Back edges use max blending, so bright smoke in front hides them.
 
 All of it is in `src/`. Start with `settings.js` for the controls and looks, and `simulation.js` for the flow.
 

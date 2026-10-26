@@ -121,9 +121,10 @@ function applyOutput() {
 
 function applyFrame() {
   const pixelsHigh = output.height * output.ratio;
-  // Edges are 2.8 px on a 1280 px frame with the flat lens (the reference's weight), 1.4 px with depth.
-  const lineWidth = ((view.lens === 'flat' ? 2.8 : 1.4) * pixelsHigh) / 1280;
-  cube.setOutput(output.width * output.ratio, pixelsHigh, Math.max(1, lineWidth));
+  // Edges are 2.8 px on a 1280 px frame with the flat lens (the reference's weight), 2.4 px with depth,
+  // and never thinner than one screen point, so the stroke always reads.
+  const lineWidth = ((view.lens === 'flat' ? 2.8 : 2.4) * pixelsHigh) / 1280;
+  cube.setOutput(output.width * output.ratio, pixelsHigh, Math.max(output.ratio, lineWidth));
   view.frame(output.width, output.height, output.offsetX, output.offsetY);
   grade.uniforms.uAspect.value = output.width / output.height;
   grade.uniforms.uCenter.value = [0.5 - output.offsetX / output.width, 0.5 + output.offsetY / output.height];
@@ -197,14 +198,9 @@ function render(dt) {
   grade.uniforms.uLift.value = Math.min(1, live.glow * 4);
   grade.uniforms.uTime.value = time;
 
-  // The cube's frame stays solid and crisp whatever the blur: it is the fixed reference the smoke moves
-  // in. Depth shading and the glow belong to the depth lens and the glow slider, so the flat original
-  // keeps clean, even lines.
+  // The cube's frame is a plain stroke: no blur, no fade, no glow, the same line at any zoom.
   cube.update(state.edges, 1, camera, exporting || !rendered ? Infinity : dt, {
-    blur: 0,
-    focusDepth: camera.position.length() + (live.focus - 0.5) * 3.6,
-    glow: live.glow * 0.35,
-    depthShade: view.lens === 'depth' ? 1 : 0,
+    blur: 0, focusDepth: 0, glow: 0, depthShade: 0,
   });
   rendered = true;
   renderer.setClearColor(0x000000, 1);
