@@ -160,11 +160,11 @@ export function createUI(app) {
   const head = h('div', { class: 'panel-head' },
     h('span', { class: 'micro micro-strong' }, 'Parameters'),
     h('button', { type: 'button', class: 'text-button micro', onclick: () => setOpen(false), 'aria-label': 'Hide parameters (H)' }, 'Hide'));
-  // The two buttons people reach for first: a new random look, or back to the original.
+  // The two buttons people reach for first: a new random look, or back to the default look.
   const quick = h('div', { class: 'quick' },
     h('button', { type: 'button', class: 'pill pill-randomize', onclick: (e) => { rollDie(e.detail === 0); shuffle(); }, title: 'Randomize (R)' },
       h('span', { class: 'die', 'aria-hidden': 'true' }), 'randomize'),
-    h('button', { type: 'button', class: 'pill', onclick: () => applyLook(presetValues('original'), 'original') }, 'reset'));
+    h('button', { type: 'button', class: 'pill', onclick: () => applyLook(presetValues('pure'), 'pure') }, 'reset'));
   // The die rolls a quarter turn per click (a die looks the same each quarter, so it reads as a roll).
   let turns = 0;
   function rollDie(instant) {

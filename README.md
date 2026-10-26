@@ -12,7 +12,7 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 
 | Group | Control | What it does |
 | --- | --- | --- |
-| Look | original, smoke, storm, silk, plume, core | Starting points. **Randomize** picks a random look that still reads well; **reset** goes back to the original. |
+| Look | pure, original, smoke, storm, silk, plume, core | Starting points. **Pure** is the default: the clip's breath through a depth lens, with fine filaments, soft focus and sealed glass. **Randomize** picks a random look that still reads well; **reset** goes back to pure. |
 | Smoke | source | Where the smoke is born: wandering clouds, a plume at the bottom, or a core in the middle. |
 | | flow | How fast the current moves. |
 | | turbulence | How many small eddies ride on the big swirls. Calm smoke also turns in bigger rolls. |
@@ -35,7 +35,7 @@ Measured on an Apple M5 at 2560 × 1600: 1M grains take about 8 ms a frame, 2M a
 
 ## The original look
 
-The default look takes its camera and its movement from a reference clip (734 frames, 720 × 1280) of particle smoke in a turning wireframe cube, and keeps the studio's own particle texture.
+The original look takes its camera and its movement from a reference clip (734 frames, 720 × 1280) of particle smoke in a turning wireframe cube, and keeps the studio's own particle texture.
 
 - **Camera, exact.** Measured on every frame: an orthographic view looking 16.85° down, turning at 62.66° a second, with the cube's half-edge at 203 px on a 1280 px frame. When the look starts, its edges land on the clip's edges frame for frame.
 - **Movement, measured frame by frame.** Every one of the clip's 734 frames was analysed at full resolution with optical flow, with the camera's own motion taken out. Each frame's vertical motion splits into a swell (spreading apart or squeezing together), a drift, a swirl in the picture's plane, and turbulence. Folded over its 12 beats (one every 1.994 s), the breath goes: a burst right after the smallest point, easing out into the glass; a float at the fullest, when the smoke is calmest; then a collapse that gets faster and twists, sinking as it swells and rising as it collapses, and a bounce straight back. The pulse plays those measured curves on the clip's clock, and gather holds the mass together only while it collapses. Measured inside the simulation, its swell follows the clip's through the beat at a correlation of +0.88; on the picture, the cube fills and empties on the clip's beats.

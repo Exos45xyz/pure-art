@@ -41,6 +41,12 @@ const base = {
 // "original" is the reference clip: its camera (flat lens, 16.85° down, 62.66°/s), its red edges,
 // no glow or grain on a pure black ground. See README › The original look.
 export const presets = {
+  // Romain's look: the clip's breath through a depth lens, fine filaments, soft focus, sealed glass.
+  pure: {
+    flow: 0.45, turbulence: 0.51, spread: 0, gather: 0.98, pulse: 1, escape: 0,
+    brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.42,
+    grain: 0.4, blur: 0.4, focus: 0.5, spin: 0.13, lens: 'depth', edges: 'white',
+  },
   // The reference clip's camera and movement, measured frame by frame, with the studio's particle
   // texture: see README › The original look.
   original: {
@@ -59,7 +65,7 @@ export function presetValues(name) {
   return { ...base, ...presets[name] };
 }
 
-export const defaults = { ...presetValues('original'), particles: 1024, format: 'screen' };
+export const defaults = { ...presetValues('pure'), particles: 1024, format: 'screen' };
 for (const c of controls) c.default = defaults[c.key];
 
 const lookKeys = controls.filter((c) => c.look !== false).map((c) => c.key);
