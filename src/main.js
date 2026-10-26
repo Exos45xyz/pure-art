@@ -11,7 +11,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { createCube } from './cube.js';
 import { GradeShader } from './grade.js';
 import { createSimulation } from './simulation.js';
-import { pulseAt, readHash, spinRate, writeHash } from './settings.js';
+import { breathAt, readHash, spinRate, writeHash } from './settings.js';
 import { createSmoke } from './smoke.js';
 import { createUI } from './ui.js';
 import { createView } from './view.js';
@@ -57,8 +57,13 @@ let simulation;
 let smoke;
 // The clip's clock: zero when the original look starts, so its pulse lands on the clip's beats.
 let clock = 0;
+const towardCamera = new Vector3();
 function simStep(dt, withStir = true) {
-  simulation.step(dt, live, state.source, withStir ? stir : null, live.pulse * pulseAt(clock));
+  // The breath turns in the picture's plane, so the sim needs to know where the camera looks from.
+  view.camera.getWorldDirection(towardCamera).negate();
+  // The smoke answers the breath a little early (a compact mass springs back out on its own), so the
+  // breath is fed 0.2 s late; measured inside the simulation, its swell then lines up with the clip's.
+  simulation.step(dt, live, state.source, withStir ? stir : null, breathAt(clock - 0.2), towardCamera);
   clock += dt;
 }
 function build(size) {

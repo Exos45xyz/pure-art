@@ -44,7 +44,7 @@ export const presets = {
   // The reference clip's camera and movement, measured frame by frame, with the studio's particle
   // texture: see README › The original look.
   original: {
-    flow: 1, turbulence: 0.1, spread: 0.45, gather: 1, pulse: 1, escape: 0,
+    flow: 1, turbulence: 0.3, spread: 0.45, gather: 1, pulse: 1, escape: 0,
     brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.35,
     grain: 0.4, spin: 0.5, lens: 'flat', edges: 'red',
   },
@@ -131,14 +131,34 @@ export const ORIGINAL_CAMERA = {
 // The reference breathes: every 1.994 s the smoke fills the cube and pulls back, first peak at 1.192 s.
 export const ORIGINAL_PULSE = { period: 1.994, firstPeak: 1.192 };
 
-// How hard the pulse pushes at a point of its cycle (phase 0.5 = the smoke at its fullest). The push
-// builds on the rising half and holds through the beat, so the smoke stays pressed against the glass
-// for about half a second, as in the clip, then lets go.
-const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-export function pulseAt(clock) {
+// One breath of the reference, measured on every frame at full resolution and folded over its 12 beats
+// (20 steps, step i centred on phase (i + 0.5) / 20, phase 0.5 = the smoke at its fullest). With the
+// camera's own motion removed, the smoke's vertical motion splits into:
+//   swell  how fast it spreads apart (+) or squeezes together (-), per second; the same horizontally
+//   drift  the whole mass rising (+) or sinking (-), in half-edges per second
+//   swirl  turning in the picture's plane (+ counter-clockwise), per second
+//   energy how lively the turbulence is, relative to its average
+// It bursts out right after its smallest point, floats at its fullest, then collapses faster and faster
+// with a twist, and bounces straight back.
+const BREATH = {
+  swell: [0.0, 0.36, 0.43, 0.58, 0.62, 0.62, 0.5, 0.34, 0.25, 0.12, -0.01, -0.1, -0.18, -0.36, -0.46, -0.45, -0.52, -0.61, -0.82, -0.45],
+  drift: [0.18, -0.02, 0.08, -0.09, -0.33, -0.32, -0.26, -0.17, -0.13, -0.08, -0.03, 0.0, -0.04, -0.05, -0.08, -0.09, 0.08, 0.18, 0.28, 0.21],
+  swirl: [-0.25, -0.18, -0.34, -0.12, 0.03, -0.02, -0.07, -0.07, -0.03, 0.03, 0.12, 0.08, 0.14, 0.08, -0.15, -0.23, -0.1, -0.15, -0.43, -0.39],
+  energy: [0.92, 0.94, 0.88, 0.89, 0.95, 0.89, 0.77, 0.68, 0.63, 0.64, 0.57, 0.57, 0.61, 0.69, 0.83, 0.82, 0.8, 0.76, 0.95, 1.03].map((e) => e / 0.79),
+};
+
+// The breath at a moment of the clip's clock, eased between the measured steps.
+export function breathAt(clock) {
   const phase = ((((clock - ORIGINAL_PULSE.firstPeak) / ORIGINAL_PULSE.period + 0.5) % 1) + 1) % 1;
-  // The swell takes about 0.4 s to fill the cube, so it starts that much before the beat.
-  return smooth(0.02, 0.16, phase) * (1 - smooth(0.4, 0.52, phase));
+  const x = phase * 20 - 0.5;
+  const i = Math.floor(x);
+  const f = x - i;
+  const w = f * f * (3 - 2 * f);
+  const at = (curve) => curve[(i + 20) % 20] * (1 - w) + curve[(i + 21) % 20] * w;
+  // The mass lets go of itself from the burst through the float, and pulls together for the collapse.
+  const smooth = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const hold = 1 - smooth(0.02, 0.12, phase) * (1 - smooth(0.66, 0.8, phase));
+  return { swell: at(BREATH.swell), drift: at(BREATH.drift), swirl: at(BREATH.swirl), energy: at(BREATH.energy), hold };
 }
 
 // Spin 0.5 is the reference's exact speed.

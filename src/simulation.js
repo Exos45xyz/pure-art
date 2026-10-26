@@ -24,6 +24,12 @@ float openness(vec3 p, float t) {
 const bodies = /* glsl */ `
 uniform float uGather;
 uniform float uPulse;
+uniform float uSwell;
+uniform float uDrift;
+uniform float uSwirl;
+uniform float uEnergy;
+uniform float uHold;
+uniform vec3 uTowardCamera;
 vec3 centre(float k, float t) {
   return 0.6 * vec3(
     sin(t * (0.53 + 0.17 * k) + k * 2.1) * cos(t * 0.21 + k),
@@ -88,7 +94,8 @@ void main() {
   v += octave(p, 1.9, vec3(t * 0.11, 3.7, -t * 0.08), R, slope, gradD) * 0.65 * uTurbulence;
   // The finest swirls only once they'd show; below that they cost two noises for nothing.
   if (uTurbulence > 0.15) v += octave(p, 4.3, vec3(-7.1, t * 0.19, t * 0.15), R, slope, gradD) * 0.4 * uTurbulence * uTurbulence;
-  vec3 target = v * uSpeed;
+  // The breath makes the turbulence livelier at the burst and calmer while the smoke floats.
+  vec3 target = v * uSpeed * mix(1.0, uEnergy, uPulse);
   // Spread: each grain also wanders at random, a new direction every third of a second.
   // The flow alone stretches smoke into thin sheets; this puffs them back out into volumes.
   vec3 wander = hash33(vec3(gl_FragCoord.xy, floor(t * 3.0 + vel.w * 7.0))) * 2.0 - 1.0;
@@ -101,16 +108,19 @@ void main() {
     vec3 c = centre(k, t);
     vec3 toCentre = c - p;
     vec3 axis = normalize(vec3(sin(k * 2.3 + 1.0), 0.8, cos(k * 1.7)));
-    // While the pulse pushes, the bodies let go.
-    float hold = uGather * (1.0 - 0.95 * min(uPulse, 1.0));
+    // The bodies hold together; with the breath on, only while it collapses.
+    float hold = uGather * mix(1.0, uHold, uPulse);
     target += toCentre * hold * 3.36 - cross(axis, toCentre) * hold * 2.24;
-    // The pulse: the mass swells until it fills the glass. Each grain moves in proportion to its
-    // distance from the middle, so the whole shape scales up and fills the cube instead of
-    // leaving it hollow; the glass then holds it flat against the faces.
-    vec3 swell = p - c * 0.4;
-    // About 2.6 per second over the push: the mass grows two to three times, just enough to reach
-    // the glass.
-    target += swell * uPulse * 2.6 * (1.0 - smoothstep(0.85, 1.0, max(a.x, max(a.y, a.z))));
+    // The breath, as measured: each grain moves in proportion to its distance from the middle, so the
+    // whole shape scales up (swell > 0) or down (swell < 0) and fills the cube instead of going hollow.
+    // The glass holds it at the faces. Then the whole mass drifts up or down and turns in the picture.
+    vec3 fromMiddle = p - c * 0.4;
+    float atGlass = smoothstep(0.85, 1.0, max(a.x, max(a.y, a.z)));
+    // Squeezing needs more force than swelling: a compact mass's own turbulence pushes it back out.
+    float gain = uSwell > 0.0 ? 0.6 * (1.0 - atGlass) : 1.2;
+    target += fromMiddle * uSwell * uPulse * gain;
+    target.y += uDrift * uPulse;
+    target += cross(uTowardCamera, p) * uSwirl * uPulse;
   }
 
   // Sources shape the current: a plume rises and pools under the lid, a core breathes outward.
@@ -236,6 +246,12 @@ export function createSimulation(renderer, size) {
     uSpread: { value: 0 },
     uGather: { value: 0 },
     uPulse: { value: 0 },
+    uSwell: { value: 0 },
+    uDrift: { value: 0 },
+    uSwirl: { value: 0 },
+    uEnergy: { value: 1 },
+    uHold: { value: 1 },
+    uTowardCamera: { value: new Vector3(0, 0, 1) },
     uEscape: { value: 0 },
     uSource: { value: 0 },
     uRayOrigin: { value: new Vector3(0, 0, 100) },
@@ -249,6 +265,11 @@ export function createSimulation(renderer, size) {
     uSpread: { value: 0 },
     uGather: { value: 0 },
     uPulse: { value: 0 },
+    uSwell: { value: 0 },
+    uDrift: { value: 0 },
+    uSwirl: { value: 0 },
+    uEnergy: { value: 1 },
+    uTowardCamera: { value: new Vector3(0, 0, 1) },
     uEscape: { value: 0 },
   });
 
@@ -263,8 +284,8 @@ export function createSimulation(renderer, size) {
     size,
     count: size * size,
     // live: the eased control values. stir: { origin, direction, velocity } in cube space.
-    // pulse: how hard the smoke is pushed out right now (0 = not at all).
-    step(dt, live, source, stir, pulse = 0) {
+    // breath: the measured breath at this moment ({ swell, drift, swirl, energy }), scaled by live.pulse.
+    step(dt, live, source, stir, breath = null, towardCamera = null) {
       const speed = 0.06 + live.flow * 0.62;
       // The swirls change faster when the smoke moves faster, so fast smoke churns
       // instead of racing along fixed paths. At the studio's usual speed the pace is 1.
@@ -276,7 +297,15 @@ export function createSimulation(renderer, size) {
       vu.uTurbulence.value = live.turbulence;
       vu.uSpread.value = pu.uSpread.value = live.spread;
       vu.uGather.value = pu.uGather.value = live.gather;
-      vu.uPulse.value = pu.uPulse.value = pulse;
+      vu.uPulse.value = pu.uPulse.value = breath ? live.pulse : 0;
+      if (breath) {
+        vu.uSwell.value = breath.swell;
+        vu.uDrift.value = breath.drift;
+        vu.uSwirl.value = breath.swirl;
+        vu.uEnergy.value = breath.energy;
+        vu.uHold.value = breath.hold;
+      }
+      if (towardCamera) vu.uTowardCamera.value.copy(towardCamera);
       vu.uEscape.value = pu.uEscape.value = live.escape;
       if (stir) {
         vu.uRayOrigin.value.copy(stir.origin);
