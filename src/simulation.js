@@ -45,6 +45,7 @@ uniform float uDt;
 uniform float uSpeed;
 uniform float uTurbulence;
 uniform float uSpread;
+uniform float uRebound;
 uniform float uSource;
 uniform vec3 uRayOrigin;
 uniform vec3 uRayDirection;
@@ -136,9 +137,14 @@ void main() {
   target += uStir * exp(-dot(across, across) * 16.0);
 
   // Rebound off the glass. Near a closed wall the current may only run along it, never into it;
-  // a grain that reaches the glass moving outward bounces straight back with 90% of its speed (and a
-  // small kick, so even slow smoke springs off), and part of the impact splashes sideways along the
-  // glass. Close to the glass the smoke eases back into the current slowly, so the bounce carries.
+  // a grain that reaches the glass moving outward bounces straight back (at rebound 0.5 with 90% of its
+  // speed and a small kick, so even slow smoke springs off), and part of the impact splashes sideways
+  // along the glass. Close to the glass the smoke eases back into the current slowly, so the bounce
+  // carries. Rebound 0 lets the smoke settle on the glass; 1 throws it back hard and far.
+  float rebound = uRebound * 2.0;
+  float restitution = min(0.9 * rebound, 1.0);
+  float kick = 0.25 * rebound * rebound;
+  float carry = rebound <= 1.0 ? mix(9.0, 2.5, rebound) : mix(2.5, 1.2, rebound - 1.0);
   vec3 outward = -gradD;
   float sealed = (1.0 - open) * inside;
   float nearGlass = (1.0 - smoothstep(0.0, 0.15, d)) * sealed;
@@ -157,12 +163,12 @@ void main() {
   if (d < 0.05 && into > 0.0 && sealed > 0.5) {
     vec3 along = p - outward * dot(p, outward);
     vec3 splash = length(along) > 1e-4 ? normalize(along) : vec3(0.0);
-    bounced += -outward * (into * 1.9 + 0.25) + splash * into * 1.2;
+    bounced += -outward * (into * (1.0 + restitution) + kick) + splash * into * 1.2 * min(rebound, 1.4);
   }
 
   // A grain that was just born takes the current at once; the others ease into it. Near the glass the
   // bounce off it eases out slowly, while the slide along it picks up speed quickly.
-  float response = pos.w < 0.015 ? 1.0 : 1.0 - exp(-uDt * mix(9.0, 2.5, nearGlass));
+  float response = pos.w < 0.015 ? 1.0 : 1.0 - exp(-uDt * mix(9.0, carry, nearGlass));
   vec3 next = mix(bounced, target, response);
   vec3 slide = next - outward * dot(next, outward);
   vec3 slideTarget = target - outward * dot(target, outward);
@@ -274,6 +280,7 @@ export function createSimulation(renderer, size) {
     uSpeed: { value: 0 },
     uTurbulence: { value: 0 },
     uSpread: { value: 0 },
+    uRebound: { value: 0.5 },
     uGather: { value: 0 },
     uPulse: { value: 0 },
     uSwell: { value: 0 },
@@ -326,6 +333,7 @@ export function createSimulation(renderer, size) {
       vu.uSpeed.value = speed;
       vu.uTurbulence.value = live.turbulence;
       vu.uSpread.value = pu.uSpread.value = live.spread;
+      vu.uRebound.value = live.rebound;
       vu.uGather.value = pu.uGather.value = live.gather;
       vu.uPulse.value = pu.uPulse.value = breath ? live.pulse : 0;
       if (breath) {

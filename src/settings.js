@@ -13,6 +13,7 @@ export const controls = [
   { group: 'Smoke', key: 'gather', label: 'gather' },
   { group: 'Smoke', key: 'pulse', label: 'pulse' },
   { group: 'Smoke', key: 'escape', label: 'escape' },
+  { group: 'Smoke', key: 'rebound', label: 'rebound' },
 
   { group: 'Light', key: 'brightness', label: 'brightness' },
   { group: 'Light', key: 'shadows', label: 'shadows' },
@@ -36,7 +37,7 @@ export const controls = [
 
 // The studio look every other look starts from.
 const base = {
-  source: 'volume', flow: 0.45, turbulence: 0.5, spread: 0, gather: 0, pulse: 0, escape: 0,
+  source: 'volume', flow: 0.45, turbulence: 0.5, spread: 0, gather: 0, pulse: 0, escape: 0, rebound: 0.5,
   brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.35,
   grain: 0.4, blur: 0, focus: 0.5, spin: 0.2, lens: 'depth', edges: 'white',
 };
@@ -90,6 +91,7 @@ export function shuffled(state) {
     turbulence: r(0.1, 0.95),
     // Randomize never opens the glass: the smoke stays in the cube. Escape is a choice you make.
     escape: 0,
+    rebound: r(0.25, 0.85),
     brightness: r(0.4, 0.62),
     shadows: r(0.35, 0.85),
     glow: r(0.15, 0.55),
