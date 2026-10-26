@@ -20,7 +20,7 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 | | spread | How much each grain wanders on its own, which puffs thin sheets out into soft volumes. |
 | | gather | Pulls the smoke into bodies that chase two centres racing around the cube, so it moves as whole masses. |
 | | pulse | The breath: every 1.994 s the masses swell until they fill the cube, then pull back in. |
-| | escape | How much smoke finds its way out through the glass. |
+| | escape | How much smoke finds its way out through the glass. Every look and randomize keep it at 0, so the smoke stays in the cube unless you open it yourself. |
 | Light | brightness, shadows, glow, film grain | Exposure, how much the smoke shades itself, the soft glow around it, and grain. |
 | Particles | count | 65k, 262k, 1M, 2M or 4M grains. Computers start at 1M and step down to 262k if they can't keep 45 fps. |
 | | size | How big each grain is. |

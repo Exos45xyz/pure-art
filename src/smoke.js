@@ -213,8 +213,13 @@ export function createSmoke(size, type = HalfFloatType) {
         // total light, so blurred smoke gets softer, not brighter.
         float coc = min(uBlur * abs(-view.z - uFocusDepth) * 18.0, 28.0) * uHeight / 1280.0;
         float blurred = sqrt(px * px + coc * coc);
+        // Never wider than the grain's distance to the glass: a grain against a wall stays a point,
+        // so nothing drawn spills past the cube's outline.
+        float pxPerUnit = uHeight * projectionMatrix[1][1] * 0.5 * perspective;
+        float gap = max(1.0 - reach, 0.0);
+        blurred = min(blurred, max(1.6, 2.0 * gap * pxPerUnit + 1.0));
         alpha *= (px * px) / (blurred * blurred);
-        vSoft = coc / blurred;
+        vSoft = sqrt(max(blurred * blurred - px * px, 0.0)) / blurred;
         gl_PointSize = blurred;
 
         vLight = 0.06 + 0.94 * exp(-opticalDepth(p) * uShadow);

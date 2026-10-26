@@ -36,7 +36,7 @@ export const controls = [
 
 // The studio look every other look starts from.
 const base = {
-  source: 'volume', flow: 0.45, turbulence: 0.5, spread: 0, gather: 0, pulse: 0, escape: 0.18,
+  source: 'volume', flow: 0.45, turbulence: 0.5, spread: 0, gather: 0, pulse: 0, escape: 0,
   brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.35,
   grain: 0.4, blur: 0, focus: 0.5, spin: 0.2, lens: 'depth', edges: 'white',
 };
@@ -58,10 +58,10 @@ export const presets = {
     grain: 0.4, spin: 0.5, lens: 'flat', edges: 'red',
   },
   smoke: {},
-  storm: { flow: 0.82, turbulence: 0.92, escape: 0.34, shadows: 0.78, glow: 0.5, brightness: 0.46, grain: 0.32 },
+  storm: { flow: 0.82, turbulence: 0.92, shadows: 0.78, glow: 0.5, brightness: 0.46, grain: 0.32 },
   silk: { flow: 0.22, turbulence: 0.12, escape: 0, shadows: 0.42, glow: 0.22, brightness: 0.58, grain: 0.22, spin: 0.15 },
-  plume: { source: 'plume', flow: 0.55, turbulence: 0.55, escape: 0.55, shadows: 0.7, glow: 0.4 },
-  core: { source: 'core', flow: 0.6, turbulence: 0.72, escape: 0.3, shadows: 0.72, glow: 0.45, brightness: 0.55 },
+  plume: { source: 'plume', flow: 0.55, turbulence: 0.55, shadows: 0.7, glow: 0.4 },
+  core: { source: 'core', flow: 0.6, turbulence: 0.72, shadows: 0.72, glow: 0.45, brightness: 0.55 },
 };
 
 export function presetValues(name) {
@@ -88,7 +88,8 @@ export function shuffled(state) {
     source: ['volume', 'volume', 'plume', 'core'][Math.floor(Math.random() * 4)],
     flow: r(0.2, 0.85),
     turbulence: r(0.1, 0.95),
-    escape: r(0, 0.5),
+    // Randomize never opens the glass: the smoke stays in the cube. Escape is a choice you make.
+    escape: 0,
     brightness: r(0.4, 0.62),
     shadows: r(0.35, 0.85),
     glow: r(0.15, 0.55),
