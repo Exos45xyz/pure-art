@@ -5,7 +5,9 @@ export const controls = [
   { group: 'Colour', key: 'colour', label: 'colour', type: 'choice', look: false,
     options: [['white', 'white'], ['dusk', 'dusk'], ['pearl', 'pearl'], ['image', 'image']] },
 
-  { group: 'Smoke', key: 'source', label: 'source', type: 'choice',
+  // Where the smoke is born. Not in the panel: with gather on (pure's masses) the smoke is born at the
+  // gather centres and the source changes nothing you see; the looks and randomize set it where it shows.
+  { group: 'Smoke', key: 'source', label: 'source', type: 'choice', hidden: true,
     options: [['volume', 'volume'], ['plume', 'plume'], ['core', 'core']] },
   { group: 'Smoke', key: 'flow', label: 'flow' },
   { group: 'Smoke', key: 'turbulence', label: 'turbulence' },
@@ -117,6 +119,15 @@ export function shuffled(state) {
     rebound: r(0.3, 0.85),
     focus: r(0.3, 0.7),
   };
+}
+
+// The current look as code, ready to paste into presets above (copy code in the panel).
+export function lookCode(state) {
+  const value = (v) => (typeof v === 'string' ? `'${v}'` : String(v));
+  const keys = controls.filter((c) => c.look !== false).map((c) => c.key);
+  const lines = [];
+  for (let i = 0; i < keys.length; i += 6) lines.push('    ' + keys.slice(i, i + 6).map((k) => `${k}: ${value(state[k])}`).join(', ') + ',');
+  return `  // A Pure Smoke look: paste it into presets in src/settings.js.\n  mine: {\n${lines.join('\n')}\n  },\n`;
 }
 
 // The link carries every look control that differs from its default: #flow=0.62&edges=red

@@ -1,4 +1,4 @@
-import { controls, defaults, matchingPreset, presets, presetValues, shuffled } from './settings.js';
+import { controls, defaults, lookCode, matchingPreset, presets, presetValues, shuffled } from './settings.js';
 
 const h = (tag, attrs = {}, ...children) => {
   const el = document.createElement(tag);
@@ -154,7 +154,7 @@ export function createUI(app) {
   // Actions
   const save = h('button', { type: 'button', class: 'pill pill-wide', onclick: () => saveImage() }, 'save image');
   const record = h('button', { type: 'button', class: 'pill', onclick: () => openRecord(true) }, h('i', { class: 'rec-dot' }), 'record');
-  const copy = h('button', { type: 'button', class: 'pill', onclick: () => copyLink() }, 'copy link');
+  const copy = h('button', { type: 'button', class: 'pill', onclick: () => copyCode() }, 'copy code');
 
   // Controls. The everyday path comes first: a look, a colour, then save or share. The rest waits one
   // level deeper under Fine-tune, so a first visit asks for three choices instead of twenty.
@@ -188,7 +188,7 @@ export function createUI(app) {
   const tune = h('div', { class: 'tune', id: 'fine-tune' }, tuneGroups.map((group) =>
     h('section', {},
       h('h3', { class: 'micro' }, group),
-      h('div', { class: 'rows' }, controls.filter((c) => c.group === group).map((c) => field(c))))));
+      h('div', { class: 'rows' }, controls.filter((c) => c.group === group && !c.hidden).map((c) => field(c))))));
   const tuneButton = h('button', {
     type: 'button', class: 'disclosure micro', 'aria-controls': 'fine-tune', onclick: () => setTune(tune.hidden),
   }, 'Fine-tune', h('i', { class: 'chevron', 'aria-hidden': 'true' }));
@@ -373,14 +373,16 @@ export function createUI(app) {
     }
   }
 
-  async function copyLink() {
+  // The look as code (every parameter, as a preset for src/settings.js), for anyone building on it.
+  async function copyCode() {
     try {
-      await navigator.clipboard.writeText(location.href);
-      toast('link copied');
+      await navigator.clipboard.writeText(lookCode(app.state));
+      toast('code copied · paste into settings.js');
     } catch {
-      toast('copy the address bar to share');
+      toast('this browser blocked the clipboard');
     }
   }
+
 
   // Open / hide. Keyboard toggles are instant: animating something done with a shortcut feels slow.
   function setOpen(open, instant = false) {
