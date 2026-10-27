@@ -4,7 +4,7 @@
   "description": "Particle smoke in a glass cube. A free, open-source three.js toy by Pure Studio.",
   "type": "module",
   "license": "MIT",
-  "author": "Pure Studio (https://purestudio.art)",
+  "author": "Pure Studio (https://www.purestudio.art)",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5321",
     "build": "vite build",

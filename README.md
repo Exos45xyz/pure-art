@@ -75,13 +75,14 @@ All of it is in `src/`. Start with `settings.js` for the controls and looks, and
 ## Credits
 
 - [three.js](https://threejs.org) (MIT)
+- [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) by Vanilagy, for the loop's MP4 (MIT)
 - Simplex noise with gradients from [webgl-noise](https://github.com/stegu/webgl-noise) by Ian McEwan and Stefan Gustavson (MIT)
 - Hash without Sine by Dave Hoskins (MIT)
 - [Archivo](https://fonts.google.com/specimen/Archivo) and [Inter](https://rsms.me/inter/) (SIL Open Font License)
 
 ## License
 
-MIT. Use it, change it, ship it.
+[MIT](LICENSE): use it, change it, ship it. That covers the code and the two bundled colours, dusk and pearl. The Pure Studio name and logo are the studio's own and aren't part of the licence. The libraries, the noise code and the fonts keep their own licences, listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ---
 
