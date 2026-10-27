@@ -309,6 +309,7 @@ canvas:active { cursor: grabbing; }
   right: 16px;
   opacity: 0;
   transform: scale(0.95);
+  transform-origin: top right;
   pointer-events: none;
   transition: opacity 180ms ease, transform 200ms var(--ease-out);
 }
@@ -422,7 +423,7 @@ canvas:active { cursor: grabbing; }
   .ready .panel[data-hidden] { transform: translateY(calc(100% + 24px)); }
   .foot, .keys, .format-guide { display: none; }
   .brand { top: max(16px, env(safe-area-inset-top)); left: 16px; }
-  .reopen { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); }
+  .reopen { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform-origin: bottom right; }
   .toast { top: max(16px, env(safe-area-inset-top)); bottom: auto; left: 50%; }
 }
 
