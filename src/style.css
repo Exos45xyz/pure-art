@@ -81,6 +81,47 @@ canvas:active { cursor: grabbing; }
 }
 .micro b, .micro-strong { font-weight: 600; color: var(--strong); }
 
+/* ---- Loading ------------------------------------------------------------------------------- */
+
+/* Fifteen hairline columns over black. Their lines breathe and the ticks on the middle line flicker
+   one after another, left to right, while the count runs; then the whole screen fades into the smoke. */
+.loader {
+  --cols: 15;
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  background: var(--page);
+  transition: opacity 500ms var(--ease-out), visibility 0s linear 500ms;
+}
+.loaded .loader, .no-webgl .loader { opacity: 0; visibility: hidden; pointer-events: none; }
+.loader i { position: relative; }
+.loader i::before, .loader i::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  width: 1px;
+  background: #fff;
+  opacity: 0;
+  animation: 3s ease calc(var(--i) * 100ms) infinite both;
+}
+.loader i::before { top: 0; bottom: 0; animation-name: loader-line; }
+.loader i::after { top: calc(50% - 5px); height: 10px; animation-name: loader-tick; }
+/* No line at the right edge, and no ticks under the words */
+.loader i:last-of-type::before, .loader i:last-of-type::after,
+.loader i:nth-of-type(-n + 2)::after, .loader i:nth-of-type(n + 13)::after { display: none; }
+@keyframes loader-line { 0% { opacity: 0; } 25% { opacity: 0.15; } 100% { opacity: 0; } }
+@keyframes loader-tick { 0% { opacity: 0.5; } 10% { opacity: 1; } 20% { opacity: 0.25; } 100% { opacity: 0; } }
+.loader-label, .loader-count {
+  position: absolute;
+  top: calc(50% - 6px);
+  color: var(--strong);
+  white-space: nowrap;
+}
+.loader-label { left: calc(100% / var(--cols) + 8px); letter-spacing: 0.5em; }
+.loader-count { left: calc(100% * (var(--cols) - 2) / var(--cols) + 8px); font-variant-numeric: tabular-nums; }
+
 /* ---- Chrome around the canvas -------------------------------------------------------------- */
 
 .brand {
@@ -457,6 +498,10 @@ canvas:active { cursor: grabbing; }
   .brand { top: max(16px, env(safe-area-inset-top)); left: 16px; }
   .reopen { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform-origin: bottom right; }
   .toast { bottom: calc(var(--sheet, 0px) + max(8px, env(safe-area-inset-bottom)) + 12px); left: 50%; }
+  /* Ten columns on a phone: ticks only between the words */
+  .loader { --cols: 10; }
+  .loader i:nth-of-type(n + 11) { display: none; }
+  .loader i:nth-of-type(10)::before, .loader i:nth-of-type(-n + 3)::after, .loader i:nth-of-type(n + 8)::after { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -465,4 +510,8 @@ canvas:active { cursor: grabbing; }
   /* Movement goes; opacity and colour stay. The die keeps one face (it would flick between two). */
   .die { transform: none !important; }
   .choice-thumb, .gliding .slider-fill, .chevron { transition: none; }
+  /* The loader holds still: faint lines, steady ticks; it still fades out. */
+  .loader i::before, .loader i::after { animation: none; }
+  .loader i::before { opacity: 0.08; }
+  .loader i::after { opacity: 0.4; }
 }

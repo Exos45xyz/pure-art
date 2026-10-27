@@ -1,6 +1,8 @@
 import '@fontsource-variable/archivo/wdth.css';
 import '@fontsource-variable/inter';
 import './style.css';
+// First, so the loading screen starts counting before anything heavy runs.
+import { loaded } from './loader.js';
 
 import {
   FloatType, FramebufferTexture, HalfFloatType, Mesh, OrthographicCamera, Plane, PlaneGeometry, Raycaster, Scene,
@@ -511,6 +513,7 @@ requestAnimationFrame((now) => {
   last = now;
   tick(now);
   document.body.classList.add('ready');
+  loaded();
   // After the one-time entrance, the panel opens and closes on its own, faster timing.
   setTimeout(() => document.body.classList.add('settled'), 1000);
 });

@@ -13,6 +13,15 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   </head>
   <body>
+    <!-- Loading: in the page itself so it is there from the first paint; src/loader.js counts. -->
+    <div class="loader" aria-hidden="true">
+      <i style="--i: 0"></i><i style="--i: 1"></i><i style="--i: 2"></i><i style="--i: 3"></i><i style="--i: 4"></i>
+      <i style="--i: 5"></i><i style="--i: 6"></i><i style="--i: 7"></i><i style="--i: 8"></i><i style="--i: 9"></i>
+      <i style="--i: 10"></i><i style="--i: 11"></i><i style="--i: 12"></i><i style="--i: 13"></i><i style="--i: 14"></i>
+      <p class="micro loader-label">Loading</p>
+      <p class="micro loader-count"><span class="loader-num">00</span>%</p>
+    </div>
+
     <canvas aria-label="Particle smoke inside a turning glass cube. Drag to turn it, hover to stir the smoke."></canvas>
 
     <header class="brand">
