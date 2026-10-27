@@ -1,10 +1,9 @@
 import { DataTexture, NearestFilter, RGBAFormat, UnsignedByteType } from 'three';
 
-// Colours from an image, in the image's own proportions. Every pixel is read and laid out in a
-// ribbon, grouped by colour, so neighbouring places on the ribbon are neighbouring colours. Each grain
-// carries a place on it like pigment (simulation.js): a region of smoke shares one stretch of the
-// ribbon, the flow folds the regions into each other, and over time every pixel colours about its
-// share of the smoke.
+// Colours from an image, as data: every pixel is read and laid out on a colour map (colourMap), so
+// neighbouring places on the map are neighbouring colours. Each grain carries a place on it like
+// pigment (simulation.js): a region of smoke shares one neighbourhood of the map, the flow folds the
+// regions into each other, and every pixel colours its share of the smoke.
 
 const MAX_SIDE = 400; // about 160k pixels: every colour region is kept, the work stays instant
 
@@ -57,8 +56,7 @@ export async function readImage(file, name = file.name) {
 // How far apart two colours look: green counts most, blue least, as the eye sees them.
 const distance = (a, b) => 2 * (a[0] - b[0]) ** 2 + 4 * (a[1] - b[1]) ** 2 + 3 * (a[2] - b[2]) ** 2;
 
-// The image's main colours and how much of it each covers (k-means). They group the ribbon's pixels and
-// fill the strip in the panel.
+// The image's main colours and how much of it each covers (k-means), for the strip in the panel.
 function swatches(pixels, n, k = 8) {
   const sample = [];
   const step = Math.max(1, Math.floor(n / 6000));
@@ -102,48 +100,54 @@ function swatches(pixels, n, k = 8) {
     .sort((a, b) => b.share - a.share);
 }
 
-// The ribbon: all pixels, grouped by their main colour (in hue order, greys last by brightness),
-// darkest to lightest within each group, packed into a texture row by row.
-export function ribbonTexture(image) {
+// The colour map: the image's own pixels laid out on a square, like data in a latent space where near
+// means alike. Across, hue (starting at the hue the image has least of, so no colour family is cut in
+// two; greys after every hue, dark to light). Up, within each column of hue, dark to light. Every pixel
+// fills its share of the map, so a grain that wanders over it evenly meets every colour as often as the
+// picture shows it.
+const MAP = 512;
+export function colourMap(image) {
   const n = image.count;
   const px = image.pixels;
-  const centres = image.swatches.map((sw) => sw.rgb);
-  const hueOf = ([r, g, b]) => {
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    if (max - min < 24) return 10 + (r + g + b) / 765; // greys after every hue, dark to light
-    const d = max - min;
-    const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-    return ((h + 6) % 6) / 6;
-  };
-  const rank = centres.map((c, j) => [hueOf(c), j]).sort((a, b) => a[0] - b[0]).map(([, j]) => j);
-  const order = new Map(rank.map((j, i) => [j, i]));
-  const keys = new Float64Array(n);
+  const key = new Float32Array(n);
+  const light = new Float32Array(n);
+  const hue = new Float32Array(n);
+  const bins = new Float32Array(36);
   for (let i = 0; i < n; i++) {
     const r = px[i * 3], g = px[i * 3 + 1], b = px[i * 3 + 2];
-    let best = 0, dist = Infinity;
-    centres.forEach((c, j) => {
-      const d = distance([r, g, b], c);
-      if (d < dist) { dist = d; best = j; }
-    });
-    keys[i] = order.get(best) * 1000 + (0.2126 * r + 0.7152 * g + 0.0722 * b);
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+    light[i] = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    if (d < 24) {
+      hue[i] = -1;
+      continue;
+    }
+    const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    hue[i] = ((h + 6) % 6) / 6;
+    bins[Math.min(35, Math.floor(hue[i] * 36))]++;
   }
-  const index = new Uint32Array(n);
-  for (let i = 0; i < n; i++) index[i] = i;
-  index.sort((a, b) => keys[a] - keys[b]);
+  let emptiest = 0;
+  bins.forEach((count, j) => { if (count < bins[emptiest]) emptiest = j; });
+  const origin = (emptiest + 0.5) / 36;
+  for (let i = 0; i < n; i++) key[i] = hue[i] < 0 ? 2 + light[i] / 255 : (hue[i] - origin + 1) % 1;
+  const order = Uint32Array.from({ length: n }, (_, i) => i).sort((a, b) => key[a] - key[b]);
 
-  const width = Math.min(1024, n);
-  const height = Math.ceil(n / width);
-  const data = new Uint8Array(width * height * 4);
-  for (let i = 0; i < n; i++) {
-    const p = index[i] * 3;
-    data[i * 4] = px[p];
-    data[i * 4 + 1] = px[p + 1];
-    data[i * 4 + 2] = px[p + 2];
-    data[i * 4 + 3] = 255;
+  const data = new Uint8Array(MAP * MAP * 4);
+  for (let x = 0; x < MAP; x++) {
+    const from = Math.min(n - 1, Math.floor((x * n) / MAP));
+    const to = Math.min(n, Math.max(from + 1, Math.floor(((x + 1) * n) / MAP)));
+    const column = order.slice(from, to).sort((a, b) => light[a] - light[b]);
+    for (let y = 0; y < MAP; y++) {
+      const p = column[Math.floor((y * column.length) / MAP)] * 3;
+      const o = (y * MAP + x) * 4;
+      data[o] = px[p];
+      data[o + 1] = px[p + 1];
+      data[o + 2] = px[p + 2];
+      data[o + 3] = 255;
+    }
   }
   // Kept as the image's own values: the smoke's light is graded as display values, like the picture.
-  const texture = new DataTexture(data, width, height, RGBAFormat, UnsignedByteType);
+  const texture = new DataTexture(data, MAP, MAP, RGBAFormat, UnsignedByteType);
   texture.minFilter = texture.magFilter = NearestFilter;
   texture.needsUpdate = true;
-  return { texture, width, height, count: n };
+  return { texture, size: MAP };
 }

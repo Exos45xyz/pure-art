@@ -20,7 +20,7 @@ import { ORIGINAL_PULSE, breathAt, readHash, spinRate, writeHash } from './setti
 import { createLighting, createSmoke } from './smoke.js';
 import { createUI } from './ui.js';
 import { createView } from './view.js';
-import { readImage, ribbonTexture } from './palette.js';
+import { colourMap, readImage } from './palette.js';
 import { download, formatSize, recordVideo, saveImage, stamp } from './capture.js';
 
 const canvas = document.querySelector('canvas');
@@ -67,26 +67,26 @@ const cube = createCube(lighting);
 let simulation;
 let smoke;
 // The colours the grains wear: white, a palette that ships with the app, or an uploaded image. Each is
-// read once into its colour ribbon (palette.js).
+// read once into its colour map (palette.js).
 const bundled = {
   dusk: new URL('./colours/dusk.webp', import.meta.url).href,
   pearl: new URL('./colours/pearl.webp', import.meta.url).href,
 };
-const palettes = {}; // colour choice → { image, ribbon }
+const palettes = {}; // colour choice → { image, map }
 let colours = null; // the palette the grains wear now, or null for white
-let retired = null; // a replaced upload's ribbon, freed once no grain is turning from it
+let retired = null; // a replaced upload's colour map, freed once no grain is turning from it
 // Lifts dark images so the smoke keeps about the brightness it has in white.
 const colourGain = (image) => Math.min(2.5, Math.max(1, 0.7 / Math.max(image.meanLuminance, 0.01)));
 function wear(choice) {
   colours = palettes[choice] ?? null;
-  if (colours) smoke.setColours(colours.ribbon, colourGain(colours.image), true);
+  if (colours) smoke.setColours(colours.map, colourGain(colours.image), true);
   ui.showColours(colours?.image ?? null);
 }
 async function loadBundled(choice) {
   if (palettes[choice]) return;
   const blob = await (await fetch(bundled[choice])).blob();
   const image = await readImage(blob, choice);
-  palettes[choice] = { image, ribbon: ribbonTexture(image) };
+  palettes[choice] = { image, map: colourMap(image) };
 }
 // The clip's clock: zero when the original look starts, so its pulse lands on the clip's beats.
 let clock = 0;
@@ -111,7 +111,7 @@ function build(size) {
   }
   simulation = createSimulation(renderer, size);
   smoke = createSmoke(size, lighting);
-  if (colours) smoke.setColours(colours.ribbon, colourGain(colours.image));
+  if (colours) smoke.setColours(colours.map, colourGain(colours.image));
   scene.add(smoke.object);
   // Let the smoke settle before anyone sees it.
   const settle = clock;
@@ -551,8 +551,8 @@ const app = {
   async useImage(file) {
     const image = await readImage(file);
     retired?.dispose();
-    retired = palettes.image?.ribbon.texture ?? null;
-    palettes.image = { image, ribbon: ribbonTexture(image) };
+    retired = palettes.image?.map.texture ?? null;
+    palettes.image = { image, map: colourMap(image) };
     state.colour = 'image';
     wear('image');
     return image;

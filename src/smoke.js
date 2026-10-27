@@ -272,12 +272,12 @@ export function createSmoke(size, lighting) {
       uOutline: { value: Array.from({ length: 6 }, () => new Vector3(0, 0, 1)) },
       uOutlineSides: { value: 0 },
       tColour: { value: white },
-      uRibbon: { value: new Vector3(1, 1, 1) },
+      uMap: { value: 1 },
       uColour: { value: 0 },
       uColourGain: { value: 1 },
       // The palette the grains are turning from, and how far the turn is (1 = done).
       tColourFrom: { value: white },
-      uRibbonFrom: { value: new Vector3(1, 1, 1) },
+      uMapFrom: { value: 1 },
       uColourGainFrom: { value: 1 },
       uTurn: { value: 1 },
     },
@@ -291,11 +291,11 @@ export function createSmoke(size, lighting) {
       uniform float uBlur;
       uniform float uFocusDepth;
       uniform sampler2D tColour;
-      uniform vec3 uRibbon;
+      uniform float uMap;
       uniform float uColour;
       uniform float uColourGain;
       uniform sampler2D tColourFrom;
-      uniform vec3 uRibbonFrom;
+      uniform float uMapFrom;
       uniform float uColourGainFrom;
       uniform float uTurn;
       varying float vAlpha;
@@ -304,10 +304,9 @@ export function createSmoke(size, lighting) {
       varying vec3 vColour;
       ${fade}
       ${opacityGlsl}
-      // The colour at a place along a palette's ribbon (palette.js).
-      vec3 ribbonColour(sampler2D map, vec3 ribbon, float gain, float along) {
-        float idx = min(floor(along * ribbon.z), ribbon.z - 1.0);
-        vec2 uv = (vec2(mod(idx, ribbon.x), floor(idx / ribbon.x)) + 0.5) / ribbon.xy;
+      // The pixel at a place on a colour map (palette.js), size × size pixels.
+      vec3 mapColour(sampler2D map, float size, float gain, vec2 at) {
+        vec2 uv = (min(floor(at * size), size - 1.0) + 0.5) / size;
         return texture2D(map, uv).rgb * gain;
       }
       void main() {
@@ -336,15 +335,15 @@ export function createSmoke(size, lighting) {
         // The lamp's light, shaded by the smoke on its way in; then hidden by the smoke in front of it.
         vLight = 0.06 + 0.94 * lampLight(p);
         vAlpha = alpha * seenThrough(p);
-        // The grain's colour: the pigment it carries (simulation.js), a phase that walks the image's
-        // colour ribbon up and back down, so neighbouring phases are neighbouring colours. A touch of
-        // the seed gives each grain its own shade within its region's colour.
-        vec2 dye = texture2D(tDye, position.xy).xy;
-        float phase = atan(dye.y, dye.x) / 6.2831853 + 0.5 + (seed - 0.5) * 0.03;
-        float along = 1.0 - abs(2.0 * fract(phase) - 1.0);
-        vec3 pigment = ribbonColour(tColour, uRibbon, uColourGain, along);
+        // The grain's colour: the pigment it carries (simulation.js), two phases that walk the image's
+        // colour map across (hue) and up (light) and back, so neighbouring places are neighbouring
+        // colours. A touch of the seed gives each grain its own shade within its region's colours.
+        vec4 dye = texture2D(tDye, position.xy);
+        vec2 phase = vec2(atan(dye.y, dye.x), atan(dye.w, dye.z)) / 6.2831853 + 0.5 + (seed - 0.5) * 0.03;
+        vec2 at = 1.0 - abs(2.0 * fract(phase) - 1.0);
+        vec3 pigment = mapColour(tColour, uMap, uColourGain, at);
         // Turning to a new palette, every grain crossfades from its colour in the old one.
-        if (uTurn < 1.0) pigment = mix(ribbonColour(tColourFrom, uRibbonFrom, uColourGainFrom, along), pigment, uTurn);
+        if (uTurn < 1.0) pigment = mix(mapColour(tColourFrom, uMapFrom, uColourGainFrom, at), pigment, uTurn);
         vColour = mix(vec3(1.0), pigment, uColour);
       }`,
     fragmentShader: /* glsl */ `
@@ -391,18 +390,18 @@ export function createSmoke(size, lighting) {
       // is behind it, so each grain carries enough light for the picture to keep its brightness.
       material.uniforms.uAlpha.value = (2.0 * share * 0.0071 * 0.0071) / (material.uniforms.uSize.value ** 2);
     },
-    // ribbon: the image's colour ribbon (palette.js), or null for white. gain: lifts dark images so
-    // the smoke keeps about the brightness it has in white. turn: the grains turn from the palette
-    // they wear to this one (see turnColours) instead of changing in one frame.
-    setColours(ribbon, gain = 1, turn = false) {
+    // map: the image's colour map (palette.js), or null for white. gain: lifts dark images so the
+    // smoke keeps about the brightness it has in white. turn: the grains turn from the palette they
+    // wear to this one (see turnColours) instead of changing in one frame.
+    setColours(map, gain = 1, turn = false) {
       const u = material.uniforms;
-      const next = ribbon?.texture ?? null;
+      const next = map?.texture ?? null;
       if (next === colours) return;
       if (turn && colours && next) {
         // Turn from what the grains mostly wear: past halfway through a turn, that is its new palette.
         if (u.uTurn.value >= 0.5) {
           u.tColourFrom.value = colours;
-          u.uRibbonFrom.value.copy(u.uRibbon.value);
+          u.uMapFrom.value = u.uMap.value;
           u.uColourGainFrom.value = u.uColourGain.value;
         }
         u.uTurn.value = 0;
@@ -411,7 +410,7 @@ export function createSmoke(size, lighting) {
       }
       colours = next;
       u.tColour.value = colours ?? white;
-      if (ribbon) u.uRibbon.value.set(ribbon.width, ribbon.height, ribbon.count);
+      if (map) u.uMap.value = map.size;
       u.uColourGain.value = gain;
     },
     // Move a palette turn on by dt seconds. It eases like the change to and from white (main.js).

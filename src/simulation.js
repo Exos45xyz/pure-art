@@ -1,11 +1,14 @@
-import { HalfFloatType, Vector3 } from 'three';
+import {
+  BufferAttribute, Camera, CustomBlending, FloatType, HalfFloatType, InstancedBufferGeometry, LinearFilter, Mesh, OneFactor,
+  PlaneGeometry, Points, Scene, ShaderMaterial, Vector3, WebGLRenderTarget,
+} from 'three';
 import { GPUComputationRenderer } from 'three/addons/misc/GPUComputationRenderer.js';
 import { hash, noise } from './glsl.js';
 
 // The smoke lives on the GPU: one texel per grain, in two textures.
 // position = xyz inside the cube (-1..1) and w = age (0 at birth, 1 at death)
 // velocity = xyz and w = a fixed random seed
-// dye = xy, the grain's place on the image's colour ribbon (see dyeShader)
+// dye = the grain's place on the image's colour map, as two angles: (cos, sin) of hue and of light
 
 const sources = { volume: 0, plume: 1, core: 2 };
 
@@ -254,34 +257,55 @@ void main() {
 }
 `;
 
-// The image's colours, as pigment in the smoke. Each grain carries a place on the colour ribbon (smoke.js)
-// as a direction (cos, sin), so it can turn the short way round. A large, slow colour field gives every
-// region of the cube its own stretch of the ribbon, and a grain eases toward its region's colour over
-// about three seconds: the flow drags colours into strands and folds before they settle, so neighbouring
-// smoke shares a colour and colours meet in folds, not in confetti. A newborn grain takes its region's
-// colour at once. Half a turn of the field walks the whole ribbon, so over time every pixel of the image
-// gets about its share of the smoke.
+// The image's colours, as pigment in the smoke. Each grain carries a place on the image's colour map
+// (palette.js, read in smoke.js) as two directions (cos, sin), so each can turn the short way round.
+// Large, slow colour fields give every region of the cube its own neighbourhood of the map, and a grain
+// eases toward its region's colour over about three seconds: the flow drags colours into strands and
+// folds before they settle, so neighbouring smoke shares a colour and colours meet in folds, not in
+// confetti. A newborn grain takes its region's colour at once.
+// The two colour fields at p (hue, light), each about -1..1. Shared by the dye and the curve that evens
+// them out over the grains. Hue changes over large regions (a line of sight through the cube crosses
+// few of them, so colours stay saturated instead of averaging out); light changes within them, so a
+// region of one colour shows the image's own range of tones.
+const colourFieldsGlsl = /* glsl */ `
+vec2 colourFields(vec3 p, float t) {
+  vec3 g;
+  float hue = snoise(p * 0.3 + vec3(t * 0.021, -t * 0.017, t * 0.013), g);
+  float light = snoise(p * 0.9 + vec3(-41.0 - t * 0.015, 13.0 + t * 0.019, 29.0), g);
+  return vec2(hue, light);
+}
+`;
+
 const dyeShader = /* glsl */ `
 uniform float uTime;
 uniform float uDt;
+uniform float uSnap;
 
 ${noise}
+${colourFieldsGlsl}
 
-float colourPhase(vec3 p, float t) {
-  vec3 g;
-  float n = snoise(p * 0.55 + vec3(t * 0.021, -t * 0.017, t * 0.013), g);
-  return n * 0.7 + t * 0.012;
+// Where a grain sits on the image's colour map (palette.js): two smooth fields across the cube, hue
+// and light, turning slowly. The smoke only fills part of the cube, so the field values its grains meet
+// are spread unevenly; tCdf (made each step from the grains themselves, see measureColours) spreads them
+// evenly over 0..1. Then every part of the map, so every pixel, colours exactly its share of the
+// smoke at every moment, while neighbouring grains stay alike.
+uniform sampler2D tCdf;
+vec2 colourPlace(vec3 p, float t) {
+  vec2 n = colourFields(p, t);
+  return vec2(texture2D(tCdf, vec2(n.x * 0.5 + 0.5, 0.5)).r, texture2D(tCdf, vec2(n.y * 0.5 + 0.5, 0.5)).g) + t * 0.012;
 }
 
 void main() {
   vec2 uv = gl_FragCoord.xy / resolution.xy;
   vec4 pos = texture2D(texturePosition, uv);
-  vec2 dye = texture2D(textureDye, uv).xy;
-  float a = colourPhase(pos.xyz, uTime) * 6.2831853;
-  vec2 target = vec2(cos(a), sin(a));
-  float k = pos.w < 0.02 ? 1.0 : 1.0 - exp(-uDt * 0.35);
-  vec2 next = mix(dye, target, k);
-  gl_FragColor = vec4(next / max(length(next), 1e-4), 0.0, 1.0);
+  vec4 dye = texture2D(textureDye, uv);
+  vec2 a = colourPlace(pos.xyz, uTime) * 6.2831853;
+  vec4 target = vec4(cos(a.x), sin(a.x), cos(a.y), sin(a.y));
+  // A newborn grain takes its place at once (and every grain, the first time); the others drift to it
+  // over about three seconds.
+  float k = pos.w < 0.02 || uSnap > 0.5 ? 1.0 : 1.0 - exp(-uDt * 0.35);
+  vec4 next = mix(dye, target, k);
+  gl_FragColor = vec4(next.xy / max(length(next.xy), 1e-4), next.zw / max(length(next.zw), 1e-4));
 }
 `;
 
@@ -302,7 +326,7 @@ export function createSimulation(renderer, size) {
   }
 
   const dye0 = gpu.createTexture();
-  for (let i = 0; i < dye0.image.data.length; i += 4) dye0.image.data[i] = 1;
+  for (let i = 0; i < dye0.image.data.length; i += 4) dye0.image.data[i] = dye0.image.data[i + 2] = 1;
 
   const velocity = gpu.addVariable('textureVelocity', velocityShader, velocity0);
   const position = gpu.addVariable('texturePosition', positionShader, position0);
@@ -310,7 +334,7 @@ export function createSimulation(renderer, size) {
   gpu.setVariableDependencies(velocity, [velocity, position]);
   gpu.setVariableDependencies(position, [velocity, position]);
   gpu.setVariableDependencies(dye, [dye, position]);
-  Object.assign(dye.material.uniforms, { uTime: { value: 0 }, uDt: { value: 0 } });
+  Object.assign(dye.material.uniforms, { uTime: { value: 0 }, uDt: { value: 0 }, uSnap: { value: 1 }, tCdf: { value: null } });
 
   Object.assign(velocity.material.uniforms, {
     uTime: { value: 0 },
@@ -356,6 +380,90 @@ export function createSimulation(renderer, size) {
   const du = dye.material.uniforms;
   let time = Math.random() * 100;
 
+  // (Made after the random start above: three gives every new object an id from Math.random.)
+  // The colour curve: where the grains are in the two colour fields right now. Every 16th grain lands
+  // in a 256-bin histogram of each field (hue in red, light in green); a second pass sums it bin by bin
+  // into the share of grains below each value. Floats where the GPU can blend into them.
+  const BINS = 256;
+  const curveType = renderer.extensions.has('EXT_color_buffer_float') && renderer.extensions.has('EXT_float_blend') ? FloatType : HalfFloatType;
+  const histogram = new WebGLRenderTarget(BINS, 1, { type: curveType, depthBuffer: false });
+  const curve = new WebGLRenderTarget(BINS, 1, { type: curveType, depthBuffer: false, minFilter: LinearFilter, magFilter: LinearFilter });
+  const sampleSide = Math.max(1, Math.floor(size / 4));
+  const refs = new Float32Array(sampleSide * sampleSide * 3);
+  for (let i = 0; i < sampleSide * sampleSide; i++) {
+    refs[i * 3] = ((i % sampleSide) * 4 + 0.5) / size;
+    refs[i * 3 + 1] = (Math.floor(i / sampleSide) * 4 + 0.5) / size;
+  }
+  const sampleGeometry = new InstancedBufferGeometry();
+  sampleGeometry.instanceCount = 2;
+  sampleGeometry.setAttribute('position', new BufferAttribute(refs, 3));
+  const histogramMaterial = new ShaderMaterial({
+    transparent: true, depthTest: false, depthWrite: false,
+    blending: CustomBlending, blendSrc: OneFactor, blendDst: OneFactor,
+    uniforms: { tPosition: { value: null }, uTime: { value: 0 }, uWeight: { value: 1 / (sampleSide * sampleSide) } },
+    vertexShader: /* glsl */ `
+      uniform sampler2D tPosition;
+      uniform float uTime;
+      ${noise}
+      ${colourFieldsGlsl}
+      varying vec2 vField;
+      void main() {
+        vec2 n = colourFields(texture2D(tPosition, position.xy).xyz, uTime) * 0.5 + 0.5;
+        // One point per field: the first draw counts hue, the second light (gl_InstanceID).
+        float field = float(gl_InstanceID);
+        float x = clamp(field < 0.5 ? n.x : n.y, 0.0, 0.9999);
+        vField = vec2(1.0 - field, field);
+        gl_Position = vec4((floor(x * ${BINS}.0) + 0.5) / ${BINS}.0 * 2.0 - 1.0, 0.0, 0.0, 1.0);
+        gl_PointSize = 1.0;
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform float uWeight;
+      varying vec2 vField;
+      void main() { gl_FragColor = vec4(vField * uWeight, 0.0, 1.0); }`,
+  });
+  const histogramPoints = new Points(sampleGeometry, histogramMaterial);
+  histogramPoints.frustumCulled = false;
+  const curveMaterial = new ShaderMaterial({
+    depthTest: false, depthWrite: false,
+    uniforms: { tHistogram: { value: histogram.texture } },
+    vertexShader: 'void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: /* glsl */ `
+      uniform sampler2D tHistogram;
+      void main() {
+        // The share of grains below this bin's middle: every bin before it, and half of its own.
+        float here = floor(gl_FragCoord.x);
+        vec2 below = vec2(0.0), total = vec2(0.0);
+        for (int i = 0; i < ${BINS}; i++) {
+          vec2 h = texture2D(tHistogram, vec2((float(i) + 0.5) / ${BINS}.0, 0.5)).rg;
+          total += h;
+          below += h * (float(i) < here ? 1.0 : float(i) == here ? 0.5 : 0.0);
+        }
+        gl_FragColor = vec4(below / max(total, vec2(1e-6)), 0.0, 1.0);
+      }`,
+  });
+  const curveQuad = new Mesh(new PlaneGeometry(2, 2), curveMaterial);
+  curveQuad.frustumCulled = false;
+  const histogramScene = new Scene().add(histogramPoints);
+  const curveScene = new Scene().add(curveQuad);
+  const passCamera = new Camera();
+  const clearColour = new Vector3();
+  function measureColours(time) {
+    const before = renderer.getRenderTarget();
+    const alpha = renderer.getClearAlpha();
+    renderer.getClearColor(clearColour);
+    histogramMaterial.uniforms.tPosition.value = gpu.getCurrentRenderTarget(position).texture;
+    histogramMaterial.uniforms.uTime.value = time;
+    renderer.setClearColor(0x000000, 0);
+    renderer.setRenderTarget(histogram);
+    renderer.clear();
+    renderer.render(histogramScene, passCamera);
+    renderer.setRenderTarget(curve);
+    renderer.render(curveScene, passCamera);
+    renderer.setRenderTarget(before);
+    renderer.setClearColor(clearColour, alpha);
+  }
+
+
   return {
     size,
     count: size * size,
@@ -389,7 +497,10 @@ export function createSimulation(renderer, size) {
         vu.uRayDirection.value.copy(stir.direction);
         vu.uStir.value.copy(stir.velocity);
       }
+      measureColours(time);
+      du.tCdf.value = curve.texture;
       gpu.compute();
+      du.uSnap.value = 0;
     },
     // The simulation's own clock, so a copy can replay the same steps (the loop recording).
     get time() { return time; },
@@ -412,12 +523,25 @@ export function createSimulation(renderer, size) {
     get velocities() {
       return gpu.getCurrentRenderTarget(velocity).texture;
     },
-    // Each grain's place on the colour ribbon, as (cos, sin) of its phase.
+    // For checks: the dye's render target and the colour curve.
+    get dyeTarget() {
+      return gpu.getCurrentRenderTarget(dye);
+    },
+    get colourCurve() {
+      return curve;
+    },
+    // Each grain's place on the colour map, as (cos, sin) of its hue phase and of its light phase.
     get dyes() {
       return gpu.getCurrentRenderTarget(dye).texture;
     },
     dispose() {
       gpu.dispose();
+      histogram.dispose();
+      curve.dispose();
+      sampleGeometry.dispose();
+      histogramMaterial.dispose();
+      curveMaterial.dispose();
+      curveQuad.geometry.dispose();
     },
   };
 }
