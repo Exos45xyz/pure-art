@@ -427,4 +427,7 @@ canvas:active { cursor: grabbing; }
 @media (prefers-reduced-motion: reduce) {
   .brand, .foot, .panel, .ready .panel[data-hidden], .toast, .reopen { transform: none !important; }
   .recording .rec-dot { animation: none; }
+  /* Movement goes; opacity and colour stay. The die keeps one face (it would flick between two). */
+  .die { transform: none !important; }
+  .choice-thumb, .gliding .slider-fill { transition: none; }
 }

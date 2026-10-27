@@ -375,7 +375,8 @@ const app = {
     const reserve = app.recording ? { x: 0, y: 0 } : ui.reserve();
     pan.targetX = reserve.x / 2;
     pan.targetY = reserve.y / 2;
-    if (instant) {
+    // With reduced motion the scene moves to its new centre at once instead of sliding.
+    if (instant || reducedMotion) {
       pan.x = pan.targetX;
       pan.y = pan.targetY;
     }
