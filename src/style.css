@@ -203,9 +203,10 @@ canvas:active { cursor: grabbing; }
   position: absolute;
   inset: 0;
   background: var(--fill);
-  will-change: transform;
 }
-.gliding .slider-fill { transition: transform 240ms var(--ease-out); }
+/* A layer only while a fill moves: gliding to a look, or under the hand. */
+.gliding .slider-fill { transition: transform 240ms var(--ease-out); will-change: transform; }
+.slider.dragging .slider-fill { will-change: transform; }
 .slider-label, .slider-value { position: relative; pointer-events: none; transition: color 200ms ease; }
 .slider-value { font-variant-numeric: tabular-nums; color: var(--strong); }
 .slider.dragging { background: var(--row-hover); }
