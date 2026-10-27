@@ -31,11 +31,13 @@ The panel shows the everyday choices first: a look, a colour, then save or share
 | Form | spin, lens, edges | How fast the cube turns, a flat (orthographic) or depth lens (a change of lens crossfades from the last frame), and the edge colour. The edges are lit by the same lamp as the smoke, and smoke in front of them hides them. |
 | Share | record, copy code | **Record** opens the record window in the panel's place. **Frame**: screen, 16:9, 9:16, 4:5 or 1:1; the canvas becomes that frame, fitted in the free space, so what you see is what is saved; **save image** saves it (4K on the long side). **Video**: 4, 8 or 16 s, a seamless **loop** or a single take (**once**), 30 or 60 fps, then **start recording** (1080 on the short side; see below). **Copy code** copies the current look as code, a preset ready to paste into `presets` in `src/settings.js`. The address bar always holds a link that opens with your settings. The S key saves the screen as you see it. |
 
-Double-click a slider to reset it. Hold Shift while dragging for fine steps. Every change goes into the address bar, so **copy link** shares the exact look.
+Double-click a slider to reset it. Hold Shift while dragging for fine steps; arrow keys step by 1, Shift or Page Up/Down by 10. On a phone, a sideways drag sets a slider and a swipe up or down scrolls the panel. Every change goes into the address bar, so the link shares the exact look.
 
 Keys: `Space` pause · `R` randomize · `S` save image · `H` hide the panel.
 
-Measured on an Apple M5 at 2560 × 1600: 1M grains take about 8 ms a frame, 2M about 23 ms. The lamp's two opacity maps add about 3 ms a frame at 1M (measured in a 560 × 1238 window). ### The loop
+Measured on an Apple M5 at 2560 × 1600: 1M grains take about 8 ms a frame, 2M about 23 ms. The lamp's two opacity maps add about 3 ms a frame at 1M (measured in a 560 × 1238 window).
+
+### The loop
 
 **Record** renders the video frame by frame instead of filming the screen, so every computer gets every frame (about 12 s for an 8 s loop at 60 fps and 1M grains on an M5; 30 fps takes half). The smoke always steps at 60 a second, as it does live; 30 fps keeps every other step. While it renders, the record window shows its progress and a cancel (or Escape); the frame shows the frames as they are made. A loop lasts whole breaths (the length asked for rounded to 1.994 s breaths: 8 s → 7.98 s; exactly the length when the smoke doesn't breathe), and the camera turns by whole quarter turns, because the glass looks the same every quarter turn: the original look's 501° become 540°, and a slow spin like pure's holds still for the loop. The last second crossfades into the first: a second simulation, started from the first frame's grains, replays that second under the end, so the last frame leads straight into the first. A single take keeps the length and the spin as they are. Rendering needs a browser with a video encoder (WebCodecs: Chrome, Edge, Safari 16.4+, Firefox 130+); others film the length in real time instead, without the loop. The MP4 is written by [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) (MIT), loaded only when you record.
 

@@ -218,7 +218,11 @@ canvas:active { cursor: grabbing; }
   padding: 2px 2px 0;
 }
 .panel-head-actions { display: flex; gap: 14px; }
-.text-button { transition: color 200ms ease, opacity 200ms ease, transform 160ms var(--ease-pill); }
+.text-button { position: relative; transition: color 200ms ease, opacity 200ms ease, transform 160ms var(--ease-pill); }
+/* Hide, Back and change are small words: an invisible margin makes them easy to hit, larger for a
+   finger. It stays inside the gaps around them, clear of the next control. */
+.text-button::after { content: ''; position: absolute; inset: -8px; }
+@media (pointer: coarse) { .text-button::after { inset: -12px; } }
 .text-button:active { transform: scale(0.96); }
 
 .panel section { display: grid; gap: 8px; }
@@ -237,7 +241,8 @@ canvas:active { cursor: grabbing; }
   background: var(--row);
   overflow: hidden;
   cursor: ew-resize;
-  touch-action: none;
+  /* A vertical swipe scrolls the sheet; sideways is the slider's (ui.js) */
+  touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
   transition: background-color 200ms ease, opacity 200ms ease;

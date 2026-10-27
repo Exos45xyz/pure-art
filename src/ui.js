@@ -13,7 +13,8 @@ const h = (tag, attrs = {}, ...children) => {
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
 // A full-width row you drag anywhere on. Click jumps, drag scrubs, Shift is fine, double-click resets,
-// arrows step by 1 (Shift: 10).
+// arrows step by 1 (Shift or Page keys: 10). A finger might be scrolling the sheet instead: the row waits
+// until it moves sideways (a drag) or lifts where it landed (a tap), and lets a vertical swipe scroll.
 function slider(control, app, onChange) {
   const fill = h('div', { class: 'slider-fill' });
   const value = h('span', { class: 'slider-value' });
@@ -34,31 +35,55 @@ function slider(control, app, onChange) {
     onChange();
   };
 
+  const at = (e) => {
+    const box = el.getBoundingClientRect();
+    return clamp01((e.clientX - box.left) / box.width);
+  };
+  // Direct manipulation is never animated, even if a look was applied a moment ago.
+  const still = () => el.closest('.panel')?.classList.remove('gliding');
   let start = null;
-  el.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
-    // Direct manipulation is never animated, even if a look was applied a moment ago.
-    el.closest('.panel')?.classList.remove('gliding');
+  let touch = null;
+  const scrub = (e) => set(start.value + ((e.clientX - start.x) / start.width) * (e.shiftKey ? 0.2 : 1));
+  const grab = (e, x, value) => {
+    still();
     el.setPointerCapture(e.pointerId);
     el.classList.add('dragging');
-    const box = el.getBoundingClientRect();
-    start = { x: e.clientX, value: clamp01((e.clientX - box.left) / box.width), width: box.width };
-    set(start.value);
+    start = { x, value, width: el.getBoundingClientRect().width };
+    scrub(e);
+  };
+  el.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    if (e.pointerType === 'touch') touch = { id: e.pointerId, x: e.clientX, value: at(e) };
+    else grab(e, e.clientX, at(e));
   });
   el.addEventListener('pointermove', (e) => {
-    if (!start || !el.hasPointerCapture(e.pointerId)) return;
-    const scale = e.shiftKey ? 0.2 : 1;
-    set(start.value + ((e.clientX - start.x) / start.width) * scale);
+    if (touch?.id === e.pointerId) {
+      if (Math.abs(e.clientX - touch.x) < 6) return;
+      const { x, value } = touch;
+      touch = null;
+      return grab(e, x, value);
+    }
+    if (start && el.hasPointerCapture(e.pointerId)) scrub(e);
   });
   const end = () => { start = null; el.classList.remove('dragging'); };
-  el.addEventListener('pointerup', end);
-  el.addEventListener('pointercancel', end);
+  el.addEventListener('pointerup', (e) => {
+    if (touch?.id === e.pointerId) {
+      still();
+      set(touch.value);
+    }
+    touch = null;
+    end();
+  });
+  // The browser took the finger to scroll the sheet: the value stays as it was.
+  el.addEventListener('pointercancel', () => { touch = null; end(); });
   el.addEventListener('dblclick', () => set(defaults[control.key]));
   el.addEventListener('keydown', (e) => {
     const step = e.shiftKey ? 0.1 : 0.01;
     const now = app.state[control.key];
     if (e.key === 'ArrowRight' || e.key === 'ArrowUp') set(now + step);
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') set(now - step);
+    else if (e.key === 'PageUp') set(now + 0.1);
+    else if (e.key === 'PageDown') set(now - 0.1);
     else if (e.key === 'Home') set(0);
     else if (e.key === 'End') set(1);
     else return;
@@ -149,7 +174,7 @@ export function createUI(app) {
   const shuffle = (instant = false) => applyLook(shuffled(app.state), undefined, instant);
   const look = h('section', {},
     h('h2', { class: 'micro' }, 'Look'),
-    h('div', { class: 'chips' }, Object.values(chips)));
+    h('div', { class: 'chips', role: 'group', 'aria-label': 'Look' }, Object.values(chips)));
 
   // Actions
   const save = h('button', { type: 'button', class: 'pill pill-wide', onclick: () => saveImage() }, 'save image');
@@ -342,11 +367,14 @@ export function createUI(app) {
   const startLabel = h('span', {}, 'start recording');
   const start = h('button', { type: 'button', class: 'pill pill-primary pill-start', onclick: () => recordVideo() },
     h('i', { class: 'rec-dot' }), startLabel);
+  // Progress is a progressbar, not a live region: a screen reader can ask for it, instead of hearing
+  // every percent read out. The toast announces the end.
   const statusText = h('span');
   const statusFill = h('i');
-  const status = h('div', { class: 'record-status', role: 'status', hidden: true },
-    h('p', { class: 'micro' }, statusText),
-    h('div', { class: 'bar' }, statusFill));
+  const statusBar = h('div', { class: 'bar', role: 'progressbar', 'aria-label': 'Recording', 'aria-valuemin': 0, 'aria-valuemax': 100 }, statusFill);
+  const status = h('div', { class: 'record-status', hidden: true },
+    h('p', { class: 'micro', 'aria-hidden': 'true' }, statusText),
+    statusBar);
   const back = h('button', { type: 'button', class: 'text-button micro', onclick: (e) => openRecord(false, { keyboard: e.detail === 0 }) }, 'Back');
   const frameRow = h('div', { class: 'rows' }, field(byKey('format'), true));
   const recordRows = h('div', { class: 'rows' }, ['length', 'loop', 'fps'].map((key) => field(byKey(key), true)));
@@ -392,6 +420,8 @@ export function createUI(app) {
     const show = (p) => {
       statusText.textContent = `${doing} · ${Math.floor(p * 100)}%`;
       statusFill.style.transform = `scaleX(${p})`;
+      statusBar.setAttribute('aria-valuenow', Math.floor(p * 100));
+      statusBar.setAttribute('aria-valuetext', statusText.textContent);
     };
     show(0);
     status.hidden = false;
