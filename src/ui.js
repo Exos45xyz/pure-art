@@ -286,16 +286,38 @@ export function createUI(app) {
   fields.forEach((f) => f.sync());
   refresh();
 
-  // Toast
-  let toastTimer;
+  // Toast, with Sonner's manners: it stays long enough to read (a longer message, longer), its clock
+  // stops while the page is hidden (a video can finish while you are in another tab), and a message
+  // that replaces one on screen blurs across instead of snapping.
   // instant: raised by a key, so it appears at once (it still fades out when it leaves).
+  let toastTimer;
+  let toastLeft = 0;
+  let toastSince = 0;
   function toast(message, instant = false) {
-    toastEl.textContent = message;
+    const text = h('span', {}, message);
+    const replacing = toastEl.classList.contains('show') && !instant;
+    toastEl.replaceChildren(text);
+    if (replacing) {
+      text.animate([{ opacity: 0, filter: 'blur(2px)' }, { opacity: 1, filter: 'blur(0)' }],
+        { duration: 180, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+    }
     toastEl.classList.toggle('instant', instant);
     toastEl.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.classList.remove('show', 'instant'), 2200);
+    toastLeft = Math.max(2000, 1200 + message.length * 45);
+    runToastClock();
   }
+  function runToastClock() {
+    clearTimeout(toastTimer);
+    if (document.hidden) return;
+    toastSince = performance.now();
+    toastTimer = setTimeout(() => toastEl.classList.remove('show', 'instant'), toastLeft);
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!toastEl.classList.contains('show')) return;
+    if (!document.hidden) return runToastClock();
+    clearTimeout(toastTimer);
+    toastLeft -= performance.now() - toastSince;
+  });
 
   // A large image takes a second or two to encode: the button says so while it does.
   async function saveImage() {

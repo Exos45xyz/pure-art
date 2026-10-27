@@ -24,7 +24,9 @@ import { colourMap, readImage } from './palette.js';
 import { download, formatSize, recordVideo, saveImage, stamp } from './capture.js';
 
 const canvas = document.querySelector('canvas');
-const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Read when it is used, so turning the setting on with the page open takes effect at once.
+const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+const reducedMotion = () => motionQuery.matches;
 const coarse = matchMedia('(pointer: coarse)').matches;
 
 let renderer;
@@ -48,8 +50,8 @@ const state = readHash();
 state.particles = coarse ? 256 : 1024;
 let qualityCheck = coarse ? null : { frames: 0, time: 0 };
 // Reduced motion: no turning camera and no breathing blasts unless a shared link asks for them.
-if (reducedMotion && !location.hash.includes('spin=')) state.spin = 0;
-if (reducedMotion && !location.hash.includes('pulse=')) state.pulse = 0;
+if (reducedMotion() && !location.hash.includes('spin=')) state.spin = 0;
+if (reducedMotion() && !location.hash.includes('pulse=')) state.pulse = 0;
 
 // The shaders read eased copies of the sliders, so every change glides instead of jumping.
 const live = { ...state, colourMix: 0 };
@@ -247,7 +249,8 @@ function glideFrom(from) {
   const y = from.y - box.top - s * (to.y - box.top);
   frameGlide = canvas.animate(
     [{ transform: `translate(${x}px, ${y}px) scale(${s})` }, { transform: 'none' }],
-    { duration: 300, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' },
+    // The panel's own drawer curve (style.css), so the canvas and the panel move as one.
+    { duration: 300, easing: getComputedStyle(document.documentElement).getPropertyValue('--ease-drawer').trim() },
   );
 }
 
@@ -596,7 +599,7 @@ const app = {
   // The panel opened, closed, or gave way to the record window: fit the canvas or the frame again.
   // glide: the canvas moves to its new place from where it was (the record window opening or closing).
   reframe(instant = false, glide = false) {
-    const from = glide && !instant && !reducedMotion ? cubeOnPage() : null;
+    const from = glide && !instant && !reducedMotion() ? cubeOnPage() : null;
     fitScreen(instant || !!from);
     if (from) glideFrom(from);
   },
@@ -608,7 +611,7 @@ const app = {
     pan.targetY = reserve.y / 2;
     if (framed) instant = true;
     // With reduced motion the scene moves to its new centre at once instead of sliding.
-    if (instant || reducedMotion) {
+    if (instant || reducedMotion()) {
       pan.x = pan.targetX;
       pan.y = pan.targetY;
     }

@@ -1,36 +1,33 @@
 // The loading screen (index.html): the name and a bar. The bar follows the real loading: the code is
 // here, the grains are built, the shaders are compiled. Between steps it creeps toward the next one
 // without reaching it, and it fills only when the smoke is ready.
+//
+// The creep is a CSS transition, not a script: building the grains holds the page for a second or
+// more, and a transition on transform keeps moving through it for as long as the browser can draw at
+// all (it draws it off the page's thread), where a script stands still from the first moment.
 
 const bar = document.querySelector('.loader .bar i');
 const order = ['code', 'grains', 'shaders'];
 // Each step's share of the bar: the grains take the longest, the shaders next.
 const marks = { code: 0.12, grains: 0.64, shaders: 1 };
+const easeOut = 'cubic-bezier(0.23, 1, 0.32, 1)';
 
-let done = -1;
-let since = performance.now();
-let shown = 0;
-let last = since;
+function fillTo(value, ms) {
+  bar.style.transition = `transform ${ms}ms ${easeOut}`;
+  bar.style.transform = `scaleX(${value})`;
+}
 
 export function step(name) {
-  done = order.indexOf(name);
-  since = performance.now();
+  const next = order[order.indexOf(name) + 1];
+  if (next) return fillTo(marks[next] - 0.02, 2400);
+  // Ready: the bar fills, then the loader leaves. A background tab may never end the transition.
+  fillTo(1, 200);
+  const loaded = () => document.body.classList.add('loaded');
+  bar.addEventListener('transitionend', loaded, { once: true });
+  setTimeout(loaded, 300);
 }
 
-function fill(now) {
-  // Eased by time, so a slow frame (the page is busy) doesn't make it lag.
-  const dt = Math.min((now - last) / 1000, 0.25);
-  last = now;
-  const next = order[done + 1];
-  const from = done < 0 ? 0 : marks[order[done]];
-  const target = next ? from + (marks[next] - 0.02 - from) * (1 - Math.exp(-(now - since) / 700)) : 1;
-  shown += (target - shown) * (1 - Math.exp(-dt * 12));
-  if (!next && shown > 0.995) shown = 1;
-  bar.style.transform = `scaleX(${shown})`;
-  if (shown >= 1) document.body.classList.add('loaded');
-  else requestAnimationFrame(fill);
-}
-requestAnimationFrame(fill);
-
-// This module running means the code has arrived.
+// This module running means the code has arrived. The empty bar is laid out first, so the creep
+// starts from it.
+getComputedStyle(bar).transform;
 step('code');

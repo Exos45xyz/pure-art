@@ -193,10 +193,10 @@ canvas:active { cursor: grabbing; }
   opacity: 0;
   transform: translateX(calc(100% + 24px));
   pointer-events: none;
-  transition: opacity 180ms ease, transform 240ms var(--ease-drawer);
+  transition: opacity 180ms var(--ease-out), transform 240ms var(--ease-drawer);
 }
-.settled .panel { transition: opacity 200ms ease, transform 260ms var(--ease-drawer); }
-.settled .panel[data-hidden] { transition: opacity 160ms ease, transform 220ms var(--ease-drawer); }
+.settled .panel { transition: opacity 200ms var(--ease-out), transform 260ms var(--ease-drawer); }
+.settled .panel[data-hidden] { transition: opacity 160ms var(--ease-out), transform 220ms var(--ease-drawer); }
 .ready .panel:not([data-hidden]).instant,
 .ready .panel[data-hidden].instant { transition: none; }
 /* The record window is a level below the parameters: it turns in from the right as they leave to
@@ -240,7 +240,7 @@ canvas:active { cursor: grabbing; }
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-  transition: background-color 200ms ease;
+  transition: background-color 200ms ease, opacity 200ms ease;
 }
 .slider-fill {
   position: absolute;
@@ -399,7 +399,7 @@ canvas:active { cursor: grabbing; }
   transform: scale(0.95);
   transform-origin: top right;
   pointer-events: none;
-  transition: opacity 180ms ease, transform 200ms var(--ease-out);
+  transition: opacity 180ms var(--ease-out), transform 200ms var(--ease-out);
 }
 .reopen[data-shown] { opacity: 1; transform: none; pointer-events: auto; transition-delay: 80ms; }
 .reopen.instant { transition: none; }
@@ -458,7 +458,7 @@ canvas:active { cursor: grabbing; }
   background: rgba(0, 0, 0, 0.35);
   pointer-events: none;
   opacity: 0;
-  transition: opacity 150ms ease;
+  transition: opacity 150ms var(--ease-out);
 }
 .dropping .dropzone { opacity: 1; transition: opacity 200ms var(--ease-out); }
 
