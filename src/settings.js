@@ -21,7 +21,7 @@ export const controls = [
   { group: 'Light', key: 'film', label: 'film grain' },
 
   { group: 'Particles', key: 'particles', label: 'count', type: 'choice', look: false,
-    options: [[256, '65k'], [512, '262k'], [1024, '1m'], [1448, '2m'], [2048, '4m']] },
+    options: [[256, '65k'], [512, '262k'], [708, '500k'], [1024, '1m'], [1448, '2m']] },
   { group: 'Particles', key: 'grain', label: 'size' },
   { group: 'Particles', key: 'blur', label: 'blur' },
   { group: 'Particles', key: 'focus', label: 'focus', needs: 'blur' },

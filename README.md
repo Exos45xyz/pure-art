@@ -25,7 +25,7 @@ The panel shows the everyday choices first: a look, a colour, then save or share
 | | escape | How much smoke finds its way out through the glass. Every look and randomize keep it at 0, so the smoke stays in the cube unless you open it yourself. |
 | | rebound | How hard the smoke bounces off the glass. At 0 it settles against the faces; 50, every look's setting, springs back with 90% of its speed; 100 throws it back hard and far. |
 | Light | brightness, shadows, glow, film grain | Exposure, how dense the smoke is to the light (how deep its shadows fall, and how much thick smoke hides what is behind it), the soft glow around it, and grain. |
-| Particles | count | 65k, 262k, 1M, 2M or 4M grains. Computers start at 1M and step down to 262k if they can't keep 45 fps. |
+| Particles | count | 65k, 262k, 500k, 1M or 2M grains. Computers start at 1M and step down to 500k if they can't keep 45 fps. |
 | | size | How big each grain is. |
 | | blur, focus | Depth of field: away from the focus plane grains open into soft discs with the same total light. Focus 0.5 is the middle of the cube; it rests (dimmed) while blur is 0, where it would do nothing. Every look and randomize keep blur at 0, so the grains stay sharp. |
 | Form | spin, lens, edges | How fast the cube turns, a flat (orthographic) or depth lens (a change of lens crossfades from the last frame), and the edge colour. The edges are lit by the same lamp as the smoke, and smoke in front of them hides them. |
@@ -35,7 +35,7 @@ Double-click a slider to reset it. Hold Shift while dragging for fine steps. Eve
 
 Keys: `Space` pause · `R` randomize · `S` save image · `H` hide the panel.
 
-Measured on an Apple M5 at 2560 × 1600: 1M grains take about 8 ms a frame, 2M about 23 ms, 4M about 36 ms (50 ms with blur). The lamp's two opacity maps add about 3 ms a frame at 1M (measured in a 560 × 1238 window). Recording films in real time, so 4M videos come out at the frame rate your machine reaches.
+Measured on an Apple M5 at 2560 × 1600: 1M grains take about 8 ms a frame, 2M about 23 ms. The lamp's two opacity maps add about 3 ms a frame at 1M (measured in a 560 × 1238 window). Recording films in real time, so 2M videos come out at the frame rate your machine reaches.
 
 ## The original look
 

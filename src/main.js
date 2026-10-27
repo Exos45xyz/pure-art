@@ -361,7 +361,7 @@ function tick(now) {
   requestAnimationFrame(tick);
 }
 
-// Over the first two seconds, a computer that stays under 45 fps drops to 262k grains.
+// Over the first two seconds, a computer that stays under 45 fps drops to 500k grains.
 function checkQuality(dt) {
   if (!qualityCheck || document.hidden) return;
   qualityCheck.frames++;
@@ -371,7 +371,7 @@ function checkQuality(dt) {
   const fps = (qualityCheck.frames - 20) / qualityCheck.time;
   qualityCheck = null;
   if (fps < 45 && state.particles === 1024) {
-    app.set('particles', 512);
+    app.set('particles', 708);
     ui.sync();
   }
 }
