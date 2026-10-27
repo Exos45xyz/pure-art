@@ -63,7 +63,10 @@ let simulation;
 let smoke;
 // The colours the grains wear: white, a palette that ships with the app, or an uploaded image. Each is
 // read once into its colour ribbon (palette.js).
-const bundled = { dusk: new URL('./colours/dusk.webp', import.meta.url).href };
+const bundled = {
+  dusk: new URL('./colours/dusk.webp', import.meta.url).href,
+  pearl: new URL('./colours/pearl.webp', import.meta.url).href,
+};
 const palettes = {}; // colour choice → { image, ribbon }
 let colours = null; // the palette the grains wear now, or null for white
 let retired = null; // a replaced upload's ribbon, freed once no grain is turning from it

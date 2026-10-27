@@ -13,7 +13,7 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 | Group | Control | What it does |
 | --- | --- | --- |
 | Look | pure, original, smoke, storm, silk, plume, core | Starting points. **Pure** is the default: the clip's breath through a depth lens, with fine filaments, sharp grains and sealed glass. **Randomize** picks a random look that still reads well; **reset** goes back to pure. |
-| Colour | white, dusk, image | **Dusk** is a grain gradient by Pure Studio (orange, pink, lilac, pale mint) that ships with the app. **Upload an image** (or drop one anywhere on the page) and the smoke takes its colours like pigment in a fluid: each region of the cube wears one stretch of the image's colours, the flow folds the regions into strands, and over time a colour that covers 30% of the picture colours about 30% of the smoke. Black (under 8% brightness) is left out: the smoke is light on a black studio, so the black around a picture is the studio itself. The panel shows the colours' main shades at their real shares. |
+| Colour | white, dusk, pearl, image | Two colours ship with the app, both by Pure Studio: **dusk**, a grain gradient (orange, pink, lilac, pale mint), and **pearl**, pearl orbs on black (pearl white, lilac, violet grey, with a blue and blush sheen). **Upload an image** (or drop one anywhere on the page) and the smoke takes its colours like pigment in a fluid: each region of the cube wears one stretch of the image's colours, the flow folds the regions into strands, and over time a colour that covers 30% of the picture colours about 30% of the smoke. Black (under 8% brightness) is left out: the smoke is light on a black studio, so the black around a picture is the studio itself. The panel shows the colours' main shades at their real shares. Switching between two colours turns every grain from its old colour to its new one. |
 | Smoke | source | Where the smoke is born: wandering clouds, a plume at the bottom, or a core in the middle. |
 | | flow | How fast the current moves. |
 | | turbulence | How many small eddies ride on the big swirls. Calm smoke also turns in bigger rolls. |
@@ -26,7 +26,7 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 | Particles | count | 65k, 262k, 1M, 2M or 4M grains. Computers start at 1M and step down to 262k if they can't keep 45 fps. |
 | | size | How big each grain is. |
 | | blur, focus | Depth of field: away from the focus plane grains open into soft discs with the same total light. Focus 0.5 is the middle of the cube. Every look and randomize keep blur at 0, so the grains stay sharp. |
-| Form | spin, lens, edges | How fast the cube turns, a flat (orthographic) or depth lens, and the edge colour. The edges are lit by the same lamp as the smoke, and smoke in front of them hides them. |
+| Form | spin, lens, edges | How fast the cube turns, a flat (orthographic) or depth lens (a change of lens crossfades from the last frame), and the edge colour. The edges are lit by the same lamp as the smoke, and smoke in front of them hides them. |
 | Output | format | screen, 9:16, 4:5 or 1:1. A frame on screen shows what the file will hold. Images are 4K on the long side, videos 1080 wide. |
 
 Double-click a slider to reset it. Hold Shift while dragging for fine steps. Every change goes into the address bar, so **copy link** shares the exact look.
