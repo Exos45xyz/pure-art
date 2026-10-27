@@ -35,6 +35,9 @@ try {
   throw new Error('WebGL 2 is not available.');
 }
 renderer.autoClear = false;
+// Checking every shader for errors makes the GPU finish compiling each one before the next can start.
+// The shaders are known good, so only the dev build checks; the published page compiles them in parallel.
+renderer.debug.checkShaderErrors = import.meta.env.DEV;
 // Accumulate light in full floats where the GPU can blend into them (see smoke.js).
 const accumulate = renderer.extensions.has('EXT_color_buffer_float') && renderer.extensions.has('EXT_float_blend') ? FloatType : HalfFloatType;
 
@@ -111,8 +114,12 @@ function build(size) {
   for (let i = 0; i < 90; i++) simStep(1 / 45, false);
   clock = settle;
 }
-// Let the loading screen paint "code" before the grains are built (the build holds the page).
-await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+// Let the loading screen paint "code" before the grains are built (the build holds the page). A tab
+// opened in the background never paints, so it builds after a moment anyway and is ready when shown.
+await Promise.race([
+  new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  new Promise((resolve) => setTimeout(resolve, 100)),
+]);
 build(state.particles);
 step('grains');
 
