@@ -301,7 +301,7 @@ canvas:active { cursor: grabbing; }
 .chip:active, .pill:active { transform: scale(0.97); }
 
 /* Save, record and copy: three equal buttons on one line */
-.actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
 .actions .pill { justify-content: center; padding: 0 8px; }
 .quick { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
 .quick .pill { justify-content: center; }
@@ -387,7 +387,7 @@ canvas:active { cursor: grabbing; }
 }
 
 /* The record window: the panel's place, the video's settings, one start button, then its progress */
-.pill-start { height: 34px; justify-content: center; }
+.pill-start, .pill-wide { height: 34px; justify-content: center; }
 .record-status { display: grid; gap: 8px; padding: 2px 2px 0; }
 .record-status[hidden] { display: none; }
 .record-status .micro { color: var(--strong); font-variant-numeric: tabular-nums; }

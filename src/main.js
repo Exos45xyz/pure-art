@@ -202,8 +202,8 @@ function fitScreen(instant = false) {
   // A page opened in a background tab can start with no size; wait for a real one.
   if (!innerWidth || !innerHeight || exporting) return;
   Object.assign(fitted, { width: innerWidth, height: innerHeight });
-  // A format, or the record window, makes the canvas the frame of the file: you see what is saved.
-  const framed = state.format !== 'screen' || ui.recordOpen;
+  // In the record window the canvas becomes the frame of the file: you see what is saved.
+  const framed = ui.recordOpen;
   document.body.classList.toggle('framed', framed);
   const ratio = Math.min(devicePixelRatio, 2);
   if (framed) {
@@ -577,8 +577,9 @@ const app = {
       pan.y = pan.targetY;
     }
   },
+  // What you see: the chosen frame in the record window, the screen everywhere else (the S key).
   saveImage() {
-    const size = formatSize(state.format, 'image', innerWidth, innerHeight);
+    const size = formatSize(ui.recordOpen ? state.format : 'screen', 'image', innerWidth, innerHeight);
     return atSize(size.width, size.height, 1, () => saveImage({ canvas, render, ...size }));
   },
   // A browser with a video encoder renders the video (a loop or a single take); one without films it live.

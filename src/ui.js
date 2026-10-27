@@ -152,7 +152,7 @@ export function createUI(app) {
     h('div', { class: 'chips' }, Object.values(chips)));
 
   // Actions
-  const save = h('button', { type: 'button', class: 'pill pill-primary', onclick: () => saveImage() }, 'save image');
+  const save = h('button', { type: 'button', class: 'pill pill-wide', onclick: () => saveImage() }, 'save image');
   const record = h('button', { type: 'button', class: 'pill', onclick: () => openRecord(true) }, h('i', { class: 'rec-dot' }), 'record');
   const copy = h('button', { type: 'button', class: 'pill', onclick: () => copyLink() }, 'copy link');
 
@@ -181,8 +181,8 @@ export function createUI(app) {
   const imageRow = h('div', { class: 'image-row', hidden: true }, thumb, h('div', { class: 'image-meta' }, imageName, strip), change);
   const colour = section('Colour', h('div', { class: 'rows' }, field(byKey('colour'), true), imageRow, fileInput));
 
-  // The format frames what is saved (the canvas shows it); record opens the record window.
-  const share = section('Share', h('div', { class: 'rows' }, field(byKey('format'), true)), h('div', { class: 'actions' }, save, record, copy));
+  // Record opens the record window, where the frame is chosen and an image or a video is made.
+  const share = section('Share', h('div', { class: 'actions' }, record, copy));
 
   const tuneGroups = [...new Set(controls.map((c) => c.group))].filter((g) => g !== 'Colour' && g !== 'Output');
   const tune = h('div', { class: 'tune', id: 'fine-tune' }, tuneGroups.map((group) =>
@@ -309,8 +309,8 @@ export function createUI(app) {
     }
   }
 
-  // The record window: in the panel's place, the video's settings and a start button; the canvas
-  // becomes the frame being recorded. Each option names itself, so the rows need no labels.
+  // The record window, in the panel's place: choose the frame (the canvas becomes it), then save an
+  // image of it or record a video. Each option names itself, so the rows need no labels.
   const startLabel = h('span', {}, 'start recording');
   const start = h('button', { type: 'button', class: 'pill pill-primary pill-start', onclick: () => recordVideo() },
     h('i', { class: 'rec-dot' }), startLabel);
@@ -320,11 +320,12 @@ export function createUI(app) {
     h('p', { class: 'micro' }, statusText),
     h('div', { class: 'bar' }, statusFill));
   const back = h('button', { type: 'button', class: 'text-button micro', onclick: () => openRecord(false) }, 'Back');
-  const recordRows = h('div', { class: 'rows' }, ['format', 'length', 'loop', 'fps'].map((key) => field(byKey(key), true)));
+  const frameRow = h('div', { class: 'rows' }, field(byKey('format'), true));
+  const recordRows = h('div', { class: 'rows' }, ['length', 'loop', 'fps'].map((key) => field(byKey(key), true)));
   const recordPanel = h('aside', { class: 'panel record-panel', 'aria-label': 'Record', 'data-hidden': true },
     h('div', { class: 'panel-head' }, h('span', { class: 'micro micro-strong' }, 'Record'), back),
-    h('section', {}, recordRows),
-    h('section', {}, start, status),
+    section('Frame', frameRow, save),
+    section('Video', recordRows, start, status),
     h('p', { class: 'micro keys' }, 'Esc back · cancel'));
   recordPanel.inert = true;
   document.body.append(recordPanel);
@@ -357,7 +358,7 @@ export function createUI(app) {
     start.classList.add('recording');
     back.disabled = true;
     // The settings hold still while a video is being made.
-    recordRows.inert = true;
+    recordRows.inert = frameRow.inert = save.disabled = true;
     try {
       const ext = await app.recordVideo(show);
       toast(`${app.canLoop && loop === 'loop' ? 'loop' : 'video'} saved · ${ext}`);
@@ -368,7 +369,7 @@ export function createUI(app) {
       startLabel.textContent = 'start recording';
       start.classList.remove('recording');
       back.disabled = false;
-      recordRows.inert = false;
+      recordRows.inert = frameRow.inert = save.disabled = false;
     }
   }
 
