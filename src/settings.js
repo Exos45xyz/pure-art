@@ -24,7 +24,7 @@ export const controls = [
     options: [[256, '65k'], [512, '262k'], [1024, '1m'], [1448, '2m'], [2048, '4m']] },
   { group: 'Particles', key: 'grain', label: 'size' },
   { group: 'Particles', key: 'blur', label: 'blur' },
-  { group: 'Particles', key: 'focus', label: 'focus' },
+  { group: 'Particles', key: 'focus', label: 'focus', needs: 'blur' },
 
   { group: 'Form', key: 'spin', label: 'spin' },
   { group: 'Form', key: 'lens', label: 'lens', type: 'choice', options: [['flat', 'flat'], ['depth', 'depth']] },

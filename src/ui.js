@@ -68,8 +68,9 @@ function slider(control, app, onChange) {
   return { el, sync: () => show(app.state[control.key]) };
 }
 
-// A row with its label on the left and a sliding thumb behind the chosen option.
-function choice(control, app, onChange) {
+// A row with its label on the left and a sliding thumb behind the chosen option. bare: no label, for a
+// row that is the only control in its section (the section's title already names it).
+function choice(control, app, onChange, bare = false) {
   const thumb = h('div', { class: 'choice-thumb' });
   thumb.style.width = `${100 / control.options.length}%`;
   const buttons = control.options.map(([value, label], i) =>
@@ -94,7 +95,7 @@ function choice(control, app, onChange) {
       },
     }, label));
   const group = h('div', { class: 'choice', role: 'radiogroup', 'aria-label': control.label }, thumb, buttons);
-  const el = h('div', { class: 'row' }, h('span', { class: 'row-label' }, control.label), group);
+  const el = h('div', { class: bare ? 'row bare' : 'row' }, bare ? [] : h('span', { class: 'row-label' }, control.label), group);
 
   function sync() {
     const index = control.options.findIndex(([value]) => value === app.state[control.key]);
@@ -117,6 +118,14 @@ export function createUI(app) {
   const refresh = () => {
     const active = matchingPreset(app.state);
     for (const [name, chip] of Object.entries(chips)) chip.setAttribute('aria-pressed', String(name === active));
+    // A control that only works with another one (focus needs blur) rests until that one is on.
+    for (const { el, control } of fields) {
+      if (!control.needs) continue;
+      const resting = !app.state[control.needs];
+      el.classList.toggle('resting', resting);
+      el.setAttribute('aria-disabled', String(resting));
+      el.tabIndex = resting ? -1 : 0;
+    }
   };
   let glideTimer;
   const syncAll = (instant) => {
@@ -141,18 +150,23 @@ export function createUI(app) {
     h('h2', { class: 'micro' }, 'Look'),
     h('div', { class: 'chips' }, Object.values(chips)));
 
-  // Controls, grouped
-  const groups = [...new Set(controls.map((c) => c.group))].map((group) =>
-    h('section', {},
-      h('h2', { class: 'micro' }, group),
-      h('div', { class: 'rows' }, controls.filter((c) => c.group === group).map((c) => {
-        const field = c.type === 'choice' ? choice(c, app, refresh) : slider(c, app, refresh);
-        fields.push(field);
-        return field.el;
-      }))));
+  // Actions
+  const save = h('button', { type: 'button', class: 'pill pill-primary', onclick: () => saveImage() }, 'save image');
+  const recordLabel = h('span', {}, 'record 8s');
+  const record = h('button', { type: 'button', class: 'pill', onclick: () => recordVideo() }, h('i', { class: 'rec-dot' }), recordLabel);
+  const copy = h('button', { type: 'button', class: 'pill', onclick: () => copyLink() }, 'copy link');
 
-  // Colour from an image: the upload button, or drop one anywhere on the page.
-  const colourRows = groups[0].querySelector('.rows');
+  // Controls. The everyday path comes first: a look, a colour, then save or share. The rest waits one
+  // level deeper under Fine-tune, so a first visit asks for three choices instead of twenty.
+  const field = (control, bare = false) => {
+    const f = control.type === 'choice' ? choice(control, app, refresh, bare) : slider(control, app, refresh);
+    fields.push({ ...f, control });
+    return f.el;
+  };
+  const byKey = (key) => controls.find((c) => c.key === key);
+  const section = (title, ...children) => h('section', {}, h('h2', { class: 'micro' }, title), ...children);
+
+  // Colour from an image: pick "image" (it asks for one the first time), or drop one on the page.
   const fileInput = h('input', {
     type: 'file', accept: 'image/*', hidden: true,
     onchange: () => {
@@ -163,14 +177,49 @@ export function createUI(app) {
   const thumb = h('img', { class: 'image-thumb', alt: '' });
   const strip = h('div', { class: 'swatches', 'aria-hidden': 'true' });
   const imageName = h('span', { class: 'image-name' });
-  const imageRow = h('div', { class: 'image-row', hidden: true }, thumb, h('div', { class: 'image-meta' }, imageName, strip));
-  const upload = h('button', { type: 'button', class: 'pill pill-upload', onclick: () => fileInput.click() }, 'upload image');
-  colourRows.append(imageRow, upload, fileInput);
+  const change = h('button', { type: 'button', class: 'text-button micro', hidden: true, onclick: () => fileInput.click() }, 'change');
+  const imageRow = h('div', { class: 'image-row', hidden: true }, thumb, h('div', { class: 'image-meta' }, imageName, strip), change);
+  const colour = section('Colour', h('div', { class: 'rows' }, field(byKey('colour'), true), imageRow, fileInput));
+
+  // The format only changes what is saved, so it sits with save and record.
+  const share = section('Share', h('div', { class: 'rows' }, field(byKey('format'), true)), h('div', { class: 'actions' }, save, record, copy));
+
+  const tuneGroups = [...new Set(controls.map((c) => c.group))].filter((g) => g !== 'Colour' && g !== 'Output');
+  const tune = h('div', { class: 'tune', id: 'fine-tune' }, tuneGroups.map((group) =>
+    h('section', {},
+      h('h3', { class: 'micro' }, group),
+      h('div', { class: 'rows' }, controls.filter((c) => c.group === group).map((c) => field(c))))));
+  const tuneButton = h('button', {
+    type: 'button', class: 'disclosure micro', 'aria-controls': 'fine-tune', onclick: () => setTune(tune.hidden),
+  }, 'Fine-tune', h('i', { class: 'chevron', 'aria-hidden': 'true' }));
+  const tuneSection = h('section', {}, tuneButton, tune);
+
+  // Fine-tune stays open or closed as each visitor left it (kept in this browser only).
+  const TUNE_KEY = 'pure-smoke-fine-tune';
+  const showTune = (open) => {
+    tune.hidden = !open;
+    tuneButton.setAttribute('aria-expanded', String(open));
+  };
+  function setTune(open) {
+    showTune(open);
+    try { localStorage.setItem(TUNE_KEY, open ? 'open' : 'closed'); } catch {}
+    // On a phone the sheet grows or shrinks, so the cube re-centres in the space left above it.
+    app.layoutChanged();
+    placeChrome();
+    if (open && panel.scrollHeight > panel.clientHeight) {
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      tuneButton.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+    }
+  }
+  let remembered = null;
+  try { remembered = localStorage.getItem(TUNE_KEY); } catch {}
+  showTune(remembered === 'open');
 
   // The colours in use (a bundled palette or an uploaded image), or none for white. The strip shows
   // the picture's main colours at the share of it each one covers.
   function showColours(picked) {
     imageRow.hidden = !picked;
+    change.hidden = app.state.colour !== 'image';
     if (!picked) return;
     thumb.src = picked.thumbnail;
     imageName.textContent = picked.name;
@@ -186,7 +235,6 @@ export function createUI(app) {
     if (!file.type.startsWith('image/')) return toast('that file is not an image');
     try {
       await app.useImage(file);
-      upload.textContent = 'change image';
       fields.forEach((f) => f.sync());
       toast('image colours · same proportions');
     } catch (e) {
@@ -214,12 +262,6 @@ export function createUI(app) {
     if (file) loadImage(file);
   });
 
-  // Actions
-  const save = h('button', { type: 'button', class: 'pill pill-primary', onclick: () => saveImage() }, 'save image');
-  const recordLabel = h('span', {}, 'record 8s');
-  const record = h('button', { type: 'button', class: 'pill', onclick: () => recordVideo() }, h('i', { class: 'rec-dot' }), recordLabel);
-  const copy = h('button', { type: 'button', class: 'pill', onclick: () => copyLink() }, 'copy link');
-
   const head = h('div', { class: 'panel-head' },
     h('span', { class: 'micro micro-strong' }, 'Parameters'),
     h('button', { type: 'button', class: 'text-button micro', onclick: () => setOpen(false), 'aria-label': 'Hide parameters (H)' }, 'Hide'));
@@ -239,8 +281,7 @@ export function createUI(app) {
   // A die face, drawn once.
   quick.querySelector('.die').innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="1.5" width="13" height="13" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5.2" cy="5.2" r="1.15" fill="currentColor"/><circle cx="8" cy="8" r="1.15" fill="currentColor"/><circle cx="10.8" cy="10.8" r="1.15" fill="currentColor"/></svg>';
 
-  panel.append(head, quick, look, ...groups,
-    h('div', { class: 'actions' }, save, record, copy),
+  panel.append(head, quick, look, colour, share, tuneSection,
     h('p', { class: 'micro keys' }, 'Space pause · R randomize · H hide'));
   fields.forEach((f) => f.sync());
   refresh();
@@ -299,18 +340,28 @@ export function createUI(app) {
     panel.inert = !open;
     reopen.toggleAttribute('data-shown', !open);
     app.layoutChanged(instant);
-    document.body.style.setProperty('--reserve-x', `${reserve().x}px`);
+    placeChrome();
   }
   reopen.addEventListener('click', () => setOpen(true));
 
   function reserve() {
     if (panel.hasAttribute('data-hidden')) return { x: 0, y: 0 };
-    if (matchMedia('(max-width: 720px)').matches) return { x: 0, y: panel.offsetHeight + 8 };
+    // On a phone the cube sits in the band between the title and the sheet, clear of both.
+    if (matchMedia('(max-width: 720px)').matches) {
+      const brand = document.querySelector('.brand');
+      return { x: 0, y: panel.offsetHeight + 8 - (brand.offsetTop + brand.offsetHeight) };
+    }
     return { x: panel.offsetWidth + 16, y: 0 };
   }
 
-  addEventListener('resize', () => document.body.style.setProperty('--reserve-x', `${reserve().x}px`));
-  document.body.style.setProperty('--reserve-x', `${reserve().x}px`);
+  // The page's own chrome follows the panel: messages centre in the free space, and on a phone they
+  // sit just above the sheet, where the eye already is.
+  function placeChrome() {
+    document.body.style.setProperty('--reserve-x', `${reserve().x}px`);
+    document.body.style.setProperty('--sheet', `${panel.hasAttribute('data-hidden') ? 0 : panel.offsetHeight}px`);
+  }
+  addEventListener('resize', placeChrome);
+  placeChrome();
 
   addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -323,6 +374,13 @@ export function createUI(app) {
     else if (key === 's') saveImage();
     else if (key === 'h') setOpen(panel.hasAttribute('data-hidden'), true);
   });
+
+  // Phones have no footer hint: if nobody has touched the cube a few seconds in, say what it does.
+  if (matchMedia('(pointer: coarse)').matches) {
+    let touched = false;
+    document.querySelector('canvas').addEventListener('pointerdown', () => { touched = true; }, { once: true });
+    setTimeout(() => { if (!touched) toast('drag to turn the cube'); }, 3500);
+  }
 
   // The export frame drawn on screen, so you see what a 9:16, 4:5 or 1:1 file will hold.
   const guide = document.querySelector('.format-guide');
