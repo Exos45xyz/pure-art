@@ -2,7 +2,10 @@ import '@fontsource-variable/archivo/wdth.css';
 import '@fontsource-variable/inter';
 import './style.css';
 
-import { FloatType, HalfFloatType, Plane, Raycaster, Scene, Vector2, Vector3, WebGLRenderTarget, WebGLRenderer } from 'three';
+import {
+  FloatType, FramebufferTexture, HalfFloatType, Mesh, OrthographicCamera, Plane, PlaneGeometry, Raycaster, Scene,
+  ShaderMaterial, Vector2, Vector3, WebGLRenderTarget, WebGLRenderer,
+} from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
@@ -63,11 +66,12 @@ let smoke;
 const bundled = { dusk: new URL('./colours/dusk.webp', import.meta.url).href };
 const palettes = {}; // colour choice → { image, ribbon }
 let colours = null; // the palette the grains wear now, or null for white
+let retired = null; // a replaced upload's ribbon, freed once no grain is turning from it
 // Lifts dark images so the smoke keeps about the brightness it has in white.
 const colourGain = (image) => Math.min(2.5, Math.max(1, 0.7 / Math.max(image.meanLuminance, 0.01)));
 function wear(choice) {
   colours = palettes[choice] ?? null;
-  if (colours) smoke.setColours(colours.ribbon, colourGain(colours.image));
+  if (colours) smoke.setColours(colours.ribbon, colourGain(colours.image), true);
   ui.showColours(colours?.image ?? null);
 }
 async function loadBundled(choice) {
@@ -119,6 +123,29 @@ composer.addPass(grade);
 const edgeScene = new Scene();
 edgeScene.add(cube.object);
 
+// A change of lens, or the original look's camera, crossfades: the last frame through the old camera
+// is kept and fades out over the new one, so the picture changes instead of jumping.
+const cut = { pending: null, fade: 0, texture: new FramebufferTexture(1, 1) };
+const stillScene = new Scene();
+const still = new Mesh(new PlaneGeometry(2, 2), new ShaderMaterial({
+  uniforms: { tStill: { value: cut.texture }, uFade: { value: 0 } },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tStill;
+    uniform float uFade;
+    varying vec2 vUv;
+    void main() { gl_FragColor = vec4(texture2D(tStill, vUv).rgb, uFade); }`,
+  transparent: true,
+  depthTest: false,
+  depthWrite: false,
+}));
+still.frustumCulled = false;
+stillScene.add(still);
+const stillCamera = new OrthographicCamera();
+const bufferSize = new Vector2();
+
 // ---- Output --------------------------------------------------------------------------------
 
 // What the renderer draws into: the screen, or for a moment an export size.
@@ -132,6 +159,8 @@ function applyOutput() {
   renderer.setSize(output.width, output.height, false);
   composer.setPixelRatio(output.ratio);
   composer.setSize(output.width, output.height);
+  // A kept frame belongs to the old size.
+  cut.fade = 0;
   applyFrame();
 }
 
@@ -237,6 +266,11 @@ function render(dt) {
   smoke.update(simulation, live, output.height * output.ratio, camera);
   smoke.setOutline(cubeOutline(camera, output.width * output.ratio, output.height * output.ratio));
   smoke.colourMix = live.colourMix;
+  smoke.turnColours(dt);
+  if (retired && !smoke.turning) {
+    retired.dispose();
+    retired = null;
+  }
   lighting.update(camera, live.shadows);
   smoke.renderShadow(renderer);
 
@@ -254,6 +288,34 @@ function render(dt) {
   composer.render(dt);
   renderer.setRenderTarget(null);
   renderer.render(edgeScene, camera);
+  if (cut.fade > 0 && !exporting) {
+    still.material.uniforms.uFade.value = cut.fade;
+    renderer.render(stillScene, stillCamera);
+  }
+}
+
+// Move the camera to a new lens or to the original look's start, keeping the frame just drawn so it
+// can fade out over the new view.
+function takeCut() {
+  const { lens, original } = cut.pending;
+  cut.pending = null;
+  if (rendered && !exporting) {
+    renderer.getDrawingBufferSize(bufferSize);
+    if (cut.texture.image.width !== bufferSize.x || cut.texture.image.height !== bufferSize.y) {
+      cut.texture.dispose();
+      cut.texture = new FramebufferTexture(bufferSize.x, bufferSize.y);
+      still.material.uniforms.tStill.value = cut.texture;
+    }
+    renderer.setRenderTarget(null);
+    renderer.copyFramebufferToTexture(cut.texture);
+    cut.fade = 1;
+  }
+  if (lens) view.setLens(lens);
+  if (original) {
+    view.original();
+    clock = 0;
+  }
+  applyFrame();
 }
 
 let last = performance.now();
@@ -283,7 +345,10 @@ function tick(now) {
   updateStir(dt);
 
   if (!paused) simStep(dt);
+  // The kept frame fades like the sliders glide.
+  cut.fade = cut.fade > 0.01 ? cut.fade * Math.exp(-dt * 10) : 0;
   render(dt);
+  if (cut.pending) takeCut();
   checkQuality(dt);
   requestAnimationFrame(tick);
 }
@@ -341,28 +406,22 @@ const app = {
       qualityCheck = null;
       build(value);
     }
-    if (key === 'lens') {
-      view.setLens(value);
-      applyFrame();
-    }
+    if (key === 'lens') cut.pending = { ...cut.pending, lens: value };
     if (key === 'format') ui.showFormat(value);
     writeHash(state);
   },
   apply(values, look) {
     for (const [key, value] of Object.entries(values)) if (key !== 'particles' && key !== 'format') state[key] = value;
-    view.setLens(state.lens);
-    applyFrame();
-    // The original look starts the camera where the reference clip starts.
-    if (look === 'original') {
-      view.original();
-      clock = 0;
-    }
+    // The original look starts the camera where the reference clip starts. Both moves crossfade.
+    if (state.lens !== view.lens) cut.pending = { ...cut.pending, lens: state.lens };
+    if (look === 'original') cut.pending = { ...cut.pending, original: true };
     writeHash(state);
   },
   // Colour the grains from an image file, in the image's own proportions.
   async useImage(file) {
     const image = await readImage(file);
-    palettes.image?.ribbon.texture.dispose();
+    retired?.dispose();
+    retired = palettes.image?.ribbon.texture ?? null;
     palettes.image = { image, ribbon: ribbonTexture(image) };
     state.colour = 'image';
     wear('image');
@@ -410,6 +469,7 @@ if (import.meta.env.DEV) {
   window.pureSmoke = {
     renderer, view, state, live, stir, app,
     get simulation() { return simulation; },
+    get smoke() { return smoke; },
     // Draw frame n of the original timing at width × height and hand back a PNG blob.
     async frame(n, width = 720, height = 1280, fps = 30) {
       paused = true;

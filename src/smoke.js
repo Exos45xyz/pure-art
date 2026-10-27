@@ -275,6 +275,11 @@ export function createSmoke(size, lighting) {
       uRibbon: { value: new Vector3(1, 1, 1) },
       uColour: { value: 0 },
       uColourGain: { value: 1 },
+      // The palette the grains are turning from, and how far the turn is (1 = done).
+      tColourFrom: { value: white },
+      uRibbonFrom: { value: new Vector3(1, 1, 1) },
+      uColourGainFrom: { value: 1 },
+      uTurn: { value: 1 },
     },
     vertexShader: /* glsl */ `
       uniform sampler2D tPosition;
@@ -289,12 +294,22 @@ export function createSmoke(size, lighting) {
       uniform vec3 uRibbon;
       uniform float uColour;
       uniform float uColourGain;
+      uniform sampler2D tColourFrom;
+      uniform vec3 uRibbonFrom;
+      uniform float uColourGainFrom;
+      uniform float uTurn;
       varying float vAlpha;
       varying float vLight;
       varying float vSoft;
       varying vec3 vColour;
       ${fade}
       ${opacityGlsl}
+      // The colour at a place along a palette's ribbon (palette.js).
+      vec3 ribbonColour(sampler2D map, vec3 ribbon, float gain, float along) {
+        float idx = min(floor(along * ribbon.z), ribbon.z - 1.0);
+        vec2 uv = (vec2(mod(idx, ribbon.x), floor(idx / ribbon.x)) + 0.5) / ribbon.xy;
+        return texture2D(map, uv).rgb * gain;
+      }
       void main() {
         vec4 pos = texture2D(tPosition, position.xy);
         float seed = texture2D(tVelocity, position.xy).w;
@@ -327,9 +342,10 @@ export function createSmoke(size, lighting) {
         vec2 dye = texture2D(tDye, position.xy).xy;
         float phase = atan(dye.y, dye.x) / 6.2831853 + 0.5 + (seed - 0.5) * 0.03;
         float along = 1.0 - abs(2.0 * fract(phase) - 1.0);
-        float idx = min(floor(along * uRibbon.z), uRibbon.z - 1.0);
-        vec2 ribbonUv = (vec2(mod(idx, uRibbon.x), floor(idx / uRibbon.x)) + 0.5) / uRibbon.xy;
-        vColour = mix(vec3(1.0), texture2D(tColour, ribbonUv).rgb * uColourGain, uColour);
+        vec3 pigment = ribbonColour(tColour, uRibbon, uColourGain, along);
+        // Turning to a new palette, every grain crossfades from its colour in the old one.
+        if (uTurn < 1.0) pigment = mix(ribbonColour(tColourFrom, uRibbonFrom, uColourGainFrom, along), pigment, uTurn);
+        vColour = mix(vec3(1.0), pigment, uColour);
       }`,
     fragmentShader: /* glsl */ `
       uniform vec3 uOutline[6];
@@ -376,13 +392,41 @@ export function createSmoke(size, lighting) {
       material.uniforms.uAlpha.value = (2.0 * share * 0.0071 * 0.0071) / (material.uniforms.uSize.value ** 2);
     },
     // ribbon: the image's colour ribbon (palette.js), or null for white. gain: lifts dark images so
-    // the smoke keeps about the brightness it has in white.
-    setColours(ribbon, gain = 1) {
-      colours = ribbon?.texture ?? null;
-      material.uniforms.tColour.value = colours ?? white;
-      if (ribbon) material.uniforms.uRibbon.value.set(ribbon.width, ribbon.height, ribbon.count);
-      material.uniforms.uColourGain.value = gain;
+    // the smoke keeps about the brightness it has in white. turn: the grains turn from the palette
+    // they wear to this one (see turnColours) instead of changing in one frame.
+    setColours(ribbon, gain = 1, turn = false) {
+      const u = material.uniforms;
+      const next = ribbon?.texture ?? null;
+      if (next === colours) return;
+      if (turn && colours && next) {
+        // Turn from what the grains mostly wear: past halfway through a turn, that is its new palette.
+        if (u.uTurn.value >= 0.5) {
+          u.tColourFrom.value = colours;
+          u.uRibbonFrom.value.copy(u.uRibbon.value);
+          u.uColourGainFrom.value = u.uColourGain.value;
+        }
+        u.uTurn.value = 0;
+      } else {
+        this.endTurn();
+      }
+      colours = next;
+      u.tColour.value = colours ?? white;
+      if (ribbon) u.uRibbon.value.set(ribbon.width, ribbon.height, ribbon.count);
+      u.uColourGain.value = gain;
     },
+    // Move a palette turn on by dt seconds. It eases like the change to and from white (main.js).
+    turnColours(dt) {
+      const u = material.uniforms;
+      if (u.uTurn.value >= 1) return;
+      u.uTurn.value += (1 - u.uTurn.value) * (1 - Math.exp(-dt * 6));
+      if (u.uTurn.value > 0.998) this.endTurn();
+    },
+    endTurn() {
+      material.uniforms.uTurn.value = 1;
+      material.uniforms.tColourFrom.value = white;
+    },
+    // A palette the grains may still be turning from, so its texture must stay alive.
+    get turning() { return material.uniforms.uTurn.value < 1; },
     // The cube's outline in drawing-buffer pixels: up to 6 lines a*x + b*y + c >= 0 inside.
     setOutline(lines) {
       lines.forEach((l, i) => material.uniforms.uOutline.value[i].copy(l));
