@@ -1,8 +1,8 @@
 import '@fontsource-variable/archivo/wdth.css';
 import '@fontsource-variable/inter';
 import './style.css';
-// First, so the loading screen starts counting before anything heavy runs.
-import { loaded } from './loader.js';
+// First, so the loading screen marks the code as here before anything heavy runs.
+import { step } from './loader.js';
 
 import {
   FloatType, FramebufferTexture, HalfFloatType, Mesh, OrthographicCamera, Plane, PlaneGeometry, Raycaster, Scene,
@@ -111,7 +111,10 @@ function build(size) {
   for (let i = 0; i < 90; i++) simStep(1 / 45, false);
   clock = settle;
 }
+// Let the loading screen paint "code" before the grains are built (the build holds the page).
+await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 build(state.particles);
+step('grains');
 
 // ---- Post ----------------------------------------------------------------------------------
 
@@ -509,11 +512,12 @@ output.offsetY = pan.y;
 applyFrame();
 addEventListener('resize', fitScreen);
 
-requestAnimationFrame((now) => {
+// Two frames, so the loading screen paints "grains" before the first frame compiles the shaders.
+requestAnimationFrame(() => requestAnimationFrame((now) => {
   last = now;
   tick(now);
+  step('shaders');
   document.body.classList.add('ready');
-  loaded();
   // After the one-time entrance, the panel opens and closes on its own, faster timing.
   setTimeout(() => document.body.classList.add('settled'), 1000);
-});
+}));

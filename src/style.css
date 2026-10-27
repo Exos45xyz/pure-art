@@ -83,49 +83,130 @@ canvas:active { cursor: grabbing; }
 
 /* ---- Loading ------------------------------------------------------------------------------- */
 
-/* Fifteen hairline columns over black. Their lines breathe and the ticks on the middle line flicker
-   one after another, left to right, while the count runs; then the whole screen fades into the smoke. */
+/* From the first paint: the wordmark in its corner (it stays), a hairline glass cube turning where the
+   real one will appear, the real loading steps where the footer will be, and the count. At 100% the
+   hairline cube steps forward and fades as the real one fades in behind it. */
 .loader {
-  --cols: 15;
   position: fixed;
   inset: 0;
   z-index: 20;
-  display: grid;
-  grid-template-columns: repeat(var(--cols), 1fr);
   background: var(--page);
-  transition: opacity 500ms var(--ease-out), visibility 0s linear 500ms;
+  transition: opacity 500ms var(--ease-out) 100ms, visibility 0s linear 600ms;
 }
 .loaded .loader, .no-webgl .loader { opacity: 0; visibility: hidden; pointer-events: none; }
-.loader i { position: relative; }
-.loader i::before, .loader i::after {
+
+.loader-stage {
+  --shift-x: -152px; /* half the panel's width plus its gap: the free space's centre */
+  --shift-y: 0px;
+  --grow: 1.06;
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  perspective: 160vh;
+  transform: translate(var(--shift-x), var(--shift-y));
+  animation: loader-fade 700ms var(--ease-out) backwards;
+  transition: opacity 300ms var(--ease-out), transform 400ms var(--ease-out);
+}
+.loaded .loader-stage { opacity: 0; transform: translate(var(--shift-x), var(--shift-y)) scale(var(--grow)); }
+
+/* Twelve hairline edges in 3D: the base, the four uprights, the top, each drawn from one end. An edge
+   is two strips crossed along its length, so it never vanishes when it turns edge-on. */
+.loader-cube {
+  --size: 32vh;
+  --h: calc(var(--size) / 2);
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+  transform-style: preserve-3d;
+  animation: loader-turn 16s linear infinite;
+}
+.loader-cube i {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: var(--size);
+  height: 1px;
+  margin-top: -0.5px;
+  transform-style: preserve-3d;
+}
+.loader-cube i::before, .loader-cube i::after {
   content: '';
   position: absolute;
-  right: 0;
-  width: 1px;
-  background: #fff;
-  opacity: 0;
-  animation: 3s ease calc(var(--i) * 100ms) infinite both;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.5);
+  transform-origin: left center;
+  transform: scaleX(0);
+  /* A finished part completes quickly, its edges one after another */
+  transition: transform 320ms var(--ease-out) calc(var(--k) * 70ms);
 }
-.loader i::before { top: 0; bottom: 0; animation-name: loader-line; }
-.loader i::after { top: calc(50% - 5px); height: 10px; animation-name: loader-tick; }
-/* No line at the right edge, and no ticks under the words */
-.loader i:last-of-type::before, .loader i:last-of-type::after,
-.loader i:nth-of-type(-n + 2)::after, .loader i:nth-of-type(n + 13)::after { display: none; }
-@keyframes loader-line { 0% { opacity: 0; } 25% { opacity: 0.15; } 100% { opacity: 0; } }
-@keyframes loader-tick { 0% { opacity: 0.5; } 10% { opacity: 1; } 20% { opacity: 0.25; } 100% { opacity: 0; } }
-.loader-label, .loader-count {
+.loader-cube i::after { transform: rotateX(90deg) scaleX(0); }
+.loader-cube i[data-state='done']::before { transform: scaleX(1); }
+.loader-cube i[data-state='done']::after { transform: rotateX(90deg) scaleX(1); }
+/* The part under way draws slowly to most of its length while its step runs, and closes when it's done */
+.loader-cube i[data-state='now']::before { transform: scaleX(0.85); }
+.loader-cube i[data-state='now']::after { transform: rotateX(90deg) scaleX(0.85); }
+.loader-cube i[data-state='now']::before, .loader-cube i[data-state='now']::after {
+  transition: transform 2400ms var(--ease-out) calc(var(--k) * 120ms);
+}
+/* The base, at the floor */
+.loader-cube i:nth-child(1) { transform: translateY(var(--h)) translateZ(var(--h)); }
+.loader-cube i:nth-child(2) { transform: translateX(var(--h)) translateY(var(--h)) rotateY(90deg); }
+.loader-cube i:nth-child(3) { transform: translateY(var(--h)) translateZ(calc(var(--h) * -1)) rotateY(180deg); }
+.loader-cube i:nth-child(4) { transform: translateX(calc(var(--h) * -1)) translateY(var(--h)) rotateY(-90deg); }
+/* The uprights, drawn from the floor up */
+.loader-cube i:nth-child(5) { transform: translateX(calc(var(--h) * -1)) translateZ(var(--h)) rotateZ(-90deg); }
+.loader-cube i:nth-child(6) { transform: translateX(var(--h)) translateZ(var(--h)) rotateZ(-90deg); }
+.loader-cube i:nth-child(7) { transform: translateX(var(--h)) translateZ(calc(var(--h) * -1)) rotateZ(-90deg); }
+.loader-cube i:nth-child(8) { transform: translateX(calc(var(--h) * -1)) translateZ(calc(var(--h) * -1)) rotateZ(-90deg); }
+/* The top */
+.loader-cube i:nth-child(9) { transform: translateY(calc(var(--h) * -1)) translateZ(var(--h)); }
+.loader-cube i:nth-child(10) { transform: translateX(var(--h)) translateY(calc(var(--h) * -1)) rotateY(90deg); }
+.loader-cube i:nth-child(11) { transform: translateY(calc(var(--h) * -1)) translateZ(calc(var(--h) * -1)) rotateY(180deg); }
+.loader-cube i:nth-child(12) { transform: translateX(calc(var(--h) * -1)) translateY(calc(var(--h) * -1)) rotateY(-90deg); }
+@keyframes loader-turn {
+  from { transform: rotateX(-17deg) rotateY(0deg); }
+  to { transform: rotateX(-17deg) rotateY(-360deg); }
+}
+
+/* The steps, one baseline, lit by value: to come, under way, done. */
+.loader-steps {
   position: absolute;
-  top: calc(50% - 6px);
-  color: var(--strong);
-  white-space: nowrap;
+  left: max(20px, env(safe-area-inset-left));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  display: flex;
+  gap: 24px;
+  animation: loader-fade 700ms var(--ease-out) 120ms backwards;
+  transition: opacity 200ms ease;
 }
-.loader-label { left: calc(100% / var(--cols) + 8px); letter-spacing: 0.5em; }
-.loader-count { left: calc(100% * (var(--cols) - 2) / var(--cols) + 8px); font-variant-numeric: tabular-nums; }
+.loaded .loader-steps, .loaded .loader-count { opacity: 0; }
+.loader-steps [data-step] { transition: color 300ms ease; }
+.loader-steps [data-state='next'] { color: #3a3a3a; }
+.loader-steps [data-state='now'] { color: var(--muted); }
+.loader-steps [data-state='done'] { color: var(--strong); }
+.loader-count {
+  position: absolute;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  color: var(--strong);
+  animation: loader-fade 700ms var(--ease-out) 120ms backwards;
+  transition: opacity 200ms ease;
+}
+.loader-num { font-variant-numeric: tabular-nums; }
+.grains-phone { display: none; }
+@media (pointer: coarse) {
+  .grains-desk { display: none; }
+  .grains-phone { display: inline; }
+}
+@keyframes loader-fade { from { opacity: 0; } }
+@keyframes loader-rise { from { opacity: 0; transform: translateY(6px); } }
 
 /* ---- Chrome around the canvas -------------------------------------------------------------- */
 
 .brand {
   position: fixed;
+  z-index: 21;
+  animation: loader-rise 700ms var(--ease-out) backwards;
   top: max(20px, env(safe-area-inset-top));
   left: max(20px, env(safe-area-inset-left));
   display: grid;
@@ -161,13 +242,12 @@ canvas:active { cursor: grabbing; }
 }
 .foot a { transition: opacity 200ms ease; }
 
-.brand, .foot, .panel {
+.foot, .panel {
   opacity: 0;
   transform: translateY(6px);
   transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out);
 }
-.ready .brand, .ready .foot { opacity: 1; transform: none; }
-.ready .brand { transition-delay: 120ms; }
+.ready .foot { opacity: 1; transform: none; }
 .ready .foot { transition-delay: 240ms; }
 
 /* ---- Panel --------------------------------------------------------------------------------- */
@@ -498,10 +578,13 @@ canvas:active { cursor: grabbing; }
   .brand { top: max(16px, env(safe-area-inset-top)); left: 16px; }
   .reopen { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform-origin: bottom right; }
   .toast { bottom: calc(var(--sheet, 0px) + max(8px, env(safe-area-inset-bottom)) + 12px); left: 50%; }
-  /* Ten columns on a phone: ticks only between the words */
-  .loader { --cols: 10; }
-  .loader i:nth-of-type(n + 11) { display: none; }
-  .loader i:nth-of-type(10)::before, .loader i:nth-of-type(-n + 3)::after, .loader i:nth-of-type(n + 8)::after { display: none; }
+  /* The real cube sits in the band above the sheet; the steps keep to the bottom edge. */
+  .loader-stage { --shift-x: 0px; --shift-y: -18vh; }
+  .loader-cube { --size: 56vw; }
+  .loader-steps { left: 16px; gap: 14px; }
+  /* Two rows, like the footer that follows: the count above the steps */
+  .loader-count { right: auto; left: 16px; bottom: calc(max(20px, env(safe-area-inset-bottom)) + 20px); }
+  .grains-desk, .grains-phone { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -510,8 +593,10 @@ canvas:active { cursor: grabbing; }
   /* Movement goes; opacity and colour stay. The die keeps one face (it would flick between two). */
   .die { transform: none !important; }
   .choice-thumb, .gliding .slider-fill, .chevron { transition: none; }
-  /* The loader holds still: faint lines, steady ticks; it still fades out. */
-  .loader i::before, .loader i::after { animation: none; }
-  .loader i::before { opacity: 0.08; }
-  .loader i::after { opacity: 0.4; }
+  /* The hairline cube holds still at an angle and only fades. */
+  .loader-cube { animation: none; transform: rotateX(-17deg) rotateY(-35deg); }
+  .loader-cube i::before, .loader-cube i::after { transition-property: opacity; opacity: 0; }
+  .loader-cube i[data-state='done']::before, .loader-cube i[data-state='done']::after { opacity: 1; }
+  .loader-cube i[data-state='now']::before, .loader-cube i[data-state='now']::after { opacity: 0.4; }
+  .loader-stage { --grow: 1; }
 }
