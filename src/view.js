@@ -25,7 +25,8 @@ export function createView(canvas) {
   original();
 
   canvas.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
+    // One hand turns the cube: a second finger landing mid-drag must not take it over.
+    if (e.button !== 0 || drag) return;
     canvas.setPointerCapture(e.pointerId);
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() };
     rig.vTheta = rig.vPhi = 0;
