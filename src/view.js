@@ -39,10 +39,7 @@ export function createView(canvas) {
     const now = performance.now();
     const dt = Math.max((now - drag.t) / 1000, 1 / 240);
     rig.theta += dTheta;
-    // Past the limit the tilt follows the hand with rising resistance, like a rubber band.
-    const outward = rig.phi < Math.PI / 2 ? dPhi < 0 : dPhi > 0;
-    const resisted = outward ? dPhi / (1 + past(rig.phi) / 0.08) ** 2 : dPhi;
-    rig.phi = Math.min(Math.PI - 0.02, Math.max(0.02, rig.phi + resisted));
+    rig.phi = tilt(rig.phi, dPhi);
     // Remember how fast the hand was moving, so a flick keeps turning after release.
     rig.vTheta = rig.vTheta * 0.5 + (dTheta / dt) * 0.5;
     rig.vPhi = rig.vPhi * 0.5 + (dPhi / dt) * 0.5;
@@ -55,15 +52,28 @@ export function createView(canvas) {
   };
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', release);
+  // Capture can end without a pointerup (the browser takes the touch); never leave the drag stuck.
+  canvas.addEventListener('lostpointercapture', release);
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     rig.zoomTarget = Math.min(2.2, Math.max(0.6, rig.zoomTarget * Math.exp(-e.deltaY * 0.0015)));
   }, { passive: false });
 
   const LIMIT = 0.12;
+  // How far the tilt can stretch past a limit, so it stays clear of the poles (where lookAt flips).
+  const BAND = 0.08;
   const clampPhi = (phi) => Math.min(Math.PI - LIMIT, Math.max(LIMIT, phi));
   // How far past the top or bottom limit the camera is (0 inside).
   const past = (phi) => Math.max(LIMIT - phi, phi - (Math.PI - LIMIT), 0);
+  // Tilt by d, for the hand and for momentum alike. Inside the limits the camera follows exactly;
+  // past one it stretches like a rubber band, slower the further it goes, and never beyond BAND.
+  function tilt(phi, d) {
+    const top = phi < Math.PI / 2;
+    const over = top ? LIMIT - phi : phi - (Math.PI - LIMIT);
+    const pulled = (over > 0 ? over / (1 - over / BAND) : over) + (top ? -d : d);
+    const next = pulled > 0 ? pulled / (1 + pulled / BAND) : pulled;
+    return top ? LIMIT - next : Math.PI - LIMIT + next;
+  }
 
   return {
     get camera() { return lens === 'flat' ? flat : depth; },
@@ -79,7 +89,7 @@ export function createView(canvas) {
     update(dt, spin) {
       if (!drag) {
         rig.theta += spin * dt + rig.vTheta * dt;
-        rig.phi += rig.vPhi * dt;
+        rig.phi = tilt(rig.phi, rig.vPhi * dt);
         if (past(rig.phi) > 0) {
           // Let go past the limit: the tilt springs back inside it, and any momentum toward it stops.
           rig.vPhi = 0;
