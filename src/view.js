@@ -80,6 +80,12 @@ export function createView(canvas) {
     get dragging() { return drag !== null; },
     get lens() { return lens; },
     setLens(name) { lens = name; },
+    // The camera's turn around the cube, read and set exactly (the loop recording drives it).
+    get theta() { return rig.theta; },
+    turnTo(theta) {
+      rig.theta = theta;
+      rig.vTheta = rig.vPhi = 0;
+    },
     original,
     // For checks against the reference: the clip's camera at second t.
     atOriginalTime(t) {

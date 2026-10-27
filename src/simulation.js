@@ -391,6 +391,15 @@ export function createSimulation(renderer, size) {
       }
       gpu.compute();
     },
+    // The simulation's own clock, so a copy can replay the same steps (the loop recording).
+    get time() { return time; },
+    // Take over another simulation's grains and clock (same size): from here both run the same steps.
+    copyFrom(other) {
+      gpu.renderTexture(other.positions, gpu.getCurrentRenderTarget(position));
+      gpu.renderTexture(other.velocities, gpu.getCurrentRenderTarget(velocity));
+      gpu.renderTexture(other.dyes, gpu.getCurrentRenderTarget(dye));
+      time = other.time;
+    },
     get positionTarget() {
       return gpu.getCurrentRenderTarget(position);
     },

@@ -152,7 +152,8 @@ export function createUI(app) {
 
   // Actions
   const save = h('button', { type: 'button', class: 'pill pill-primary', onclick: () => saveImage() }, 'save image');
-  const recordLabel = h('span', {}, 'record 8s');
+  const recordName = app.canLoop ? 'record loop' : 'record 8s';
+  const recordLabel = h('span', {}, recordName);
   const record = h('button', { type: 'button', class: 'pill', onclick: () => recordVideo() }, h('i', { class: 'rec-dot' }), recordLabel);
   const copy = h('button', { type: 'button', class: 'pill', onclick: () => copyLink() }, 'copy link');
 
@@ -309,17 +310,31 @@ export function createUI(app) {
     }
   }
 
+  // While recording, the frame shows small in the middle with its progress and a way out.
+  const statusText = h('span');
+  const statusFill = h('i');
+  const status = h('div', { class: 'render-status', role: 'status' },
+    h('p', { class: 'micro' }, statusText),
+    h('div', { class: 'bar' }, statusFill),
+    h('button', { type: 'button', class: 'text-button micro', onclick: () => app.stopRecording() }, 'Cancel'));
+  document.body.append(status);
+
   async function recordVideo() {
     if (app.recording) return app.stopRecording();
     record.classList.add('recording');
+    const doing = app.canLoop ? 'Rendering loop' : 'Recording';
+    const show = (p) => {
+      statusText.textContent = `${doing} · ${Math.floor(p * 100)}%`;
+      statusFill.style.transform = `scaleX(${p})`;
+    };
+    show(0);
     try {
-      const ext = await app.recordVideo((p) => { recordLabel.textContent = `stop · ${Math.ceil(8 - p * 8)}s`; });
-      toast(`video saved · ${ext}`);
+      const ext = await app.recordVideo(show);
+      toast(`${app.canLoop ? 'loop' : 'video'} saved · ${ext}`);
     } catch (e) {
       toast(e.message);
     } finally {
       record.classList.remove('recording');
-      recordLabel.textContent = 'record 8s';
     }
   }
 
@@ -365,6 +380,11 @@ export function createUI(app) {
 
   addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    // While recording, keys only cancel: Escape.
+    if (app.recording) {
+      if (e.key === 'Escape') app.stopRecording();
+      return;
+    }
     if (e.target.closest('button, [role=slider], input, a')) return;
     const key = e.key.toLowerCase();
     if (key === ' ') {

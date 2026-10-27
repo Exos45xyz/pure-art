@@ -96,13 +96,14 @@ canvas:active { cursor: grabbing; }
   transition: opacity 400ms var(--ease-out), visibility 0s linear 400ms;
 }
 .loaded .loader, .no-webgl .loader { opacity: 0; visibility: hidden; pointer-events: none; }
-.loader-bar {
+/* A hairline progress bar: the loader's and the recording's */
+.bar {
   width: 160px;
   height: 1px;
   background: #222;
   overflow: hidden;
 }
-.loader-bar i {
+.bar i {
   display: block;
   height: 100%;
   background: var(--strong);
@@ -394,9 +395,36 @@ canvas:active { cursor: grabbing; }
   transition: opacity 200ms ease;
 }
 .format-guide[data-shown] { opacity: 1; }
-.recording-frame .format-guide { opacity: 0; }
-/* While recording a format, the canvas holds that format; show it whole instead of stretched. */
-.recording-frame canvas { object-fit: contain; }
+/* Recording: the frame being made sits small in the middle, whole, with its progress under it; the
+   rest of the page steps back until it is done. */
+.rendering canvas {
+  inset: auto;
+  left: 50%;
+  top: calc(50% - 28px);
+  width: auto;
+  height: auto;
+  max-width: calc(100% - 48px);
+  max-height: calc(100% - 176px);
+  transform: translate(-50%, -50%);
+  outline: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+}
+.rendering .panel, .rendering .reopen, .rendering .brand, .rendering .foot, .rendering .format-guide {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.render-status {
+  position: fixed;
+  left: 50%;
+  bottom: max(36px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: none;
+  justify-items: center;
+  gap: 12px;
+}
+.rendering .render-status { display: grid; }
+.render-status .micro { color: var(--strong); font-variant-numeric: tabular-nums; }
 
 /* Image colours: thumbnail, name, and the image's main colours at their real shares */
 .image-row {

@@ -19,14 +19,14 @@ export function formatSize(format, kind, screenWidth, screenHeight) {
   return { width: even(screenWidth * scale), height: even(screenHeight * scale) };
 }
 
-function download(blob, name) {
+export function download(blob, name) {
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement('a'), { href: url, download: name });
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function stamp() {
+export function stamp() {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;

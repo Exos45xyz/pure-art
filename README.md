@@ -6,7 +6,7 @@ Particle smoke in a glass cube. Free, open source and made with three.js.
 
 **Play with it:** https://pure-smoke.vercel.app
 
-Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look with the panel on the side, then save a 4K image or record an 8-second video for your post.
+Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look with the panel on the side, then save a 4K image or record a seamless loop for your post.
 
 ## Controls
 
@@ -29,13 +29,15 @@ The panel shows the everyday choices first: a look, a colour, then save or share
 | | size | How big each grain is. |
 | | blur, focus | Depth of field: away from the focus plane grains open into soft discs with the same total light. Focus 0.5 is the middle of the cube; it rests (dimmed) while blur is 0, where it would do nothing. Every look and randomize keep blur at 0, so the grains stay sharp. |
 | Form | spin, lens, edges | How fast the cube turns, a flat (orthographic) or depth lens (a change of lens crossfades from the last frame), and the edge colour. The edges are lit by the same lamp as the smoke, and smoke in front of them hides them. |
-| Share | format, save image, record 8s, copy link | Format is screen, 9:16, 4:5 or 1:1: a frame on screen shows what the file will hold. Images are 4K on the long side, videos 1080 wide. **Copy link** copies a link that opens with your settings. |
+| Share | format, save image, record loop, copy link | Format is screen, 9:16, 4:5 or 1:1: a frame on screen shows what the file will hold. Images are 4K on the long side, videos 1080 wide. **Record loop** renders a seamless MP4 loop (see below). **Copy link** copies a link that opens with your settings. |
 
 Double-click a slider to reset it. Hold Shift while dragging for fine steps. Every change goes into the address bar, so **copy link** shares the exact look.
 
 Keys: `Space` pause · `R` randomize · `S` save image · `H` hide the panel.
 
-Measured on an Apple M5 at 2560 × 1600: 1M grains take about 8 ms a frame, 2M about 23 ms. The lamp's two opacity maps add about 3 ms a frame at 1M (measured in a 560 × 1238 window). Recording films in real time, so 2M videos come out at the frame rate your machine reaches.
+Measured on an Apple M5 at 2560 × 1600: 1M grains take about 8 ms a frame, 2M about 23 ms. The lamp's two opacity maps add about 3 ms a frame at 1M (measured in a 560 × 1238 window). ### The loop
+
+**Record loop** renders the video frame by frame at 60 fps instead of filming the screen, so every computer gets every frame (about 12 s for an 8 s loop at 1M grains on an M5). The loop lasts whole breaths (4 × 1.994 s ≈ 7.98 s; 8 s when the smoke doesn't breathe), and the camera turns by whole quarter turns, because the glass looks the same every quarter turn: the original look's 501° become 540°, and a slow spin like pure's holds still for the loop. The last second crossfades into the first: a second simulation, started from the first frame's grains, replays that second under the end, so the last frame leads straight into the first. Rendering needs a browser with a video encoder (WebCodecs: Chrome, Edge, Safari 16.4+, Firefox 130+); others film 8 s in real time instead. The MP4 is written by [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) (MIT), loaded only when you record.
 
 ## The original look
 

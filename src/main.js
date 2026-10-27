@@ -16,12 +16,12 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { createCube } from './cube.js';
 import { GradeShader } from './grade.js';
 import { createSimulation } from './simulation.js';
-import { breathAt, readHash, spinRate, writeHash } from './settings.js';
+import { ORIGINAL_PULSE, breathAt, readHash, spinRate, writeHash } from './settings.js';
 import { createLighting, createSmoke } from './smoke.js';
 import { createUI } from './ui.js';
 import { createView } from './view.js';
 import { readImage, ribbonTexture } from './palette.js';
-import { formatSize, recordVideo, saveImage } from './capture.js';
+import { download, formatSize, recordVideo, saveImage, stamp } from './capture.js';
 
 const canvas = document.querySelector('canvas');
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -92,12 +92,16 @@ async function loadBundled(choice) {
 let clock = 0;
 const towardCamera = new Vector3();
 function simStep(dt, withStir = true) {
+  advance(simulation, dt, clock, withStir ? stir : null);
+  clock += dt;
+}
+// One step of a simulation at a breath clock (the loop recording also steps a second one).
+function advance(sim, dt, at, stirring = null) {
   // The breath turns in the picture's plane, so the sim needs to know where the camera looks from.
   view.camera.getWorldDirection(towardCamera).negate();
   // The smoke answers the breath a little early (a compact mass springs back out on its own), so the
   // breath is fed 0.2 s late; measured inside the simulation, its swell then lines up with the clip's.
-  simulation.step(dt, live, state.source, withStir ? stir : null, breathAt(clock - 0.2), towardCamera);
-  clock += dt;
+  sim.step(dt, live, state.source, stirring, breathAt(at - 0.2), towardCamera);
 }
 function build(size) {
   simulation?.dispose();
@@ -168,6 +172,7 @@ const output = { width: 0, height: 0, ratio: 1, offsetX: 0, offsetY: 0 };
 // The cube sits in the middle of the space the panel leaves free.
 const pan = { x: 0, y: 0, targetX: 0, targetY: 0 };
 let exporting = false;
+let rendering = false;
 
 function applyOutput() {
   renderer.setPixelRatio(output.ratio);
@@ -303,26 +308,32 @@ function render(dt) {
   composer.render(dt);
   renderer.setRenderTarget(null);
   renderer.render(edgeScene, camera);
-  if (cut.fade > 0 && !exporting) {
-    still.material.uniforms.uFade.value = cut.fade;
-    renderer.render(stillScene, stillCamera);
-  }
+  if (cut.fade > 0 && !exporting) layKeptFrame(cut.fade);
 }
 
 // Move the camera to a new lens or to the original look's start, keeping the frame just drawn so it
 // can fade out over the new view.
+// Keep the frame just drawn, to lay over a later one.
+function keepFrame() {
+  renderer.getDrawingBufferSize(bufferSize);
+  if (cut.texture.image.width !== bufferSize.x || cut.texture.image.height !== bufferSize.y) {
+    cut.texture.dispose();
+    cut.texture = new FramebufferTexture(bufferSize.x, bufferSize.y);
+    still.material.uniforms.tStill.value = cut.texture;
+  }
+  renderer.setRenderTarget(null);
+  renderer.copyFramebufferToTexture(cut.texture);
+}
+// Lay the kept frame over what is drawn, at this opacity.
+function layKeptFrame(opacity) {
+  still.material.uniforms.uFade.value = opacity;
+  renderer.render(stillScene, stillCamera);
+}
 function takeCut() {
   const { lens, original } = cut.pending;
   cut.pending = null;
   if (rendered && !exporting) {
-    renderer.getDrawingBufferSize(bufferSize);
-    if (cut.texture.image.width !== bufferSize.x || cut.texture.image.height !== bufferSize.y) {
-      cut.texture.dispose();
-      cut.texture = new FramebufferTexture(bufferSize.x, bufferSize.y);
-      still.material.uniforms.tStill.value = cut.texture;
-    }
-    renderer.setRenderTarget(null);
-    renderer.copyFramebufferToTexture(cut.texture);
+    keepFrame();
     cut.fade = 1;
   }
   if (lens) view.setLens(lens);
@@ -337,6 +348,8 @@ let last = performance.now();
 function tick(now) {
   const dt = Math.min((now - last) / 1000, 1 / 20);
   last = now;
+  // A loop being rendered draws its own frames.
+  if (rendering) return requestAnimationFrame(tick);
   if (!exporting && (innerWidth !== output.width || innerHeight !== output.height)) fitScreen();
   if (!output.width || !output.height) return requestAnimationFrame(tick);
   time += dt;
@@ -384,6 +397,81 @@ function checkQuality(dt) {
 }
 
 // ---- Capture -------------------------------------------------------------------------------
+
+// A seamless loop, rendered frame by frame at 60 fps instead of filmed live, so every computer gets
+// every frame. It lasts whole breaths (about 8 s), and the camera turns by whole quarter turns: the
+// glass looks the same every quarter turn, so it lines up where the loop closes (a slow spin holds
+// still for the loop). The last second crossfades into the first: a second simulation, started from
+// the first frame's grains, replays that second under the end, so the last frame leads into the first.
+const LOOP_FPS = 60;
+const LOOP_BLEND = 1;
+const smoothstep = (x) => {
+  x = Math.min(1, Math.max(0, x));
+  return x * x * (3 - 2 * x);
+};
+async function renderLoop(job) {
+  const { createEncoder } = await import('./loop.js');
+  const dt = 1 / LOOP_FPS;
+  const seconds = live.pulse > 0.001 ? Math.round(8 / ORIGINAL_PULSE.period) * ORIGINAL_PULSE.period : 8;
+  const quarter = Math.PI / 2;
+  const omega = (Math.round(((paused ? 0 : spinRate(live.spin)) * seconds) / quarter) * quarter) / seconds;
+  const start = view.theta;
+  const frames = Math.round(seconds * LOOP_FPS);
+  const blend = Math.round(LOOP_BLEND * LOOP_FPS);
+  const turn = (i) => {
+    view.turnTo(start + omega * i * dt);
+    view.update(0, 0);
+  };
+
+  const encoder = await createEncoder(canvas, LOOP_FPS);
+  const main = simulation;
+  const replay = createSimulation(renderer, main.size);
+  replay.copyFrom(main);
+  let replayClock = clock;
+  rendering = true;
+  try {
+    for (let i = 0; i < frames + blend; i++) {
+      if (job.cancelled) throw new Error('loop cancelled');
+      // Every frame: the camera at this moment, then one step. The first second is only simulated.
+      turn(i);
+      simStep(dt, false);
+      if (i < blend) continue;
+      time += dt;
+      if (i >= frames) {
+        // The last second: draw the replayed first second and keep it, then draw the end and lay the
+        // beginning over it, more and more, so the last frame is the one before the first.
+        const k = i - frames;
+        turn(k);
+        advance(replay, dt, replayClock);
+        replayClock += dt;
+        simulation = replay;
+        render(dt);
+        simulation = main;
+        keepFrame();
+        turn(i);
+        render(dt);
+        layKeptFrame(smoothstep((k + 1) / blend));
+      } else {
+        render(dt);
+      }
+      await encoder.add();
+      job.onProgress?.((i + 1) / (frames + blend));
+      // Let the page breathe (the preview shows the frames as they come).
+      if (i % 2) await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    const blob = await encoder.finish();
+    download(blob, `pure-smoke-loop-${canvas.width}x${canvas.height}-${stamp()}.mp4`);
+    return 'mp4';
+  } catch (e) {
+    encoder.cancel();
+    throw e;
+  } finally {
+    simulation = main;
+    replay.dispose();
+    view.turnTo(start);
+    rendering = false;
+  }
+}
 
 // Draw into a size of its own (an export), centred on the cube, then go back to the screen.
 async function atSize(width, height, ratio, task) {
@@ -459,15 +547,17 @@ const app = {
     const size = formatSize(state.format, 'image', innerWidth, innerHeight);
     return atSize(size.width, size.height, 1, () => saveImage({ canvas, render, ...size }));
   },
+  // A browser with a video encoder renders a seamless loop; one without films 8 s live.
+  canLoop: typeof VideoEncoder !== 'undefined' && typeof VideoFrame !== 'undefined',
   async recordVideo(onProgress) {
     const size = formatSize(state.format, 'video', innerWidth, innerHeight);
     app.recording = { canvas, onProgress, seconds: 8, cancelled: false };
     app.layoutChanged();
-    document.body.classList.add('recording-frame');
+    document.body.classList.add('rendering');
     try {
-      return await atSize(size.width, size.height, 1, () => recordVideo(app.recording));
+      return await atSize(size.width, size.height, 1, () => (app.canLoop ? renderLoop(app.recording) : recordVideo(app.recording)));
     } finally {
-      document.body.classList.remove('recording-frame');
+      document.body.classList.remove('rendering');
       app.recording = null;
       app.layoutChanged();
     }

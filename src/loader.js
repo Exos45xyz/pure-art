@@ -2,7 +2,7 @@
 // here, the grains are built, the shaders are compiled. Between steps it creeps toward the next one
 // without reaching it, and it fills only when the smoke is ready.
 
-const bar = document.querySelector('.loader-bar i');
+const bar = document.querySelector('.loader .bar i');
 const order = ['code', 'grains', 'shaders'];
 // Each step's share of the bar: the grains take the longest, the shaders next.
 const marks = { code: 0.12, grains: 0.64, shaders: 1 };
