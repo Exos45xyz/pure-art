@@ -88,26 +88,33 @@ export function matchingPreset(state) {
   });
 }
 
-// Random but always good-looking: every range is kept inside what reads well.
+// Randomize: every roll is one of the smoke's beautiful families, varied only inside the ranges where it
+// stays beautiful. Found by rendering rolls and scoring them (crisp strands, shapes with air around
+// them, the glass touched, no fog and no glare): spread puffs strands into fog, high flow and
+// turbulence without gather wash into fog, masses without the breath shrink into small dim blobs.
+// masses: bodies that breathe and fold against the glass, like pure (above flow .52 and turbulence .62
+// they wash into fog, and the plume source fogs them too).
+// silk: slow, crisp sheets that fill the cube.
+// ribbons: crisp filaments wrapped around a breathing body (a tight body shades itself dark, so it gets
+// a full breath, more light and softer shadows).
+const families = {
+  masses: { flow: [0.32, 0.52], turbulence: [0.35, 0.62], gather: [0.7, 1], pulse: [0.6, 1], brightness: [0.42, 0.56], shadows: [0.45, 0.78], glow: [0.2, 0.35], grain: [0.28, 0.5], sources: ['volume', 'volume', 'core'] },
+  silk: { flow: [0.15, 0.32], turbulence: [0.06, 0.28], gather: [0, 0], pulse: [0, 0.35], brightness: [0.5, 0.58], shadows: [0.35, 0.6], glow: [0.15, 0.28], grain: [0.18, 0.32], sources: ['volume'] },
+  ribbons: { flow: [0.3, 0.42], turbulence: [0.2, 0.32], gather: [0.5, 0.75], pulse: [0.75, 1], brightness: [0.5, 0.56], shadows: [0.35, 0.6], glow: [0.22, 0.32], grain: [0.28, 0.45], sources: ['volume', 'core'] },
+};
 export function shuffled(state) {
   const r = (a, b) => Math.round((a + Math.random() * (b - a)) * 100) / 100;
+  const pick = (list) => list[Math.floor(Math.random() * list.length)];
+  const { sources, ...ranges } = families[pick(['masses', 'masses', 'silk', 'ribbons'])];
   return {
     ...state,
-    source: ['volume', 'volume', 'plume', 'core'][Math.floor(Math.random() * 4)],
-    flow: r(0.2, 0.85),
-    turbulence: r(0.1, 0.95),
-    // Randomize never opens the glass: the smoke stays in the cube. Escape is a choice you make.
+    ...Object.fromEntries(Object.entries(ranges).map(([key, [a, b]]) => [key, r(a, b)])),
+    source: pick(sources),
+    // No roll puffs the strands into fog, opens the glass or blurs the grains: those are choices you make.
+    spread: 0,
     escape: 0,
-    rebound: r(0.25, 0.85),
-    brightness: r(0.4, 0.62),
-    shadows: r(0.35, 0.85),
-    glow: r(0.15, 0.55),
-    grain: r(0.2, 0.55),
-    spread: Math.random() < 0.5 ? 0 : r(0.2, 0.6),
-    gather: Math.random() < 0.6 ? 0 : r(0.5, 1),
-    pulse: Math.random() < 0.6 ? 0 : r(0.4, 1),
-    // Every grain stays sharp: blur is a choice you make.
     blur: 0,
+    rebound: r(0.3, 0.85),
     focus: r(0.3, 0.7),
   };
 }
