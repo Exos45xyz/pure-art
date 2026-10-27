@@ -247,11 +247,13 @@ export function createUI(app) {
 
   // Toast
   let toastTimer;
-  function toast(message) {
+  // instant: raised by a key, so it appears at once (it still fades out when it leaves).
+  function toast(message, instant = false) {
     toastEl.textContent = message;
+    toastEl.classList.toggle('instant', instant);
     toastEl.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show', 'instant'), 2200);
   }
 
   async function saveImage() {
@@ -316,7 +318,7 @@ export function createUI(app) {
     const key = e.key.toLowerCase();
     if (key === ' ') {
       e.preventDefault();
-      toast(app.togglePause() ? 'paused' : 'playing');
+      toast(app.togglePause() ? 'paused' : 'playing', true);
     } else if (key === 'r') shuffle(true);
     else if (key === 's') saveImage();
     else if (key === 'h') setOpen(panel.hasAttribute('data-hidden'), true);

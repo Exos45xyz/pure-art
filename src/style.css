@@ -392,6 +392,7 @@ canvas:active { cursor: grabbing; }
   transform: translate(-50%, 0);
   transition: opacity 200ms var(--ease-out), transform 240ms var(--ease-out);
 }
+.toast.show.instant { transition: none; }
 
 .fallback { display: none; }
 .no-webgl .fallback {
