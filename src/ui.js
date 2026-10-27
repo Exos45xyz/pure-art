@@ -153,8 +153,7 @@ export function createUI(app) {
 
   // Actions
   const save = h('button', { type: 'button', class: 'pill pill-primary', onclick: () => saveImage() }, 'save image');
-  const recordLabel = h('span', {}, 'record');
-  const record = h('button', { type: 'button', class: 'pill', onclick: () => recordVideo() }, h('i', { class: 'rec-dot' }), recordLabel);
+  const record = h('button', { type: 'button', class: 'pill', onclick: () => openRecord(true) }, h('i', { class: 'rec-dot' }), 'record');
   const copy = h('button', { type: 'button', class: 'pill', onclick: () => copyLink() }, 'copy link');
 
   // Controls. The everyday path comes first: a look, a colour, then save or share. The rest waits one
@@ -182,11 +181,8 @@ export function createUI(app) {
   const imageRow = h('div', { class: 'image-row', hidden: true }, thumb, h('div', { class: 'image-meta' }, imageName, strip), change);
   const colour = section('Colour', h('div', { class: 'rows' }, field(byKey('colour'), true), imageRow, fileInput));
 
-  // What is saved: the format, then the video's length, loop and frame rate. Each option names itself,
-  // so the rows need no labels.
-  const share = section('Share',
-    h('div', { class: 'rows' }, ['format', 'length', 'loop', 'fps'].map((key) => field(byKey(key), true))),
-    h('div', { class: 'actions' }, save, record, copy));
+  // The format frames what is saved (the canvas shows it); record opens the record window.
+  const share = section('Share', h('div', { class: 'rows' }, field(byKey('format'), true)), h('div', { class: 'actions' }, save, record, copy));
 
   const tuneGroups = [...new Set(controls.map((c) => c.group))].filter((g) => g !== 'Colour' && g !== 'Output');
   const tune = h('div', { class: 'tune', id: 'fine-tune' }, tuneGroups.map((group) =>
@@ -207,8 +203,8 @@ export function createUI(app) {
   function setTune(open) {
     showTune(open);
     try { localStorage.setItem(TUNE_KEY, open ? 'open' : 'closed'); } catch {}
-    // On a phone the sheet grows or shrinks, so the cube re-centres in the space left above it.
-    app.layoutChanged();
+    // On a phone the sheet grows or shrinks, so the cube (or its frame) re-centres in the space left.
+    app.reframe();
     placeChrome();
     if (open && panel.scrollHeight > panel.clientHeight) {
       const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -313,32 +309,66 @@ export function createUI(app) {
     }
   }
 
-  // While recording, the frame shows small in the middle with its progress and a way out.
+  // The record window: in the panel's place, the video's settings and a start button; the canvas
+  // becomes the frame being recorded. Each option names itself, so the rows need no labels.
+  const startLabel = h('span', {}, 'start recording');
+  const start = h('button', { type: 'button', class: 'pill pill-primary pill-start', onclick: () => recordVideo() },
+    h('i', { class: 'rec-dot' }), startLabel);
   const statusText = h('span');
   const statusFill = h('i');
-  const status = h('div', { class: 'render-status', role: 'status' },
+  const status = h('div', { class: 'record-status', role: 'status', hidden: true },
     h('p', { class: 'micro' }, statusText),
-    h('div', { class: 'bar' }, statusFill),
-    h('button', { type: 'button', class: 'text-button micro', onclick: () => app.stopRecording() }, 'Cancel'));
-  document.body.append(status);
+    h('div', { class: 'bar' }, statusFill));
+  const back = h('button', { type: 'button', class: 'text-button micro', onclick: () => openRecord(false) }, 'Back');
+  const recordRows = h('div', { class: 'rows' }, ['format', 'length', 'loop', 'fps'].map((key) => field(byKey(key), true)));
+  const recordPanel = h('aside', { class: 'panel record-panel', 'aria-label': 'Record', 'data-hidden': true },
+    h('div', { class: 'panel-head' }, h('span', { class: 'micro micro-strong' }, 'Record'), back),
+    h('section', {}, recordRows),
+    h('section', {}, start, status),
+    h('p', { class: 'micro keys' }, 'Esc back · cancel'));
+  recordPanel.inert = true;
+  document.body.append(recordPanel);
+
+  let recordOpen = false;
+  function openRecord(open) {
+    if (app.recording) return;
+    recordOpen = open;
+    document.body.classList.toggle('record-mode', open);
+    panel.toggleAttribute('data-hidden', open);
+    panel.inert = open;
+    recordPanel.toggleAttribute('data-hidden', !open);
+    recordPanel.inert = !open;
+    reopen.toggleAttribute('data-shown', false);
+    app.reframe();
+    placeChrome();
+  }
 
   async function recordVideo() {
     if (app.recording) return app.stopRecording();
-    record.classList.add('recording');
     const { length, loop, fps } = app.state;
-    const doing = app.canLoop ? `Rendering ${length} s ${loop === 'loop' ? 'loop' : 'video'} · ${fps} fps` : `Recording ${length} s`;
+    const doing = app.canLoop ? `${length} s ${loop === 'loop' ? 'loop' : 'video'} · ${fps} fps` : `${length} s live`;
     const show = (p) => {
       statusText.textContent = `${doing} · ${Math.floor(p * 100)}%`;
       statusFill.style.transform = `scaleX(${p})`;
     };
     show(0);
+    status.hidden = false;
+    startLabel.textContent = 'cancel';
+    start.classList.add('recording');
+    back.disabled = true;
+    // The settings hold still while a video is being made.
+    recordRows.inert = true;
     try {
       const ext = await app.recordVideo(show);
       toast(`${app.canLoop && loop === 'loop' ? 'loop' : 'video'} saved · ${ext}`);
     } catch (e) {
       toast(e.message);
     } finally {
-      record.classList.remove('recording');
+      status.hidden = true;
+      startLabel.textContent = 'start recording';
+      start.classList.remove('recording');
+      back.disabled = false;
+      recordRows.inert = false;
     }
   }
 
@@ -358,36 +388,58 @@ export function createUI(app) {
     panel.toggleAttribute('data-hidden', !open);
     panel.inert = !open;
     reopen.toggleAttribute('data-shown', !open);
-    app.layoutChanged(instant);
+    app.reframe(instant);
     placeChrome();
-    showFormat();
   }
   reopen.addEventListener('click', () => setOpen(true));
 
+  const shownPanel = () => (recordOpen ? recordPanel : panel.hasAttribute('data-hidden') ? null : panel);
+  const phone = () => matchMedia('(max-width: 720px)').matches;
+  const brandEl = document.querySelector('.brand');
+  const footEl = document.querySelector('.foot');
+
   function reserve() {
-    if (panel.hasAttribute('data-hidden')) return { x: 0, y: 0 };
+    const shown = shownPanel();
+    if (!shown) return { x: 0, y: 0 };
     // On a phone the cube sits in the band between the title and the sheet, clear of both.
-    if (matchMedia('(max-width: 720px)').matches) {
-      const brand = document.querySelector('.brand');
-      return { x: 0, y: panel.offsetHeight + 8 - (brand.offsetTop + brand.offsetHeight) };
-    }
-    return { x: panel.offsetWidth + 16, y: 0 };
+    if (phone()) return { x: 0, y: shown.offsetHeight + 8 - (brandEl.offsetTop + brandEl.offsetHeight) };
+    return { x: shown.offsetWidth + 16, y: 0 };
+  }
+
+  // The frame a file is recorded in, in page pixels: the format's shape, as large as fits in the free
+  // space between the title, the footer and the panel. aspect: width / height.
+  function frameBox(aspect) {
+    const shown = shownPanel();
+    const top = brandEl.offsetTop + brandEl.offsetHeight + (phone() ? 16 : 24);
+    let left = phone() ? 16 : 24;
+    let right = innerWidth - (phone() ? 16 : 24);
+    let bottom = innerHeight - (phone() ? 16 : footEl.offsetHeight + 44);
+    if (shown && phone()) bottom = innerHeight - shown.offsetHeight - 24;
+    if (shown && !phone()) right = innerWidth - shown.offsetWidth - 40;
+    const room = { w: Math.max(80, right - left), h: Math.max(80, bottom - top) };
+    const w = Math.round(Math.min(room.w, room.h * aspect));
+    const h = Math.round(w / aspect);
+    return { x: Math.round(left + (room.w - w) / 2), y: Math.round(top + (room.h - h) / 2), w, h };
   }
 
   // The page's own chrome follows the panel: messages centre in the free space, and on a phone they
   // sit just above the sheet, where the eye already is.
   function placeChrome() {
     document.body.style.setProperty('--reserve-x', `${reserve().x}px`);
-    document.body.style.setProperty('--sheet', `${panel.hasAttribute('data-hidden') ? 0 : panel.offsetHeight}px`);
+    document.body.style.setProperty('--sheet', `${shownPanel()?.offsetHeight ?? 0}px`);
   }
   addEventListener('resize', placeChrome);
   placeChrome();
 
   addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    // While recording, keys only cancel: Escape.
+    // While recording, keys only cancel: Escape. In the record window, Escape goes back.
     if (app.recording) {
       if (e.key === 'Escape') app.stopRecording();
+      return;
+    }
+    if (recordOpen) {
+      if (e.key === 'Escape') openRecord(false);
       return;
     }
     if (e.target.closest('button, [role=slider], input, a')) return;
@@ -407,17 +459,5 @@ export function createUI(app) {
     setTimeout(() => { if (!touched) toast('drag to turn the cube'); }, 3500);
   }
 
-  // The export frame drawn on screen, so you see what a 9:16, 4:5 or 1:1 file will hold.
-  const guide = document.querySelector('.format-guide');
-  // A format wider than the free space crops nothing you see (16:9 on most screens), so no frame then.
-  let shownFormat = app.state.format;
-  function showFormat(format = shownFormat) {
-    shownFormat = format;
-    const ratio = { '16:9': 16 / 9, '9:16': 9 / 16, '4:5': 4 / 5, '1:1': 1 }[format];
-    guide.toggleAttribute('data-shown', Boolean(ratio) && ratio * innerHeight < innerWidth - reserve().x);
-    if (ratio) guide.style.setProperty('--ratio', ratio);
-  }
-  addEventListener('resize', () => showFormat());
-
-  return { reserve, toast, showFormat, showColours, pickImage: () => fileInput.click(), sync: () => fields.forEach((f) => f.sync()) };
+  return { reserve, frameBox, get recordOpen() { return recordOpen; }, toast, showColours, pickImage: () => fileInput.click(), sync: () => fields.forEach((f) => f.sync()) };
 }

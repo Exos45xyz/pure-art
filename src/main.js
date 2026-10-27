@@ -195,11 +195,26 @@ function applyFrame() {
   grade.uniforms.uCenter.value = [0.5 - output.offsetX / output.width, 0.5 + output.offsetY / output.height];
 }
 
-function fitScreen() {
+// The screen the canvas was last fitted to.
+const fitted = { width: 0, height: 0 };
+const aspects = { '16:9': 16 / 9, '9:16': 9 / 16, '4:5': 4 / 5, '1:1': 1 };
+function fitScreen(instant = false) {
   // A page opened in a background tab can start with no size; wait for a real one.
   if (!innerWidth || !innerHeight || exporting) return;
-  Object.assign(output, { width: innerWidth, height: innerHeight, ratio: Math.min(devicePixelRatio, 2), offsetX: pan.x, offsetY: pan.y });
-  app.layoutChanged();
+  Object.assign(fitted, { width: innerWidth, height: innerHeight });
+  // A format, or the record window, makes the canvas the frame of the file: you see what is saved.
+  const framed = state.format !== 'screen' || ui.recordOpen;
+  document.body.classList.toggle('framed', framed);
+  const ratio = Math.min(devicePixelRatio, 2);
+  if (framed) {
+    const box = ui.frameBox(aspects[state.format] ?? innerWidth / innerHeight);
+    Object.assign(canvas.style, { left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px` });
+    Object.assign(output, { width: box.w, height: box.h, ratio, offsetX: 0, offsetY: 0 });
+  } else {
+    Object.assign(canvas.style, { left: '', top: '', width: '', height: '' });
+    Object.assign(output, { width: innerWidth, height: innerHeight, ratio, offsetX: pan.x, offsetY: pan.y });
+  }
+  app.layoutChanged(instant);
   applyOutput();
 }
 
@@ -214,8 +229,9 @@ const stir = { origin: new Vector3(), direction: new Vector3(), velocity: new Ve
 let hasLastHit = false;
 
 canvas.addEventListener('pointermove', (e) => {
-  pointer.x = (e.clientX / innerWidth) * 2 - 1;
-  pointer.y = -(e.clientY / innerHeight) * 2 + 1;
+  const box = canvas.getBoundingClientRect();
+  pointer.x = ((e.clientX - box.left) / box.width) * 2 - 1;
+  pointer.y = -((e.clientY - box.top) / box.height) * 2 + 1;
   pointer.inside = e.pointerType === 'mouse';
 });
 canvas.addEventListener('pointerleave', () => { pointer.inside = false; hasLastHit = false; });
@@ -350,7 +366,7 @@ function tick(now) {
   last = now;
   // A loop being rendered draws its own frames.
   if (rendering) return requestAnimationFrame(tick);
-  if (!exporting && (innerWidth !== output.width || innerHeight !== output.height)) fitScreen();
+  if (!exporting && (innerWidth !== fitted.width || innerHeight !== fitted.height)) fitScreen();
   if (!output.width || !output.height) return requestAnimationFrame(tick);
   time += dt;
 
@@ -518,7 +534,10 @@ const app = {
       build(value);
     }
     if (key === 'lens') cut.pending = { ...cut.pending, lens: value };
-    if (key === 'format') ui.showFormat(value);
+    if (key === 'format') {
+      ui.sync();
+      app.reframe(true);
+    }
     writeHash(state);
   },
   apply(values, look) {
@@ -541,10 +560,17 @@ const app = {
   get paused() { return paused; },
   togglePause() { paused = !paused; return paused; },
   recording: null,
+  // The panel opened, closed, or gave way to the record window: fit the canvas or the frame again.
+  reframe(instant = false) {
+    fitScreen(instant);
+  },
   layoutChanged(instant = false) {
-    const reserve = app.recording ? { x: 0, y: 0 } : ui.reserve();
+    // A framed canvas is placed in the free space itself; the full screen pans the cube into it.
+    const framed = document.body.classList.contains('framed');
+    const reserve = app.recording || framed ? { x: 0, y: 0 } : ui.reserve();
     pan.targetX = reserve.x / 2;
     pan.targetY = reserve.y / 2;
+    if (framed) instant = true;
     // With reduced motion the scene moves to its new centre at once instead of sliding.
     if (instant || reducedMotion) {
       pan.x = pan.targetX;
@@ -577,7 +603,6 @@ const app = {
 };
 
 const ui = createUI(app);
-ui.showFormat(state.format);
 
 if (import.meta.env.DEV) {
   window.pureSmoke = {

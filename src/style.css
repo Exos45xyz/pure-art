@@ -379,53 +379,24 @@ canvas:active { cursor: grabbing; }
 .reopen[data-shown] { opacity: 1; transform: none; pointer-events: auto; transition-delay: 80ms; }
 .reopen.instant { transition: none; }
 
-/* The export frame, for a format narrower than the free space: two hairlines either side of the cube */
-.format-guide {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: calc((100% - var(--reserve-x, 0px)) / 2);
-  width: calc(100vh * var(--ratio, 1));
-  max-width: calc(100% - var(--reserve-x, 0px));
-  transform: translateX(-50%);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 200ms ease;
-}
-.format-guide[data-shown] { opacity: 1; }
-/* Recording: the frame being made sits small in the middle, whole, with its progress under it; the
-   rest of the page steps back until it is done. */
-.rendering canvas {
+/* A format (or the record window) makes the canvas the frame of the file, placed by main.js in the
+   free space: what you see is what is saved. A hairline marks its edge. */
+.framed canvas {
   inset: auto;
-  left: 50%;
-  top: calc(50% - 28px);
-  width: auto;
-  height: auto;
-  /* Small enough to read as a preview of the file, not the page */
-  max-width: min(calc(100% - 48px), 62vw);
-  max-height: min(calc(100% - 176px), 56vh);
-  transform: translate(-50%, -50%);
-  outline: 1px solid rgba(255, 255, 255, 0.1);
-  pointer-events: none;
+  outline: 1px solid rgba(255, 255, 255, 0.14);
 }
-.rendering .panel, .rendering .reopen, .rendering .brand, .rendering .foot, .rendering .format-guide {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-.render-status {
-  position: fixed;
-  left: 50%;
-  bottom: max(36px, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  display: none;
-  justify-items: center;
-  gap: 12px;
-}
-.rendering .render-status { display: grid; }
-.render-status .micro { color: var(--strong); font-variant-numeric: tabular-nums; }
+
+/* The record window: the panel's place, the video's settings, one start button, then its progress */
+.pill-start { height: 34px; justify-content: center; }
+.record-status { display: grid; gap: 8px; padding: 2px 2px 0; }
+.record-status[hidden] { display: none; }
+.record-status .micro { color: var(--strong); font-variant-numeric: tabular-nums; }
+.record-status .bar { width: 100%; }
+.record-panel .rows[inert] { opacity: 0.4; }
+.text-button:disabled { opacity: 0.35; cursor: default; }
+/* While it renders, only the frame and the record window stay. */
+.rendering .reopen, .rendering .foot { opacity: 0; visibility: hidden; pointer-events: none; }
+.rendering canvas { pointer-events: none; }
 
 /* Image colours: thumbnail, name, and the image's main colours at their real shares */
 .image-row {
@@ -511,7 +482,7 @@ canvas:active { cursor: grabbing; }
     gap: 14px;
   }
   .ready .panel[data-hidden] { transform: translateY(calc(100% + 24px)); }
-  .foot, .keys, .format-guide { display: none; }
+  .foot, .keys { display: none; }
   .brand { top: max(16px, env(safe-area-inset-top)); left: 16px; }
   .reopen { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform-origin: bottom right; }
   .toast { bottom: calc(var(--sheet, 0px) + max(8px, env(safe-area-inset-bottom)) + 12px); left: 50%; }
