@@ -12,14 +12,14 @@ const NARROWEST = 9 / 16;
 export function createView(canvas) {
   const depth = new PerspectiveCamera(26, 1, 0.1, 100);
   const flat = new OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
-  const rig = { theta: 0, phi: 0, zoom: 1, vTheta: 0, vPhi: 0 };
+  const rig = { theta: 0, phi: 0, zoom: 1, zoomTarget: 1, vTheta: 0, vPhi: 0 };
   let lens = 'flat';
   let drag = null;
 
   function original() {
     rig.theta = ORIGINAL_CAMERA.theta0;
     rig.phi = Math.PI / 2 - ORIGINAL_CAMERA.tilt;
-    rig.zoom = 1;
+    rig.zoom = rig.zoomTarget = 1;
     rig.vTheta = rig.vPhi = 0;
   }
   original();
@@ -53,7 +53,7 @@ export function createView(canvas) {
   canvas.addEventListener('pointercancel', release);
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    rig.zoom = Math.min(2.2, Math.max(0.6, rig.zoom * Math.exp(-e.deltaY * 0.0015)));
+    rig.zoomTarget = Math.min(2.2, Math.max(0.6, rig.zoomTarget * Math.exp(-e.deltaY * 0.0015)));
   }, { passive: false });
 
   const clampPhi = (phi) => Math.min(Math.PI - 0.12, Math.max(0.12, phi));
@@ -77,6 +77,8 @@ export function createView(canvas) {
         rig.vTheta *= decay;
         rig.vPhi *= decay;
       }
+      // The zoom glides to where the wheel asked for, so a mouse wheel's notches don't jump the camera.
+      rig.zoom += (rig.zoomTarget - rig.zoom) * (1 - Math.exp(-dt * 12));
       for (const camera of [depth, flat]) {
         camera.position.setFromSphericalCoords(lens === 'depth' ? DISTANCE / rig.zoom : DISTANCE, rig.phi, rig.theta);
         camera.lookAt(0, 0, 0);
