@@ -116,6 +116,10 @@ export function createView(canvas) {
         flat.updateProjectionMatrix();
       }
     },
+    // How large the scene draws in a frame this size, up to a constant (both lenses fit it the same way).
+    scale(width, height) {
+      return height / Math.max(1, NARROWEST / (width / height));
+    },
     // Fit both lenses to an output of width × height, shifted by the panel's offset.
     frame(width, height, offsetX = 0, offsetY = 0) {
       const aspect = width / height;

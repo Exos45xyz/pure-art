@@ -153,7 +153,7 @@ export function createUI(app) {
 
   // Actions
   const save = h('button', { type: 'button', class: 'pill pill-wide', onclick: () => saveImage() }, 'save image');
-  const record = h('button', { type: 'button', class: 'pill', onclick: () => openRecord(true) }, h('i', { class: 'rec-dot' }), 'record');
+  const record = h('button', { type: 'button', class: 'pill', onclick: (e) => openRecord(true, { keyboard: e.detail === 0 }) }, h('i', { class: 'rec-dot' }), 'record');
   const copy = h('button', { type: 'button', class: 'pill', onclick: () => copyCode() }, 'copy code');
 
   // Controls. The everyday path comes first: a look, a colour, then save or share. The rest waits one
@@ -297,8 +297,12 @@ export function createUI(app) {
     toastTimer = setTimeout(() => toastEl.classList.remove('show', 'instant'), 2200);
   }
 
+  // A large image takes a second or two to encode: the button says so while it does.
   async function saveImage() {
+    if (save.getAttribute('aria-busy') === 'true') return;
     save.disabled = true;
+    save.setAttribute('aria-busy', 'true');
+    save.textContent = 'saving…';
     try {
       const size = await app.saveImage();
       toast(`image saved · ${size}`);
@@ -306,6 +310,8 @@ export function createUI(app) {
       toast(e.message);
     } finally {
       save.disabled = false;
+      save.removeAttribute('aria-busy');
+      save.textContent = 'save image';
     }
   }
 
@@ -319,33 +325,46 @@ export function createUI(app) {
   const status = h('div', { class: 'record-status', role: 'status', hidden: true },
     h('p', { class: 'micro' }, statusText),
     h('div', { class: 'bar' }, statusFill));
-  const back = h('button', { type: 'button', class: 'text-button micro', onclick: () => openRecord(false) }, 'Back');
+  const back = h('button', { type: 'button', class: 'text-button micro', onclick: (e) => openRecord(false, { keyboard: e.detail === 0 }) }, 'Back');
   const frameRow = h('div', { class: 'rows' }, field(byKey('format'), true));
   const recordRows = h('div', { class: 'rows' }, ['length', 'loop', 'fps'].map((key) => field(byKey(key), true)));
-  const recordPanel = h('aside', { class: 'panel record-panel', 'aria-label': 'Record', 'data-hidden': true },
+  const recordPanel = h('aside', { class: 'panel record-panel', 'aria-label': 'Record', 'data-hidden': true, tabindex: -1 },
     h('div', { class: 'panel-head' }, h('span', { class: 'micro micro-strong' }, 'Record'), back),
     section('Frame', frameRow, save),
     section('Video', recordRows, start, status),
     h('p', { class: 'micro keys' }, 'Esc back · cancel'));
   recordPanel.inert = true;
   document.body.append(recordPanel);
+  // Its rows came after the first sync above: show their choices too (8 s and 60 fps, not the first).
+  fields.forEach((f) => f.sync());
 
+  // The record window is a level below the parameters: it turns in like a page while the canvas glides
+  // into the frame (main.js), and Back turns it out again. From a key it changes at once, and keyboard
+  // focus follows into the window and back to the button that opened it.
   let recordOpen = false;
-  function openRecord(open) {
-    if (app.recording) return;
+  let pagingTimer;
+  function openRecord(open, { instant = false, keyboard = false } = {}) {
+    if (app.recording || open === recordOpen) return;
     recordOpen = open;
+    panel.classList.toggle('instant', instant);
+    recordPanel.classList.toggle('instant', instant);
+    document.body.classList.add('paging');
+    clearTimeout(pagingTimer);
+    pagingTimer = setTimeout(() => document.body.classList.remove('paging'), 400);
     document.body.classList.toggle('record-mode', open);
     panel.toggleAttribute('data-hidden', open);
     panel.inert = open;
     recordPanel.toggleAttribute('data-hidden', !open);
     recordPanel.inert = !open;
     reopen.toggleAttribute('data-shown', false);
-    app.reframe();
+    app.reframe(instant, true);
     placeChrome();
+    if (keyboard) (open ? recordPanel : record).focus({ preventScroll: true });
   }
 
   async function recordVideo() {
     if (app.recording) return app.stopRecording();
+    if (save.getAttribute('aria-busy') === 'true') return;
     const { length, loop, fps } = app.state;
     const doing = app.canLoop ? `${length} s ${loop === 'loop' ? 'loop' : 'video'} · ${fps} fps` : `${length} s live`;
     const show = (p) => {
@@ -442,7 +461,7 @@ export function createUI(app) {
       return;
     }
     if (recordOpen) {
-      if (e.key === 'Escape') openRecord(false);
+      if (e.key === 'Escape') openRecord(false, { instant: true, keyboard: true });
       return;
     }
     if (e.target.closest('button, [role=slider], input, a')) return;

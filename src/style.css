@@ -55,6 +55,8 @@ canvas {
   cursor: grab;
   opacity: 0;
   transition: opacity 900ms var(--ease-out);
+  /* The record window's glide scales it from its corner (main.js) */
+  transform-origin: 0 0;
 }
 canvas:active { cursor: grabbing; }
 .ready canvas { opacity: 1; }
@@ -158,6 +160,8 @@ canvas:active { cursor: grabbing; }
 .ready .brand, .ready .foot { opacity: 1; transform: none; }
 .ready .brand { transition-delay: 120ms; }
 .ready .foot { transition-delay: 240ms; }
+/* After the first entrance they answer at UI speed (the footer leaves and returns around a render). */
+.settled .brand, .settled .foot { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
 
 /* ---- Panel --------------------------------------------------------------------------------- */
 
@@ -195,6 +199,15 @@ canvas:active { cursor: grabbing; }
 .settled .panel[data-hidden] { transition: opacity 160ms ease, transform 220ms var(--ease-drawer); }
 .ready .panel:not([data-hidden]).instant,
 .ready .panel[data-hidden].instant { transition: none; }
+/* The record window is a level below the parameters: it turns in from the right as they leave to
+   the left, and Back turns it the other way. The leaving panel fades first, so two panes of glass
+   never stack. */
+.ready .panel.record-panel[data-hidden] { transform: translateX(16px); }
+.record-mode .panel:not(.record-panel)[data-hidden] { transform: translateX(-16px); }
+.paging .panel[data-hidden] { transition: opacity 120ms var(--ease-out), transform 200ms var(--ease-out); }
+.paging .panel:not([data-hidden]) { transition: opacity 200ms var(--ease-out) 80ms, transform 260ms var(--ease-out); }
+/* Keyboard focus lands on the window itself when it opens; the next Tab reaches its first control. */
+.record-panel:focus { outline: none; }
 
 .panel-head {
   display: flex;
@@ -205,7 +218,7 @@ canvas:active { cursor: grabbing; }
   padding: 2px 2px 0;
 }
 .panel-head-actions { display: flex; gap: 14px; }
-.text-button { transition: color 200ms ease, transform 160ms var(--ease-pill); }
+.text-button { transition: color 200ms ease, opacity 200ms ease, transform 160ms var(--ease-pill); }
 .text-button:active { transform: scale(0.96); }
 
 .panel section { display: grid; gap: 8px; }
@@ -295,7 +308,7 @@ canvas:active { cursor: grabbing; }
   text-transform: lowercase;
   background: var(--row);
   color: var(--text);
-  transition: transform 160ms var(--ease-pill), background-color 200ms ease, color 200ms ease;
+  transition: transform 160ms var(--ease-pill), background-color 200ms ease, color 200ms ease, opacity 200ms ease;
 }
 .chip[aria-pressed='true'] { background: var(--strong); color: #0b0b0b; }
 .chip:active, .pill:active { transform: scale(0.97); }
@@ -309,7 +322,11 @@ canvas:active { cursor: grabbing; }
 .die { display: inline-flex; transition: transform 260ms var(--ease-out); }
 .pill { height: 28px; padding: 0 13px; background: #1a1a1a; color: var(--strong); }
 .pill-primary { background: #f2f2f2; color: #0b0b0b; }
-.pill:disabled { opacity: 0.5; cursor: progress; }
+.pill:disabled { opacity: 0.5; cursor: default; }
+/* Working (an image being saved): the label says so, at full strength */
+.pill[aria-busy='true'] { opacity: 1; cursor: progress; }
+/* While a video renders, start becomes cancel: a quiet button beside the blinking dot */
+.pill-primary.recording { background: #1a1a1a; color: var(--strong); }
 .rec-dot {
   width: 6px;
   height: 6px;
@@ -345,8 +362,15 @@ canvas:active { cursor: grabbing; }
   transition: transform 200ms var(--ease-out);
 }
 .disclosure[aria-expanded='true'] .chevron { transform: translateY(1px) rotate(225deg); }
-.tune { display: grid; gap: 18px; padding-top: 10px; }
+.tune {
+  display: grid;
+  gap: 18px;
+  padding-top: 10px;
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
 .tune[hidden] { display: none; }
+/* Fine-tune's rows fade in a few pixels above their place as it opens */
+@starting-style { .tune { opacity: 0; transform: translateY(-4px); } }
 .panel h3 { padding: 0 2px; }
 /* A control waiting on another (focus needs blur) */
 .slider.resting { opacity: 0.35; pointer-events: none; }
@@ -361,6 +385,7 @@ canvas:active { cursor: grabbing; }
   .disclosure:hover { background: var(--row-hover); color: var(--strong); }
   .pill-randomize:hover { background: rgba(255, 255, 255, 0.06); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
   .pill-primary:hover { background: #fff; }
+  .pill-primary.recording:hover { background: #222; }
   .text-button:hover { color: var(--strong); }
   .foot a:hover, .designed:hover { opacity: 0.7; }
 }
@@ -388,14 +413,21 @@ canvas:active { cursor: grabbing; }
 
 /* The record window: the panel's place, the video's settings, one start button, then its progress */
 .pill-start, .pill-wide { height: 34px; justify-content: center; }
-.record-status { display: grid; gap: 8px; padding: 2px 2px 0; }
+.record-status { display: grid; gap: 8px; padding: 2px 2px 0; transition: opacity 200ms var(--ease-out); }
 .record-status[hidden] { display: none; }
+@starting-style { .record-status { opacity: 0; } }
 .record-status .micro { color: var(--strong); font-variant-numeric: tabular-nums; }
 .record-status .bar { width: 100%; }
+.record-panel .rows { transition: opacity 200ms ease; }
 .record-panel .rows[inert] { opacity: 0.4; }
 .text-button:disabled { opacity: 0.35; cursor: default; }
 /* While it renders, only the frame and the record window stay. */
-.rendering .reopen, .rendering .foot { opacity: 0; visibility: hidden; pointer-events: none; }
+.rendering .reopen, .rendering .foot {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 200ms var(--ease-out), visibility 0s linear 200ms;
+}
 .rendering canvas { pointer-events: none; }
 
 /* Image colours: thumbnail, name, and the image's main colours at their real shares */
@@ -448,7 +480,7 @@ canvas:active { cursor: grabbing; }
   opacity: 0;
   transform: translate(-50%, 6px);
   pointer-events: none;
-  transition: opacity 150ms ease, transform 150ms ease;
+  transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
 }
 .toast.show {
   opacity: 1;
@@ -494,4 +526,5 @@ canvas:active { cursor: grabbing; }
   /* Movement goes; opacity and colour stay. The die keeps one face (it would flick between two). */
   .die { transform: none !important; }
   .choice-thumb, .gliding .slider-fill, .chevron { transition: none; }
+  .tune { transform: none !important; }
 }

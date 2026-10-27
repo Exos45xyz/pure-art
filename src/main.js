@@ -172,6 +172,9 @@ const output = { width: 0, height: 0, ratio: 1, offsetX: 0, offsetY: 0 };
 // The cube sits in the middle of the space the panel leaves free.
 const pan = { x: 0, y: 0, targetX: 0, targetY: 0 };
 let exporting = false;
+// While an image is encoded the loop holds still: the screen keeps the frame being saved, and the
+// browser's PNG encoder gets the idle time it waits for (with the loop running it took 5 to 10 s).
+let holding = false;
 let rendering = false;
 
 function applyOutput() {
@@ -201,6 +204,7 @@ const aspects = { '16:9': 16 / 9, '9:16': 9 / 16, '4:5': 4 / 5, '1:1': 1 };
 function fitScreen(instant = false) {
   // A page opened in a background tab can start with no size; wait for a real one.
   if (!innerWidth || !innerHeight || exporting) return;
+  frameGlide?.cancel();
   Object.assign(fitted, { width: innerWidth, height: innerHeight });
   // In the record window the canvas becomes the frame of the file: you see what is saved.
   const framed = ui.recordOpen;
@@ -212,10 +216,39 @@ function fitScreen(instant = false) {
     Object.assign(output, { width: box.w, height: box.h, ratio, offsetX: 0, offsetY: 0 });
   } else {
     Object.assign(canvas.style, { left: '', top: '', width: '', height: '' });
-    Object.assign(output, { width: innerWidth, height: innerHeight, ratio, offsetX: pan.x, offsetY: pan.y });
+    Object.assign(output, { width: innerWidth, height: innerHeight, ratio });
   }
   app.layoutChanged(instant);
+  if (!framed) Object.assign(output, { offsetX: pan.x, offsetY: pan.y });
   applyOutput();
+}
+
+// The cube on the page as drawn now (through any glide under way): its centre, and its size up to a
+// constant.
+function cubeOnPage() {
+  const box = canvas.getBoundingClientRect();
+  const s = box.width / output.width;
+  return {
+    x: box.left + (output.width / 2 - output.offsetX) * s,
+    y: box.top + (output.height / 2 - output.offsetY) * s,
+    size: view.scale(output.width, output.height) * s,
+  };
+}
+
+// Opening or closing the record window, the canvas glides between the screen and the frame. It is
+// laid out at once in its new place, then drawn from where the cube was, at the size it was, and
+// settles: the cube stays under the eye while the frame closes in around it (or opens out).
+let frameGlide = null;
+function glideFrom(from) {
+  const box = canvas.getBoundingClientRect();
+  const to = cubeOnPage();
+  const s = from.size / to.size;
+  const x = from.x - box.left - s * (to.x - box.left);
+  const y = from.y - box.top - s * (to.y - box.top);
+  frameGlide = canvas.animate(
+    [{ transform: `translate(${x}px, ${y}px) scale(${s})` }, { transform: 'none' }],
+    { duration: 300, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' },
+  );
 }
 
 // ---- Stir: hovering moves the smoke -------------------------------------------------------
@@ -364,8 +397,8 @@ let last = performance.now();
 function tick(now) {
   const dt = Math.min((now - last) / 1000, 1 / 20);
   last = now;
-  // A loop being rendered draws its own frames.
-  if (rendering) return requestAnimationFrame(tick);
+  // A loop being rendered draws its own frames; an image being saved keeps the one it saves.
+  if (rendering || holding) return requestAnimationFrame(tick);
   if (!exporting && (innerWidth !== fitted.width || innerHeight !== fitted.height)) fitScreen();
   if (!output.width || !output.height) return requestAnimationFrame(tick);
   time += dt;
@@ -561,8 +594,11 @@ const app = {
   togglePause() { paused = !paused; return paused; },
   recording: null,
   // The panel opened, closed, or gave way to the record window: fit the canvas or the frame again.
-  reframe(instant = false) {
-    fitScreen(instant);
+  // glide: the canvas moves to its new place from where it was (the record window opening or closing).
+  reframe(instant = false, glide = false) {
+    const from = glide && !instant && !reducedMotion ? cubeOnPage() : null;
+    fitScreen(instant || !!from);
+    if (from) glideFrom(from);
   },
   layoutChanged(instant = false) {
     // A framed canvas is placed in the free space itself; the full screen pans the cube into it.
@@ -578,9 +614,14 @@ const app = {
     }
   },
   // What you see: the chosen frame in the record window, the screen everywhere else (the S key).
-  saveImage() {
+  async saveImage() {
     const size = formatSize(ui.recordOpen ? state.format : 'screen', 'image', innerWidth, innerHeight);
-    return atSize(size.width, size.height, 1, () => saveImage({ canvas, render, ...size }));
+    holding = true;
+    try {
+      return await atSize(size.width, size.height, 1, () => saveImage({ canvas, render, ...size }));
+    } finally {
+      holding = false;
+    }
   },
   // A browser with a video encoder renders the video (a loop or a single take); one without films it live.
   canLoop: typeof VideoEncoder !== 'undefined' && typeof VideoFrame !== 'undefined',
