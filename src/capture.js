@@ -2,6 +2,7 @@
 
 // Image: 4K on the long side. Video: what X and Instagram play (1080 wide, or 1920 long for screen).
 const sizes = {
+  '16:9': { image: [3840, 2160], video: [1920, 1080] },
   '9:16': { image: [2160, 3840], video: [1080, 1920] },
   '4:5': { image: [3072, 3840], video: [1080, 1350] },
   '1:1': { image: [3840, 3840], video: [1080, 1080] },

@@ -32,7 +32,14 @@ export const controls = [
     options: [['white', 'white'], ['red', 'red'], ['off', 'off']] },
 
   { group: 'Output', key: 'format', label: 'format', type: 'choice', look: false,
-    options: [['screen', 'screen'], ['9:16', '9:16'], ['4:5', '4:5'], ['1:1', '1:1']] },
+    options: [['screen', 'screen'], ['16:9', '16:9'], ['9:16', '9:16'], ['4:5', '4:5'], ['1:1', '1:1']] },
+  // The video: how long, a seamless loop or a single take, and how many frames a second.
+  { group: 'Output', key: 'length', label: 'length', type: 'choice', look: false,
+    options: [[4, '4 s'], [8, '8 s'], [16, '16 s']] },
+  { group: 'Output', key: 'loop', label: 'loop', type: 'choice', look: false,
+    options: [['loop', 'loop'], ['once', 'once']] },
+  { group: 'Output', key: 'fps', label: 'frame rate', type: 'choice', look: false,
+    options: [[30, '30 fps'], [60, '60 fps']] },
 ];
 
 // The studio look every other look starts from.
@@ -69,7 +76,7 @@ export function presetValues(name) {
   return { ...base, ...presets[name] };
 }
 
-export const defaults = { ...presetValues('pure'), particles: 1024, format: 'screen', colour: 'white' };
+export const defaults = { ...presetValues('pure'), particles: 1024, format: 'screen', colour: 'white', length: 8, loop: 'loop', fps: 60 };
 for (const c of controls) c.default = defaults[c.key];
 
 const lookKeys = controls.filter((c) => c.look !== false).map((c) => c.key);

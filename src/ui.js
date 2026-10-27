@@ -72,7 +72,8 @@ function slider(control, app, onChange) {
 // row that is the only control in its section (the section's title already names it).
 function choice(control, app, onChange, bare = false) {
   const thumb = h('div', { class: 'choice-thumb' });
-  thumb.style.width = `${100 / control.options.length}%`;
+  // One option's share of the row inside its 3 px padding, so the last one ends at the padding too.
+  thumb.style.width = `calc((100% - 6px) / ${control.options.length})`;
   const buttons = control.options.map(([value, label], i) =>
     h('button', {
       type: 'button', role: 'radio', class: 'choice-option',
@@ -152,8 +153,7 @@ export function createUI(app) {
 
   // Actions
   const save = h('button', { type: 'button', class: 'pill pill-primary', onclick: () => saveImage() }, 'save image');
-  const recordName = app.canLoop ? 'record loop' : 'record 8s';
-  const recordLabel = h('span', {}, recordName);
+  const recordLabel = h('span', {}, 'record');
   const record = h('button', { type: 'button', class: 'pill', onclick: () => recordVideo() }, h('i', { class: 'rec-dot' }), recordLabel);
   const copy = h('button', { type: 'button', class: 'pill', onclick: () => copyLink() }, 'copy link');
 
@@ -182,8 +182,11 @@ export function createUI(app) {
   const imageRow = h('div', { class: 'image-row', hidden: true }, thumb, h('div', { class: 'image-meta' }, imageName, strip), change);
   const colour = section('Colour', h('div', { class: 'rows' }, field(byKey('colour'), true), imageRow, fileInput));
 
-  // The format only changes what is saved, so it sits with save and record.
-  const share = section('Share', h('div', { class: 'rows' }, field(byKey('format'), true)), h('div', { class: 'actions' }, save, record, copy));
+  // What is saved: the format, then the video's length, loop and frame rate. Each option names itself,
+  // so the rows need no labels.
+  const share = section('Share',
+    h('div', { class: 'rows' }, ['format', 'length', 'loop', 'fps'].map((key) => field(byKey(key), true))),
+    h('div', { class: 'actions' }, save, record, copy));
 
   const tuneGroups = [...new Set(controls.map((c) => c.group))].filter((g) => g !== 'Colour' && g !== 'Output');
   const tune = h('div', { class: 'tune', id: 'fine-tune' }, tuneGroups.map((group) =>
@@ -322,7 +325,8 @@ export function createUI(app) {
   async function recordVideo() {
     if (app.recording) return app.stopRecording();
     record.classList.add('recording');
-    const doing = app.canLoop ? 'Rendering loop' : 'Recording';
+    const { length, loop, fps } = app.state;
+    const doing = app.canLoop ? `Rendering ${length} s ${loop === 'loop' ? 'loop' : 'video'} · ${fps} fps` : `Recording ${length} s`;
     const show = (p) => {
       statusText.textContent = `${doing} · ${Math.floor(p * 100)}%`;
       statusFill.style.transform = `scaleX(${p})`;
@@ -330,7 +334,7 @@ export function createUI(app) {
     show(0);
     try {
       const ext = await app.recordVideo(show);
-      toast(`${app.canLoop ? 'loop' : 'video'} saved · ${ext}`);
+      toast(`${app.canLoop && loop === 'loop' ? 'loop' : 'video'} saved · ${ext}`);
     } catch (e) {
       toast(e.message);
     } finally {
@@ -356,6 +360,7 @@ export function createUI(app) {
     reopen.toggleAttribute('data-shown', !open);
     app.layoutChanged(instant);
     placeChrome();
+    showFormat();
   }
   reopen.addEventListener('click', () => setOpen(true));
 
@@ -404,11 +409,15 @@ export function createUI(app) {
 
   // The export frame drawn on screen, so you see what a 9:16, 4:5 or 1:1 file will hold.
   const guide = document.querySelector('.format-guide');
-  function showFormat(format) {
-    const ratio = { '9:16': 9 / 16, '4:5': 4 / 5, '1:1': 1 }[format];
-    guide.toggleAttribute('data-shown', Boolean(ratio));
+  // A format wider than the free space crops nothing you see (16:9 on most screens), so no frame then.
+  let shownFormat = app.state.format;
+  function showFormat(format = shownFormat) {
+    shownFormat = format;
+    const ratio = { '16:9': 16 / 9, '9:16': 9 / 16, '4:5': 4 / 5, '1:1': 1 }[format];
+    guide.toggleAttribute('data-shown', Boolean(ratio) && ratio * innerHeight < innerWidth - reserve().x);
     if (ratio) guide.style.setProperty('--ratio', ratio);
   }
+  addEventListener('resize', () => showFormat());
 
   return { reserve, toast, showFormat, showColours, pickImage: () => fileInput.click(), sync: () => fields.forEach((f) => f.sync()) };
 }

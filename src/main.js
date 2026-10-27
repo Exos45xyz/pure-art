@@ -398,82 +398,90 @@ function checkQuality(dt) {
 
 // ---- Capture -------------------------------------------------------------------------------
 
-// A seamless loop, rendered frame by frame at 60 fps instead of filmed live, so every computer gets
-// every frame. It lasts whole breaths (about 8 s), and the camera turns by whole quarter turns: the
-// glass looks the same every quarter turn, so it lines up where the loop closes (a slow spin holds
-// still for the loop). The last second crossfades into the first: a second simulation, started from
-// the first frame's grains, replays that second under the end, so the last frame leads into the first.
-const LOOP_FPS = 60;
-const LOOP_BLEND = 1;
+// A video rendered frame by frame instead of filmed live, so every computer gets every frame. The
+// simulation always steps at 60 a second, as it does live; at 30 fps every other step is kept.
+// A loop lasts whole breaths (the length asked for, rounded to them) and the camera turns by whole
+// quarter turns: the glass looks the same every quarter turn, so it lines up where the loop closes
+// (a slow spin holds still for the loop). Its last second crossfades into its first: a second
+// simulation, started from the first frame's grains, replays that second under the end, so the last
+// frame leads into the first. A single take ("once") keeps the length and the spin as they are.
+const STEP = 1 / 60;
 const smoothstep = (x) => {
   x = Math.min(1, Math.max(0, x));
   return x * x * (3 - 2 * x);
 };
-async function renderLoop(job) {
+async function renderVideo(job, { length, loop, fps }) {
   const { createEncoder } = await import('./loop.js');
-  const dt = 1 / LOOP_FPS;
-  const seconds = live.pulse > 0.001 ? Math.round(8 / ORIGINAL_PULSE.period) * ORIGINAL_PULSE.period : 8;
+  const stride = Math.round(60 / fps);
+  const breathing = loop && live.pulse > 0.001;
+  const seconds = breathing ? Math.max(1, Math.round(length / ORIGINAL_PULSE.period)) * ORIGINAL_PULSE.period : length;
+  const spin = paused ? 0 : spinRate(live.spin);
   const quarter = Math.PI / 2;
-  const omega = (Math.round(((paused ? 0 : spinRate(live.spin)) * seconds) / quarter) * quarter) / seconds;
+  const omega = loop ? (Math.round((spin * seconds) / quarter) * quarter) / seconds : spin;
+  const frames = Math.round(seconds * fps);
+  const steps = frames * stride;
+  // The crossfade: a second, or a quarter of a short loop.
+  const blend = loop ? Math.round(Math.min(1, seconds / 4) * fps) * stride : 0;
   const start = view.theta;
-  const frames = Math.round(seconds * LOOP_FPS);
-  const blend = Math.round(LOOP_BLEND * LOOP_FPS);
   const turn = (i) => {
-    view.turnTo(start + omega * i * dt);
+    view.turnTo(start + omega * i * STEP);
     view.update(0, 0);
   };
 
-  const encoder = await createEncoder(canvas, LOOP_FPS);
+  const encoder = await createEncoder(canvas, fps);
   const main = simulation;
-  const replay = createSimulation(renderer, main.size);
-  replay.copyFrom(main);
+  const replay = loop ? createSimulation(renderer, main.size) : null;
+  replay?.copyFrom(main);
   let replayClock = clock;
   rendering = true;
   try {
-    for (let i = 0; i < frames + blend; i++) {
-      if (job.cancelled) throw new Error('loop cancelled');
-      // Every frame: the camera at this moment, then one step. The first second is only simulated.
+    for (let i = 0; i < steps + blend; i++) {
+      if (job.cancelled) throw new Error('recording cancelled');
+      // Every step: the camera at this moment, then the smoke moves on.
       turn(i);
-      simStep(dt, false);
-      if (i < blend) continue;
-      time += dt;
-      if (i >= frames) {
-        // The last second: draw the replayed first second and keep it, then draw the end and lay the
-        // beginning over it, more and more, so the last frame is the one before the first.
-        const k = i - frames;
-        turn(k);
-        advance(replay, dt, replayClock);
-        replayClock += dt;
+      simStep(STEP, false);
+      const tail = i >= steps;
+      if (tail) {
+        turn(i - steps);
+        advance(replay, STEP, replayClock);
+        replayClock += STEP;
+      }
+      // A frame after every stride of steps, once the first (crossfaded) second has gone by.
+      if (i < blend || (i + 1 - blend) % stride) continue;
+      time += stride * STEP;
+      if (tail) {
+        // The replayed beginning, kept, then the end with the beginning laid over it, more and more,
+        // so the last frame is the one before the first.
         simulation = replay;
-        render(dt);
+        render(STEP);
         simulation = main;
         keepFrame();
         turn(i);
-        render(dt);
-        layKeptFrame(smoothstep((k + 1) / blend));
+        render(STEP);
+        layKeptFrame(smoothstep((i - steps + 1) / blend));
       } else {
-        render(dt);
+        render(STEP);
       }
       await encoder.add();
-      job.onProgress?.((i + 1) / (frames + blend));
+      job.onProgress?.((i + 1) / (steps + blend));
       // Let the page breathe (the preview shows the frames as they come).
-      if (i % 2) await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
     const blob = await encoder.finish();
-    download(blob, `pure-smoke-loop-${canvas.width}x${canvas.height}-${stamp()}.mp4`);
+    const name = `pure-smoke-${loop ? 'loop' : 'video'}-${canvas.width}x${canvas.height}-${Math.round(seconds)}s-${fps}fps-${stamp()}.mp4`;
+    download(blob, name);
     return 'mp4';
   } catch (e) {
     encoder.cancel();
     throw e;
   } finally {
     simulation = main;
-    replay.dispose();
+    replay?.dispose();
     view.turnTo(start);
     rendering = false;
   }
 }
 
-// Draw into a size of its own (an export), centred on the cube, then go back to the screen.
 async function atSize(width, height, ratio, task) {
   exporting = true;
   Object.assign(output, { width, height, ratio, offsetX: 0, offsetY: 0 });
@@ -547,15 +555,16 @@ const app = {
     const size = formatSize(state.format, 'image', innerWidth, innerHeight);
     return atSize(size.width, size.height, 1, () => saveImage({ canvas, render, ...size }));
   },
-  // A browser with a video encoder renders a seamless loop; one without films 8 s live.
+  // A browser with a video encoder renders the video (a loop or a single take); one without films it live.
   canLoop: typeof VideoEncoder !== 'undefined' && typeof VideoFrame !== 'undefined',
   async recordVideo(onProgress) {
     const size = formatSize(state.format, 'video', innerWidth, innerHeight);
-    app.recording = { canvas, onProgress, seconds: 8, cancelled: false };
+    app.recording = { canvas, onProgress, seconds: state.length, cancelled: false };
     app.layoutChanged();
     document.body.classList.add('rendering');
+    const settings = { length: state.length, loop: state.loop === 'loop', fps: state.fps };
     try {
-      return await atSize(size.width, size.height, 1, () => (app.canLoop ? renderLoop(app.recording) : recordVideo(app.recording)));
+      return await atSize(size.width, size.height, 1, () => (app.canLoop ? renderVideo(app.recording, settings) : recordVideo(app.recording)));
     } finally {
       document.body.classList.remove('rendering');
       app.recording = null;

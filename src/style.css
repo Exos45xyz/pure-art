@@ -379,7 +379,7 @@ canvas:active { cursor: grabbing; }
 .reopen[data-shown] { opacity: 1; transform: none; pointer-events: auto; transition-delay: 80ms; }
 .reopen.instant { transition: none; }
 
-/* The export frame for 9:16, 4:5 and 1:1: two hairlines and corner ticks around the cube */
+/* The export frame, for a format narrower than the free space: two hairlines either side of the cube */
 .format-guide {
   position: fixed;
   top: 0;
@@ -403,8 +403,9 @@ canvas:active { cursor: grabbing; }
   top: calc(50% - 28px);
   width: auto;
   height: auto;
-  max-width: calc(100% - 48px);
-  max-height: calc(100% - 176px);
+  /* Small enough to read as a preview of the file, not the page */
+  max-width: min(calc(100% - 48px), 62vw);
+  max-height: min(calc(100% - 176px), 56vh);
   transform: translate(-50%, -50%);
   outline: 1px solid rgba(255, 255, 255, 0.1);
   pointer-events: none;
