@@ -39,7 +39,10 @@ export function createView(canvas) {
     const now = performance.now();
     const dt = Math.max((now - drag.t) / 1000, 1 / 240);
     rig.theta += dTheta;
-    rig.phi = clampPhi(rig.phi + dPhi);
+    // Past the limit the tilt follows the hand with rising resistance, like a rubber band.
+    const outward = rig.phi < Math.PI / 2 ? dPhi < 0 : dPhi > 0;
+    const resisted = outward ? dPhi / (1 + past(rig.phi) / 0.08) ** 2 : dPhi;
+    rig.phi = Math.min(Math.PI - 0.02, Math.max(0.02, rig.phi + resisted));
     // Remember how fast the hand was moving, so a flick keeps turning after release.
     rig.vTheta = rig.vTheta * 0.5 + (dTheta / dt) * 0.5;
     rig.vPhi = rig.vPhi * 0.5 + (dPhi / dt) * 0.5;
@@ -57,7 +60,10 @@ export function createView(canvas) {
     rig.zoomTarget = Math.min(2.2, Math.max(0.6, rig.zoomTarget * Math.exp(-e.deltaY * 0.0015)));
   }, { passive: false });
 
-  const clampPhi = (phi) => Math.min(Math.PI - 0.12, Math.max(0.12, phi));
+  const LIMIT = 0.12;
+  const clampPhi = (phi) => Math.min(Math.PI - LIMIT, Math.max(LIMIT, phi));
+  // How far past the top or bottom limit the camera is (0 inside).
+  const past = (phi) => Math.max(LIMIT - phi, phi - (Math.PI - LIMIT), 0);
 
   return {
     get camera() { return lens === 'flat' ? flat : depth; },
@@ -73,7 +79,12 @@ export function createView(canvas) {
     update(dt, spin) {
       if (!drag) {
         rig.theta += spin * dt + rig.vTheta * dt;
-        rig.phi = clampPhi(rig.phi + rig.vPhi * dt);
+        rig.phi += rig.vPhi * dt;
+        if (past(rig.phi) > 0) {
+          // Let go past the limit: the tilt springs back inside it, and any momentum toward it stops.
+          rig.vPhi = 0;
+          rig.phi += (clampPhi(rig.phi) - rig.phi) * (1 - Math.exp(-dt * 14));
+        }
         const decay = Math.exp(-dt * 4);
         rig.vTheta *= decay;
         rig.vPhi *= decay;
