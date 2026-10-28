@@ -300,22 +300,40 @@ export function createUI(app) {
 
   const head = h('div', { class: 'panel-head' },
     h('span', { class: 'micro micro-strong' }, 'Parameters'),
-    h('button', { type: 'button', class: 'text-button micro', onclick: () => setOpen(false), 'aria-label': 'Hide parameters (H)' }, 'Hide'));
-  // The two buttons people reach for first: a new random look, or back to the default look.
+    h('button', { type: 'button', class: 'text-button micro', onclick: () => setOpen(false), 'aria-label': 'Hide parameters (H)', 'aria-keyshortcuts': 'H' }, 'Hide'));
+  // The two buttons people reach for first: a new random look, or back to the default look. Randomize
+  // carries its key (R) where the eye already is, for anyone with a keyboard.
+  const die = h('span', { class: 'die', 'aria-hidden': 'true' });
   const quick = h('div', { class: 'quick' },
-    h('button', { type: 'button', class: 'pill pill-randomize', onclick: (e) => { rollDie(e.detail === 0); shuffle(); }, title: 'Randomize (R)' },
-      h('span', { class: 'die', 'aria-hidden': 'true' }), 'randomize'),
+    h('button', {
+      type: 'button', class: 'pill pill-randomize', title: 'Randomize (R)', 'aria-keyshortcuts': 'R',
+      onclick: (e) => { rollDie(e.detail === 0); shuffle(); },
+    }, die, 'randomize', h('kbd', { class: 'key micro', 'aria-hidden': 'true' }, 'R')),
     h('button', { type: 'button', class: 'pill', onclick: () => applyLook(presetValues('pure'), 'pure') }, 'reset'));
-  // The die rolls a quarter turn per click (a die looks the same each quarter, so it reads as a roll).
+  // The die rolls: a quarter turn (a die looks the same each quarter) that lands on a new face, never the
+  // one it showed, so the icon says a new random look came up. From a key: the new face, without the turn.
+  const PIPS = [null,
+    [[8, 8]],
+    [[5.2, 5.2], [10.8, 10.8]],
+    [[5.2, 5.2], [8, 8], [10.8, 10.8]],
+    [[5.2, 5.2], [10.8, 5.2], [5.2, 10.8], [10.8, 10.8]],
+    [[5.2, 5.2], [10.8, 5.2], [8, 8], [5.2, 10.8], [10.8, 10.8]],
+    [[5.2, 4.9], [10.8, 4.9], [5.2, 8], [10.8, 8], [5.2, 11.1], [10.8, 11.1]]];
+  let dieFace = 3;
   let turns = 0;
+  function showFace(n) {
+    dieFace = n;
+    const r = n === 6 ? 1 : 1.15;
+    die.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="1.5" width="13" height="13" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.3"/>'
+      + PIPS[n].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="currentColor"/>`).join('') + '</svg>';
+  }
   function rollDie(instant) {
-    const die = quick.querySelector('.die');
+    showFace(1 + ((dieFace + Math.floor(Math.random() * 5)) % 6));
+    if (instant) return;
     turns += 1;
-    die.style.transition = instant ? 'none' : '';
     die.style.transform = `rotate(${turns * 90}deg)`;
   }
-  // A die face, drawn once.
-  quick.querySelector('.die').innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="1.5" width="13" height="13" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="5.2" cy="5.2" r="1.15" fill="currentColor"/><circle cx="8" cy="8" r="1.15" fill="currentColor"/><circle cx="10.8" cy="10.8" r="1.15" fill="currentColor"/></svg>';
+  showFace(dieFace);
 
   panel.append(head, quick, look, colour, share, tuneSection,
     h('p', { class: 'micro keys' }, 'Space pause · R randomize · H hide'));
@@ -565,7 +583,10 @@ export function createUI(app) {
     if (key === ' ') {
       e.preventDefault();
       toast(app.togglePause() ? 'paused' : 'playing', true);
-    } else if (key === 'r') shuffle(true);
+    } else if (key === 'r') {
+      rollDie(true);
+      shuffle(true);
+    }
     else if (key === 's') saveImage();
     else if (key === 'h') setOpen(panel.hasAttribute('data-hidden'), true);
   });
