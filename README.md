@@ -25,6 +25,8 @@ The panel shows the everyday choices first: a look, a colour, then save or share
 | | pulse | The breath: every 1.994 s the masses swell until they fill the cube, then pull back in. |
 | | escape | How much smoke finds its way out through the glass. Every look and randomize keep it at 0, so the smoke stays in the cube unless you open it yourself. |
 | | rebound | How hard the smoke bounces off the glass. At 0 it settles against the faces; 50, every look's setting, springs back with 90% of its speed; 100 throws it back hard and far. |
+| | beat | The time between breaths, and in the rebound look between rebounds: 2.0 s is the clip's, from 0.7 s to 6 s. The breath's pushes scale with it, so a slower beat goes as far with more time between. Loops still last whole beats. |
+| | speed | How fast the smoke's time runs, breath and all: 1.00× as it is, from 0.25× (slow motion) to 2×. The camera and the panel keep the clock. |
 | Light | brightness, shadows, glow, film grain | Exposure, how dense the smoke is to the light (how deep its shadows fall, and how much thick smoke hides what is behind it), the soft glow around it, and grain. |
 | Particles | count | 65k, 262k, 500k, 1M or 2M grains. Computers start at 1M and step down to 500k if they can't keep 45 fps. |
 | | size | How big each grain is. |

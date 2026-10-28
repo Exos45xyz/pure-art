@@ -42,7 +42,9 @@ function slider(control, app, onChange) {
   let counting = 0;
   const showNumber = (n) => {
     shownNumber = n;
-    value.textContent = Math.round(n * 100);
+    // Most sliders read 0–100; one that has a real unit (the beat's seconds, the speed) shows that.
+    value.textContent = control.format ? control.format(n) : Math.round(n * 100);
+    if (control.format) el.setAttribute('aria-valuetext', value.textContent);
   };
   const show = (v, ms = 0) => {
     fill.style.transform = `translateX(${(v - 1) * 100}%)`;

@@ -14,7 +14,7 @@ import { compileAhead } from './compile.js';
 import { createCube } from './cube.js';
 import { GradeShader } from './grade.js';
 import { createSimulation } from './simulation.js';
-import { ORIGINAL_PULSE, breathAt, clipLooks, isGradient, readGradient, readHash, rgbAt, spinRate, writeHash } from './settings.js';
+import { beatPeriod, breathAt, clipLooks, isGradient, readGradient, readHash, rgbAt, spinRate, timeScale, writeHash } from './settings.js';
 import { createLighting, createSmoke } from './smoke.js';
 import { createUI } from './ui.js';
 import { createView } from './view.js';
@@ -56,7 +56,7 @@ if (reducedMotion() && !location.hash.includes('pulse=')) state.pulse = 0;
 
 // The shaders read eased copies of the sliders, so every change glides instead of jumping.
 const live = { ...state, colourMix: 0 };
-const eased = ['flow', 'turbulence', 'twist', 'spread', 'gather', 'pulse', 'escape', 'rebound', 'brightness', 'shadows', 'glow', 'film', 'grain', 'blur', 'focus', 'spin'];
+const eased = ['flow', 'turbulence', 'twist', 'spread', 'gather', 'pulse', 'escape', 'rebound', 'beat', 'speed', 'brightness', 'shadows', 'glow', 'film', 'grain', 'blur', 'focus', 'spin'];
 
 // ---- Scene ---------------------------------------------------------------------------------
 
@@ -152,7 +152,7 @@ function advance(sim, dt, at, stirring = null) {
   // breath is fed 0.2 s late; measured inside the simulation, its swell then lines up with the clip's.
   // Rebound carries its momentum, which lags the breath by about a quarter second: it is fed that much
   // earlier, so the smoke reaches the glass on the clip's beat.
-  sim.step(dt, live, state.source, stirring, breathAt(at - (live.motion === 'rebound' ? -0.05 : 0.2)), towardCamera);
+  sim.step(dt, live, state.source, stirring, breathAt(at - (live.motion === 'rebound' ? -0.05 : 0.2), beatPeriod(live.beat)), towardCamera);
 }
 function make(size) {
   simulation?.dispose();
@@ -514,7 +514,8 @@ function tick(now) {
   view.update(dt, paused ? 0 : spinRate(live.spin));
   updateStir(dt);
 
-  if (!paused) simStep(dt);
+  // Speed runs the smoke's own time faster or slower (the camera and the panel keep the wall clock).
+  if (!paused) simStep(dt * timeScale(live.speed));
   // The kept frame fades like the sliders glide.
   cut.fade = cut.fade > 0.01 ? cut.fade * Math.exp(-dt * 10) : 0;
   render(dt);
@@ -556,7 +557,10 @@ async function renderVideo(job, { length, loop, fps }) {
   const { createEncoder } = await import('./loop.js');
   const stride = Math.round(60 / fps);
   const breathing = loop && live.pulse > 0.001;
-  const seconds = breathing ? Math.max(1, Math.round(length / ORIGINAL_PULSE.period)) * ORIGINAL_PULSE.period : length;
+  // The smoke's time runs at the speed set, so a beat lasts the beat over the speed on the clock.
+  const pace = timeScale(live.speed);
+  const beat = beatPeriod(live.beat) / pace;
+  const seconds = breathing ? Math.max(1, Math.round(length / beat)) * beat : length;
   const spin = paused ? 0 : spinRate(live.spin);
   const quarter = Math.PI / 2;
   const omega = loop ? (Math.round((spin * seconds) / quarter) * quarter) / seconds : spin;
@@ -581,12 +585,12 @@ async function renderVideo(job, { length, loop, fps }) {
       if (job.cancelled) throw new Error('recording cancelled');
       // Every step: the camera at this moment, then the smoke moves on.
       turn(i);
-      simStep(STEP, false);
+      simStep(STEP * pace, false);
       const tail = i >= steps;
       if (tail) {
         turn(i - steps);
-        advance(replay, STEP, replayClock);
-        replayClock += STEP;
+        advance(replay, STEP * pace, replayClock);
+        replayClock += STEP * pace;
       }
       // A frame after every stride of steps, once the first (crossfaded) second has gone by.
       if (i < blend || (i + 1 - blend) % stride) continue;

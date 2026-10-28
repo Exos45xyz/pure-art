@@ -21,6 +21,9 @@ export const controls = [
   { group: 'Smoke', key: 'pulse', label: 'pulse' },
   { group: 'Smoke', key: 'escape', label: 'escape' },
   { group: 'Smoke', key: 'rebound', label: 'rebound' },
+  // The time between breaths (and rebounds), and how fast the smoke's time runs. Shown as what they are.
+  { group: 'Smoke', key: 'beat', label: 'beat', format: (v) => `${beatPeriod(v).toFixed(1)} s` },
+  { group: 'Smoke', key: 'speed', label: 'speed', format: (v) => `${timeScale(v).toFixed(2)}×` },
 
   { group: 'Light', key: 'brightness', label: 'brightness' },
   { group: 'Light', key: 'shadows', label: 'shadows' },
@@ -51,7 +54,7 @@ export const controls = [
 
 // The studio look every other look starts from.
 const base = {
-  source: 'volume', motion: 'flow', flow: 0.45, turbulence: 0.5, twist: 0, spread: 0, gather: 0, pulse: 0, escape: 0, rebound: 0.5,
+  source: 'volume', motion: 'flow', flow: 0.45, turbulence: 0.5, twist: 0, spread: 0, gather: 0, pulse: 0, escape: 0, rebound: 0.5, beat: 0.5, speed: 0.5,
   brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.35,
   grain: 0.4, blur: 0, focus: 0.5, spin: 0.2, lens: 'depth', edges: 'white',
 };
@@ -289,9 +292,17 @@ const BREATH = {
   energy: [0.92, 0.94, 0.88, 0.89, 0.95, 0.89, 0.77, 0.68, 0.63, 0.64, 0.57, 0.57, 0.61, 0.69, 0.83, 0.82, 0.8, 0.76, 0.95, 1.03].map((e) => e / 0.79),
 };
 
-// The breath at a moment of the clip's clock, eased between the measured steps.
-export function breathAt(clock) {
-  const phase = ((((clock - ORIGINAL_PULSE.firstPeak) / ORIGINAL_PULSE.period + 0.5) % 1) + 1) % 1;
+// Beat: the time between breaths (and rebounds). 0.5 is the clip's 1.994 s; it runs from a third of
+// that (0.66 s) to three times (6 s), evenly to the ear.
+export const beatPeriod = (beat) => ORIGINAL_PULSE.period * 3 ** ((beat - 0.5) * 2);
+// Speed: how fast the smoke's time runs, breath and all. 0.5 is as it is; from a quarter to twice.
+export const timeScale = (speed) => (speed < 0.5 ? 0.25 + 1.5 * speed : 1 + 2 * (speed - 0.5));
+
+// The breath at a moment of the clip's clock, eased between the measured steps. period: the beat; the
+// breath's pushes scale with it, so a slower beat goes as far, with more time between.
+export function breathAt(clock, period = ORIGINAL_PULSE.period) {
+  const k = period / ORIGINAL_PULSE.period;
+  const phase = ((((clock - ORIGINAL_PULSE.firstPeak * k) / period + 0.5) % 1) + 1) % 1;
   const x = phase * 20 - 0.5;
   const i = Math.floor(x);
   const f = x - i;
@@ -300,7 +311,7 @@ export function breathAt(clock) {
   // The mass lets go of itself from the burst through the float, and pulls together for the collapse.
   const smooth = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
   const hold = 1 - smooth(0.02, 0.12, phase) * (1 - smooth(0.66, 0.8, phase));
-  return { swell: at(BREATH.swell), drift: at(BREATH.drift), swirl: at(BREATH.swirl), energy: at(BREATH.energy), hold };
+  return { swell: at(BREATH.swell) / k, drift: at(BREATH.drift) / k, swirl: at(BREATH.swirl) / k, energy: at(BREATH.energy), hold };
 }
 
 // Spin 0.5 is the reference's exact speed.
