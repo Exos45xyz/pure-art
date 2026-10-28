@@ -147,20 +147,46 @@ export function lookCode(state) {
 // An edge colour: white, off, a colour of your own (#rrggbb), or red (the clip's, in older links and looks).
 export const isEdge = (v) => typeof v === 'string' && (['white', 'off', 'red'].includes(v) || /^#[0-9a-f]{6}$/i.test(v));
 
-// Your gradient as a colour: g: and its stops, two to eight, each a colour and where it sits on the bar
-// (0–100), in order: g:ffc6a5@0,ff6b8b@50,7b6cff@100 (the panel keeps it in this browser).
-const STOP = /^([0-9a-f]{6})@(\d{1,3})$/;
+// Your gradient as a colour: g: and its stops, two to eight, each a colour, where it sits on the bar
+// (0–100) and, after ~, where its blend into the next one is half done (1–99, as a share of the way;
+// 50 when left out), in order: g:d0dce3@0~40,81a8bb@28,… (the panel keeps it in this browser).
+const STOP = /^([0-9a-f]{6})@(\d{1,3})(?:~(\d{1,2}))?$/;
 export function readGradient(v) {
   if (typeof v !== 'string' || !v.startsWith('g:')) return null;
-  const stops = v.slice(2).split(',').map((s) => STOP.exec(s)).map((m) => m && { colour: `#${m[1]}`, at: Number(m[2]) });
-  if (stops.length < 2 || stops.length > 8 || stops.some((s) => !s || s.at > 100)) return null;
+  const stops = v.slice(2).split(',').map((s) => STOP.exec(s))
+    .map((m) => m && { colour: `#${m[1]}`, at: Number(m[2]), mid: m[3] ? Number(m[3]) / 100 : 0.5 });
+  if (stops.length < 2 || stops.length > 8 || stops.some((s) => !s || s.at > 100 || s.mid <= 0)) return null;
   return stops.every((s, i) => i === 0 || s.at >= stops[i - 1].at) ? stops : null;
 }
 export const isGradient = (v) => readGradient(v) !== null;
-export const gradientValue = (stops) =>
-  `g:${[...stops].sort((a, b) => a.at - b.at).map((s) => `${s.colour.slice(1).toLowerCase()}@${Math.round(s.at)}`).join(',')}`;
-// Peach, rose and violet: unlike the two palettes, and bright enough to read as colour in the smoke.
-export const DEFAULT_GRADIENT = 'g:ffc6a5@0,ff6b8b@50,7b6cff@100';
+export function gradientValue(stops) {
+  const sorted = [...stops].sort((a, b) => a.at - b.at);
+  return `g:${sorted.map((s, i) => {
+    const mid = Math.round((s.mid ?? 0.5) * 100);
+    return `${s.colour.slice(1).toLowerCase()}@${Math.round(s.at)}${i < sorted.length - 1 && mid !== 50 ? `~${mid}` : ''}`;
+  }).join(',')}`;
+}
+// How far a blend has gone at t (0–1 of the way between two stops) when it is half done at mid: the curve
+// CSS draws for a colour hint, so the bar, the disc and the smoke agree.
+export const blendAt = (t, mid = 0.5) => (mid === 0.5 ? t : t ** (Math.log(0.5) / Math.log(mid)));
+export function mixHex(a, b, t) {
+  const [x, y] = [a, b].map((c) => [1, 3, 5].map((k) => parseInt(c.slice(k, k + 2), 16)));
+  return `#${x.map((v, k) => Math.round(v + (y[k] - v) * t).toString(16).padStart(2, '0')).join('')}`;
+}
+// The gradient as plain stops for a canvas, which has no colour hints: a blend whose midpoint moved is
+// drawn by sixteen stops along its curve.
+export function gradientRamp(value) {
+  const stops = readGradient(value);
+  return stops.flatMap((a, i) => {
+    const b = stops[i + 1];
+    if (!b || a.mid === 0.5) return [a];
+    return Array.from({ length: 16 }, (_, k) => ({ colour: mixHex(a.colour, b.colour, blendAt(k / 16, a.mid)), at: a.at + (k / 16) * (b.at - a.at) }));
+  });
+}
+// Ice on dark rock, sampled from a reference picture light to dark: the icy crest, the glacier blues down
+// its most vivid third, the deep blue under them and the rock's charcoal, which sinks into the black studio
+// as the rock does in the picture.
+export const DEFAULT_GRADIENT = 'g:d0dce3@0,81a8bb@28,5a89a1@48,3b637e@66,204058@84,2c2b2d@100';
 
 // A look from outside (a file of looks): only the look controls, each a real value (a slider 0–1, a
 // choice one of its options). A colour in an older file is left out: looks don't change the colour.

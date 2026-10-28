@@ -659,41 +659,57 @@ canvas:active { cursor: grabbing; }
 @media (hover: hover) and (pointer: fine) {
   .picker-drop:hover { color: var(--strong); background: var(--row-hover); }
 }
-/* Your gradient's bar (ui.js gradientEditor): its colours and a knob for each, 10 px in from the round
-   ends; the chosen knob has the worn disc's ring, and one dragged off the bar fades before it goes. */
+/* Your gradient's bar (ui.js gradientEditor), as in Paper: a diamond above it for each blend's midpoint, a
+   pin under it for each colour, its point at the colour's place. The chosen pin is drawn in white and a
+   little larger; one dragged off the bar fades before it goes. */
+.grad { position: relative; padding: 14px 0 18px; }
 .grad-bar {
-  position: relative;
-  height: 20px;
-  border-radius: 10px;
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+  height: 24px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
   cursor: copy;
   touch-action: none;
 }
 .grad-stop {
   position: absolute;
-  top: 50%;
-  width: 14px;
-  height: 14px;
-  margin: -7px 0 0 -7px;
-  border-radius: 50%;
-  background: var(--stop);
-  box-shadow: 0 0 0 2px #fff, 0 0 0 2.5px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.5);
+  top: 33px;
+  width: 18px;
+  height: 20px;
+  margin-left: -9px;
   cursor: grab;
   touch-action: none;
   transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out);
 }
-.grad-stop::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--strong); opacity: 0; }
-.grad-stop.chosen { z-index: 1; }
-.grad-stop.chosen::before { opacity: 1; }
-.grad-stop.leaving { opacity: 0.35; transform: scale(0.85); }
-.grad-stop:focus-visible { outline-offset: 6px; }
-.chip-add[hidden] { display: none; }
-@media (pointer: coarse) {
-  .grad-bar { height: 24px; border-radius: 12px; }
-  .grad-stop { width: 18px; height: 18px; margin: -9px 0 0 -9px; }
+.grad-stop svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.grad-stop path { fill: var(--stop); stroke: rgba(255, 255, 255, 0.72); stroke-width: 1.25; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+.grad-stop.chosen { z-index: 1; transform: scale(1.1); transform-origin: 50% 0; }
+.grad-stop.chosen path { stroke: #fff; stroke-width: 2; }
+.grad-stop.leaving { opacity: 0.35; }
+.grad-stop:focus-visible { outline-offset: 3px; }
+.grad-mid {
+  position: absolute;
+  top: 4px;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  border-radius: 1.5px;
+  background: #8f8f8f;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  transform: rotate(45deg);
+  cursor: ew-resize;
+  touch-action: none;
 }
+.grad-mid::after { content: ''; position: absolute; inset: -7px; }
+@media (hover: hover) and (pointer: fine) {
+  .grad-mid:hover { background: #b5b5b5; }
+}
+@media (pointer: coarse) {
+  .grad { padding-bottom: 22px; }
+  .grad-stop { width: 22px; height: 24px; margin-left: -11px; }
+}
+.chip-add[hidden] { display: none; }
 /* A short phone: the square gives up some height so the editor stays above the sheet */
-@media (max-height: 640px) { .picker-square { height: 128px; } }
+@media (max-height: 640px) { .picker-square { height: 104px; } }
 /* A phone zooms the page into a field with smaller type */
 @media (pointer: coarse) { .picker-hex { font-size: 16px; } .picker-hue { height: 16px; border-radius: 8px; } }
 .swatches[hidden] { display: none; }

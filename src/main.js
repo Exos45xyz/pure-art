@@ -17,7 +17,7 @@ import { compileAhead } from './compile.js';
 import { createCube } from './cube.js';
 import { GradeShader } from './grade.js';
 import { createSimulation } from './simulation.js';
-import { ORIGINAL_PULSE, breathAt, clipLooks, isGradient, readGradient, readHash, spinRate, writeHash } from './settings.js';
+import { ORIGINAL_PULSE, breathAt, clipLooks, gradientRamp, isGradient, readHash, spinRate, writeHash } from './settings.js';
 import { createLighting, createSmoke } from './smoke.js';
 import { createUI } from './ui.js';
 import { createView } from './view.js';
@@ -97,7 +97,7 @@ async function gradientPalette(value) {
   const canvas = new OffscreenCanvas(256, 4);
   const ctx = canvas.getContext('2d');
   const fill = ctx.createLinearGradient(0, 0, 256, 0);
-  for (const stop of readGradient(value)) fill.addColorStop(stop.at / 100, stop.colour);
+  for (const stop of gradientRamp(value)) fill.addColorStop(stop.at / 100, stop.colour);
   ctx.fillStyle = fill;
   ctx.fillRect(0, 0, 256, 4);
   const image = await readImage(canvas, 'gradient');

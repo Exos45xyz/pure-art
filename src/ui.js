@@ -1,5 +1,5 @@
 import { download, stamp } from './capture.js';
-import { DEFAULT_GRADIENT, cleanLook, controls, defaults, gradientValue, isGradient, lookCode, lookOf, matchingPreset, presets, presetValues, readGradient, sameLook, shuffled } from './settings.js';
+import { DEFAULT_GRADIENT, blendAt, cleanLook, controls, defaults, gradientValue, isGradient, lookCode, lookOf, matchingPreset, mixHex, presets, presetValues, readGradient, sameLook, shuffled } from './settings.js';
 
 const h = (tag, attrs = {}, ...children) => {
   const el = document.createElement(tag);
@@ -758,9 +758,18 @@ export function createUI(app) {
   let gradient = DEFAULT_GRADIENT;
   try {
     const kept = localStorage.getItem(GRADIENT_KEY);
-    if (isGradient(kept)) gradient = kept;
+    // The first default (peach to violet) was kept by anyone who opened the editor: today's replaces it.
+    if (isGradient(kept) && kept !== 'g:ffc6a5@0,ff6b8b@50,7b6cff@100') gradient = kept;
   } catch {}
-  const cssGradient = (value) => `linear-gradient(90deg, ${readGradient(value).map((s) => `${s.colour} ${s.at}%`).join(', ')})`;
+  // As CSS: each colour where it sits, and where a blend's midpoint moved, a colour hint there.
+  const cssGradient = (value) => {
+    const stops = readGradient(value);
+    const parts = stops.map((s, i) => {
+      const next = stops[i + 1];
+      return next && s.mid !== 0.5 ? `${s.colour} ${s.at}%, ${s.at + s.mid * (next.at - s.at)}%` : `${s.colour} ${s.at}%`;
+    });
+    return `linear-gradient(90deg, ${parts.join(', ')})`;
+  };
   const colourKind = (v) => (isGradient(v) ? 'gradient' : v);
   const colourValue = (kind) => (kind === 'gradient' ? gradient : kind);
   const addImage = h('button', {
@@ -815,36 +824,41 @@ export function createUI(app) {
     wearColour(next);
   }
 
-  // Your gradient's editor, as in Paper or Figma: a bar with a knob on it for each colour. Press a knob
-  // to choose it and drag it along; drag it well off the bar and let go to take it away. Press the bar to
-  // add a colour there, in the colour the gradient already has at that place, so nothing changes until you
-  // change it. The chosen colour is set below with the colour controls; + adds one in the widest gap and −
-  // takes the chosen one away (two to eight). The smoke follows as you go, and every stretch of the bar
-  // colours its share of the smoke. Made the first time it opens; kept in this browser when it closes.
+  // Your gradient's editor, as in Paper: a bar of the gradient, a pin under it for each colour, pointing
+  // at its place, and a diamond above it for each blend, where it is half done. Press a pin to choose it and
+  // drag it along; drag it well off the bar and let go to take it away. Press the bar to add a colour
+  // there, in the colour the gradient already has at that place, so nothing changes until you change it.
+  // Drag a diamond to move where its blend is half done (double-click puts it back in the middle). The
+  // chosen colour is set below with the colour controls; + adds one in the widest gap and − takes the
+  // chosen one away (two to eight). The smoke follows as you go, and every stretch of the bar colours its
+  // share of the smoke. Made the first time it opens; kept in this browser when it closes.
   let editor = null;
+  const PIN = '<svg viewBox="0 0 18 20" aria-hidden="true"><path d="M9 1.2 16.8 7.3V17a2 2 0 0 1-2 2H3.2a2 2 0 0 1-2-2V7.3Z"/></svg>';
   function gradientEditor() {
     if (editor) return editor;
     const pop = popover();
     const controls = colourControls();
     const bar = h('div', { class: 'grad-bar', title: 'Press to add a colour here' });
+    const strip = h('div', { class: 'grad' }, bar);
     const add = h('button', { type: 'button', class: 'text-button micro icon-button', 'aria-label': 'add a colour', title: 'Add a colour' }, icon('save'));
     const remove = h('button', { type: 'button', class: 'text-button micro icon-button', 'aria-label': 'remove this colour', title: 'Remove this colour' }, icon('minus'));
     pop.el.append(
       h('div', { class: 'section-head' }, h('span', { class: 'micro micro-strong' }, 'Gradient'), h('span', { class: 'head-actions' }, add, remove)),
-      bar, controls.el);
+      strip, controls.el);
 
     let stops = [];
     let chosen = null;
-    let leaving = null; // a knob dragged off the bar: it goes if the hand lets go there
-    const knobs = new Map();
+    let leaving = null; // a pin dragged off the bar: it goes if the hand lets go there
+    const pins = new Map();
+    const diamonds = new Map(); // by the stop whose blend into the next one it holds
     const kept = () => stops.filter((s) => s !== leaving);
     const sorted = () => kept().sort((a, b) => a.at - b.at);
-    // The knobs sit 10 px in from the bar's round ends, and its colours follow them there.
-    const place = (at) => `calc(10px + ${at / 100} * (100% - 20px))`;
     const atPointer = (e) => {
       const box = bar.getBoundingClientRect();
-      return Math.round(clamp01((e.clientX - box.left - 10) / (box.width - 20)) * 100);
+      return clamp01((e.clientX - box.left) / box.width) * 100;
     };
+    // Where a blend is half done, on the bar (0–100).
+    const midOf = (a, b) => a.at + a.mid * (b.at - a.at);
     // The colour the gradient has at a place (0–100), as the bar draws it.
     function colourAt(at) {
       const s = sorted();
@@ -852,32 +866,46 @@ export function createUI(app) {
       if (at >= s[s.length - 1].at) return s[s.length - 1].colour;
       const i = s.findIndex((x) => x.at >= at);
       const [a, b] = [s[i - 1], s[i]];
-      const t = (at - a.at) / (b.at - a.at || 1);
-      const [x, y] = [a.colour, b.colour].map((c) => [1, 3, 5].map((k) => parseInt(c.slice(k, k + 2), 16)));
-      return `#${x.map((v, k) => Math.round(v + (y[k] - v) * t).toString(16).padStart(2, '0')).join('')}`;
+      return mixHex(a.colour, b.colour, blendAt((at - a.at) / (b.at - a.at || 1), a.mid));
     }
 
     function draw() {
-      bar.style.background = `linear-gradient(90deg, ${sorted().map((s) => `${s.colour} ${place(s.at)}`).join(', ')})`;
+      const order = sorted();
+      bar.style.background = cssGradient(gradientValue(order));
       for (const stop of stops) {
-        let knob = knobs.get(stop);
-        if (!knob) {
-          knob = makeKnob(stop);
-          knobs.set(stop, knob);
-          bar.append(knob);
+        let pin = pins.get(stop);
+        if (!pin) {
+          pin = makePin(stop);
+          pins.set(stop, pin);
+          strip.append(pin);
         }
-        knob.style.left = place(stop.at);
-        knob.style.setProperty('--stop', stop.colour);
-        knob.classList.toggle('chosen', stop === chosen);
-        knob.classList.toggle('leaving', stop === leaving);
-        knob.setAttribute('aria-valuenow', Math.round(stop.at));
-        knob.setAttribute('aria-valuetext', `${stop.colour.slice(1).toUpperCase()} at ${Math.round(stop.at)}%`);
+        pin.style.left = `${stop.at}%`;
+        pin.style.setProperty('--stop', stop.colour);
+        pin.classList.toggle('chosen', stop === chosen);
+        pin.classList.toggle('leaving', stop === leaving);
+        pin.setAttribute('aria-valuenow', Math.round(stop.at));
+        pin.setAttribute('aria-valuetext', `${stop.colour.slice(1).toUpperCase()} at ${Math.round(stop.at)}%`);
       }
-      for (const [stop, knob] of knobs) {
+      order.forEach((stop, i) => {
+        const next = order[i + 1];
+        let diamond = diamonds.get(stop);
+        if (!next) return diamond?.remove();
+        if (!diamond) {
+          diamond = makeDiamond(stop);
+          diamonds.set(stop, diamond);
+        }
+        if (!diamond.isConnected) strip.append(diamond);
+        diamond.style.left = `${midOf(stop, next)}%`;
+        diamond.setAttribute('aria-valuenow', Math.round(stop.mid * 100));
+      });
+      for (const [stop, pin] of pins) {
         if (stops.includes(stop)) continue;
-        knob.remove();
-        knobs.delete(stop);
+        pin.remove();
+        pins.delete(stop);
+        diamonds.get(stop)?.remove();
+        diamonds.delete(stop);
       }
+      for (const [stop, diamond] of diamonds) if (stop === leaving) diamond.remove();
       add.disabled = stops.length >= 8;
       remove.disabled = stops.length <= 2;
     }
@@ -902,43 +930,55 @@ export function createUI(app) {
       changed();
       return nearest;
     }
+    // A new colour where the gradient already has it; the blend it splits starts again from the middle.
+    function addAt(at) {
+      const colour = colourAt(at);
+      const before = sorted().filter((s) => s.at <= at).pop();
+      if (before) before.mid = 0.5;
+      const stop = { colour, at: Math.round(at), mid: 0.5 };
+      stops.push(stop);
+      choose(stop);
+      changed();
+      return stop;
+    }
     controls.onPick = (hex) => {
       chosen.colour = hex;
       changed();
     };
 
-    // A drag follows the hand along the bar, 1:1, off it too; 28 px above or below it, the knob lets go.
-    function grab(stop, knob, e) {
-      knob.setPointerCapture(e.pointerId);
+    // A drag follows the hand along the bar, 1:1, off it too; 28 px above or below it, the pin lets go.
+    function grab(stop, pin, e) {
+      pin.setPointerCapture(e.pointerId);
       const box = bar.getBoundingClientRect();
       const move = (ev) => {
-        if (!knob.hasPointerCapture(ev.pointerId)) return;
-        stop.at = atPointer(ev);
+        if (!pin.hasPointerCapture(ev.pointerId)) return;
+        stop.at = Math.round(atPointer(ev));
         leaving = stops.length > 2 && (ev.clientY < box.top - 28 || ev.clientY > box.bottom + 28) ? stop : null;
         changed();
       };
       const end = () => {
-        knob.removeEventListener('pointermove', move);
-        knob.removeEventListener('lostpointercapture', end);
-        if (leaving === stop) knobs.get(drop(stop))?.focus({ preventScroll: true });
+        pin.removeEventListener('pointermove', move);
+        pin.removeEventListener('lostpointercapture', end);
+        if (leaving === stop) pins.get(drop(stop))?.focus({ preventScroll: true });
       };
-      knob.addEventListener('pointermove', move);
-      knob.addEventListener('lostpointercapture', end);
+      pin.addEventListener('pointermove', move);
+      pin.addEventListener('lostpointercapture', end);
     }
-    function makeKnob(stop) {
-      const knob = h('button', {
+    function makePin(stop) {
+      const pin = h('button', {
         type: 'button', class: 'grad-stop', role: 'slider', 'aria-label': 'colour on the gradient', 'aria-valuemin': 0, 'aria-valuemax': 100,
       });
-      knob.addEventListener('pointerdown', (e) => {
+      pin.innerHTML = PIN;
+      pin.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
         e.preventDefault();
-        knob.focus({ preventScroll: true });
+        pin.focus({ preventScroll: true });
         choose(stop);
-        grab(stop, knob, e);
+        grab(stop, pin, e);
       });
-      knob.addEventListener('focus', () => { if (chosen !== stop) choose(stop); });
+      pin.addEventListener('focus', () => { if (chosen !== stop) choose(stop); });
       // Arrows move it by 1% (Shift: 10); Delete or Backspace takes it away. From a key, at once.
-      knob.addEventListener('keydown', (e) => {
+      pin.addEventListener('keydown', (e) => {
         const d = e.shiftKey ? 10 : 1;
         const to = { ArrowLeft: stop.at - d, ArrowDown: stop.at - d, ArrowRight: stop.at + d, ArrowUp: stop.at + d, Home: 0, End: 100 }[e.key];
         if (to != null) {
@@ -947,33 +987,57 @@ export function createUI(app) {
           changed();
         } else if ((e.key === 'Delete' || e.key === 'Backspace') && stops.length > 2) {
           e.preventDefault();
-          knobs.get(drop(stop))?.focus({ preventScroll: true });
+          pins.get(drop(stop))?.focus({ preventScroll: true });
         }
       });
-      return knob;
+      return pin;
+    }
+    // A blend's midpoint stays between its two colours (5–95% of the way).
+    function makeDiamond(stop) {
+      const diamond = h('button', {
+        type: 'button', class: 'grad-mid', role: 'slider', 'aria-label': 'where the blend is half done', title: 'Drag to move where the blend is half done',
+        'aria-valuemin': 5, 'aria-valuemax': 95,
+      });
+      const setMid = (mid) => {
+        stop.mid = Math.round(Math.min(0.95, Math.max(0.05, mid)) * 100) / 100;
+        changed();
+      };
+      const next = () => sorted()[sorted().indexOf(stop) + 1];
+      diamond.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        diamond.focus({ preventScroll: true });
+        diamond.setPointerCapture(e.pointerId);
+      });
+      diamond.addEventListener('pointermove', (e) => {
+        const b = next();
+        if (!diamond.hasPointerCapture(e.pointerId) || !b) return;
+        setMid((atPointer(e) - stop.at) / (b.at - stop.at || 1));
+      });
+      diamond.addEventListener('dblclick', () => setMid(0.5));
+      diamond.addEventListener('keydown', (e) => {
+        const d = e.shiftKey ? 0.1 : 0.01;
+        const to = { ArrowLeft: stop.mid - d, ArrowDown: stop.mid - d, ArrowRight: stop.mid + d, ArrowUp: stop.mid + d }[e.key];
+        if (to == null) return;
+        e.preventDefault();
+        setMid(to);
+      });
+      return diamond;
     }
     bar.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0 || e.target !== bar || stops.length >= 8) return;
+      if (e.button !== 0 || stops.length >= 8) return;
       e.preventDefault();
-      const at = atPointer(e);
-      const stop = { colour: colourAt(at), at };
-      stops.push(stop);
-      choose(stop);
-      changed();
-      const knob = knobs.get(stop);
-      knob.focus({ preventScroll: true });
-      grab(stop, knob, e);
+      const stop = addAt(atPointer(e));
+      const pin = pins.get(stop);
+      pin.focus({ preventScroll: true });
+      grab(stop, pin, e);
     });
     // + in the middle of the widest gap, in the colour already there.
     add.addEventListener('click', () => {
       const s = sorted();
       let best = 0;
       for (let i = 1; i < s.length - 1; i++) if (s[i + 1].at - s[i].at > s[best + 1].at - s[best].at) best = i;
-      const at = Math.round((s[best].at + s[best + 1].at) / 2);
-      const stop = { colour: colourAt(at), at };
-      stops.push(stop);
-      choose(stop);
-      changed();
+      addAt((s[best].at + s[best + 1].at) / 2);
     });
     remove.addEventListener('click', () => drop(chosen));
 
@@ -982,11 +1046,13 @@ export function createUI(app) {
       load(value) {
         stops = readGradient(value).map((s) => ({ ...s }));
         leaving = null;
-        knobs.forEach((knob) => knob.remove());
-        knobs.clear();
+        pins.forEach((pin) => pin.remove());
+        pins.clear();
+        diamonds.forEach((diamond) => diamond.remove());
+        diamonds.clear();
         choose(stops[0]);
       },
-      focus: () => knobs.get(chosen)?.focus({ preventScroll: true }),
+      focus: () => pins.get(chosen)?.focus({ preventScroll: true }),
     };
     return editor;
   }
@@ -1000,7 +1066,13 @@ export function createUI(app) {
       label: 'your gradient',
       instant,
       focus: ed.focus,
-      done: () => { try { localStorage.setItem(GRADIENT_KEY, gradient); } catch {} },
+      done: () => {
+        // Only a gradient you changed is kept, so the default stays the app's own.
+        try {
+          if (gradient === DEFAULT_GRADIENT) localStorage.removeItem(GRADIENT_KEY);
+          else localStorage.setItem(GRADIENT_KEY, gradient);
+        } catch {}
+      },
     });
   }
   const colour = h('section', {},
