@@ -31,7 +31,7 @@ function slider(control, app, onChange) {
   const fill = h('div', { class: 'slider-fill' });
   const value = h('span', { class: 'slider-value' });
   const el = h('div', {
-    class: 'slider', role: 'slider', tabindex: 0,
+    class: 'slider', role: 'slider', tabindex: 0, title: control.hint,
     'aria-label': control.label, 'aria-valuemin': 0, 'aria-valuemax': 100,
   }, fill, h('span', { class: 'slider-label' }, control.label), value);
 
@@ -171,7 +171,7 @@ function choice(control, app, onChange, bare = false) {
       },
     }, label));
   const group = h('div', { class: 'choice', role: 'radiogroup', 'aria-label': control.label }, buttons, lit);
-  const el = h('div', { class: bare ? 'row bare' : 'row' }, bare ? [] : h('span', { class: 'row-label' }, control.label), group);
+  const el = h('div', { class: bare ? 'row bare' : 'row', title: control.hint }, bare ? [] : h('span', { class: 'row-label' }, control.label), group);
 
   function sync() {
     const index = control.options.findIndex(([value]) => value === app.state[control.key]);
@@ -476,7 +476,7 @@ function edgeField(control, app, onChange) {
     if (next !== 'colour') edgePicker?.close({ instant: true });
     set(next === 'colour' ? yours : next);
   }
-  const el = h('div', { class: 'row' },
+  const el = h('div', { class: 'row', title: control.hint },
     h('span', { class: 'row-label' }, control.label),
     h('div', { class: 'edge-orbs', role: 'radiogroup', 'aria-label': control.label }, orbs.white, orbs.colour, orbs.off));
   return { el, sync };

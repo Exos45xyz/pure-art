@@ -5,41 +5,50 @@ export const controls = [
   { group: 'Colour', key: 'colour', label: 'colour', type: 'choice', look: false,
     options: [['white', 'white'], ['dusk', 'dusk'], ['pearl', 'pearl'], ['image', 'image']] },
 
+  // Fine-tune, in short groups by what each changes: how the smoke moves, its rhythm, the glass, the light,
+  // the grains, the camera. Each control says what it does in a line (hint, shown on hover).
+
   // Where the smoke is born. Not in the panel: with gather on (pure's masses) the smoke is born at the
   // gather centres and the source changes nothing you see; the looks and randomize set it where it shows.
-  { group: 'Smoke', key: 'source', label: 'source', type: 'choice', hidden: true,
+  { group: 'Motion', key: 'source', label: 'source', type: 'choice', hidden: true,
     options: [['volume', 'volume'], ['plume', 'plume'], ['core', 'core']] },
   // How the smoke moves. Not in the panel: the rebound look sets it. flow: the current carries it (every
   // other look); rebound: it keeps its own momentum, thrown at the glass on every beat (simulation.js).
-  { group: 'Smoke', key: 'motion', label: 'motion', type: 'choice', hidden: true,
+  { group: 'Motion', key: 'motion', label: 'motion', type: 'choice', hidden: true,
     options: [['flow', 'flow'], ['rebound', 'rebound']] },
-  { group: 'Smoke', key: 'flow', label: 'flow' },
-  { group: 'Smoke', key: 'turbulence', label: 'turbulence' },
-  { group: 'Smoke', key: 'twist', label: 'twist' },
-  { group: 'Smoke', key: 'spread', label: 'spread' },
-  { group: 'Smoke', key: 'gather', label: 'gather' },
-  { group: 'Smoke', key: 'pulse', label: 'pulse' },
-  { group: 'Smoke', key: 'escape', label: 'escape' },
-  { group: 'Smoke', key: 'rebound', label: 'rebound' },
-  // The time between breaths (and rebounds), and how fast the smoke's time runs. Shown as what they are.
-  { group: 'Smoke', key: 'beat', label: 'beat', format: (v) => `${beatPeriod(v).toFixed(1)} s` },
-  { group: 'Smoke', key: 'speed', label: 'speed', format: (v) => `${timeScale(v).toFixed(2)}×` },
+  // Speed and beat are shown as what they are (1.00×, 2.0 s), not 0–100.
+  { group: 'Motion', key: 'speed', label: 'speed', format: (v) => `${timeScale(v).toFixed(2)}×`,
+    hint: "How fast the smoke's time runs, from slow motion to twice as fast" },
+  { group: 'Motion', key: 'flow', label: 'flow', hint: 'How fast the current carries the smoke' },
+  { group: 'Motion', key: 'turbulence', label: 'turbulence', hint: 'How many small eddies ride on the big swirls' },
+  { group: 'Motion', key: 'twist', label: 'twist', hint: 'Winds the strands into a helix: the top turns one way, the bottom the other' },
+  { group: 'Motion', key: 'spread', label: 'spread', hint: 'Each grain wanders on its own, puffing thin sheets into soft clouds' },
 
-  { group: 'Light', key: 'brightness', label: 'brightness' },
-  { group: 'Light', key: 'shadows', label: 'shadows' },
-  { group: 'Light', key: 'glow', label: 'glow' },
-  { group: 'Light', key: 'film', label: 'film grain' },
+  { group: 'Rhythm', key: 'pulse', label: 'breath', hint: 'How far the smoke swells to the glass and pulls back on every beat' },
+  { group: 'Rhythm', key: 'beat', label: 'beat', needs: 'pulse', format: (v) => `${beatPeriod(v).toFixed(1)} s`,
+    hint: 'The time between breaths (and rebounds). Rests while breath is 0' },
+  { group: 'Rhythm', key: 'gather', label: 'gather', hint: 'Pulls the smoke into bodies that move as whole masses' },
+
+  { group: 'Glass', key: 'rebound', label: 'rebound', hint: 'How hard the smoke bounces off the glass (in the rebound look, how hard each beat throws it)' },
+  { group: 'Glass', key: 'escape', label: 'escape', hint: 'Opens holes in the glass that let the smoke out' },
+  // The cube's edges: white, a colour of your own (#rrggbb, picked in the panel), or off.
+  { group: 'Glass', key: 'edges', label: 'edges', type: 'edge', hint: 'The cube\'s edges: white, a colour of your own, or none' },
+
+  { group: 'Light', key: 'brightness', label: 'brightness', hint: 'How bright the smoke is' },
+  { group: 'Light', key: 'shadows', label: 'shadows', hint: 'How dense the smoke is to the light: how deep its shadows fall' },
+  { group: 'Light', key: 'glow', label: 'glow', hint: 'The soft glow around the brightest smoke' },
+  { group: 'Light', key: 'film', label: 'film grain', hint: 'Film grain over the picture' },
 
   { group: 'Particles', key: 'particles', label: 'count', type: 'choice', look: false,
-    options: [[256, '65k'], [512, '262k'], [708, '500k'], [1024, '1m'], [1448, '2m']] },
-  { group: 'Particles', key: 'grain', label: 'size' },
-  { group: 'Particles', key: 'blur', label: 'blur' },
-  { group: 'Particles', key: 'focus', label: 'focus', needs: 'blur' },
+    options: [[256, '65k'], [512, '262k'], [708, '500k'], [1024, '1m'], [1448, '2m']],
+    hint: 'How many grains: more is finer, and more work for the computer' },
+  { group: 'Particles', key: 'grain', label: 'size', hint: 'How big each grain is' },
+  { group: 'Particles', key: 'blur', label: 'blur', hint: 'Depth of field: grains away from the focus open into soft discs' },
+  { group: 'Particles', key: 'focus', label: 'focus', needs: 'blur', hint: 'Where the focus sits, front to back. Rests while blur is 0' },
 
-  { group: 'Form', key: 'spin', label: 'spin' },
-  { group: 'Form', key: 'lens', label: 'lens', type: 'choice', options: [['flat', 'flat'], ['depth', 'depth']] },
-  // The cube's edges: white, a colour of your own (#rrggbb, picked in the panel), or off.
-  { group: 'Form', key: 'edges', label: 'edges', type: 'edge' },
+  { group: 'Camera', key: 'spin', label: 'spin', hint: 'How fast the cube turns' },
+  { group: 'Camera', key: 'lens', label: 'lens', type: 'choice', options: [['flat', 'flat'], ['depth', 'depth']],
+    hint: 'Flat, without perspective like the reference clip, or with depth' },
 
   { group: 'Output', key: 'format', label: 'format', type: 'choice', look: false,
     options: [['screen', 'screen'], ['16:9', '16:9'], ['9:16', '9:16'], ['4:5', '4:5'], ['1:1', '1:1']] },
