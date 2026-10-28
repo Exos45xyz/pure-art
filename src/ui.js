@@ -530,13 +530,15 @@ export function createUI(app) {
 
   // Looks: chips with a small radius, each with a line icon of its shape, drawn like the die: a thin
   // 12 px diagram in the current colour. pure breathes (two rings), aura glows (a ring in a dotted halo),
-  // original is the clip's cube, ribbon a band, veil stacked sheets, smoke a soft cloud; yours a spark.
+  // original is the clip's cube, ribbon a band, veil stacked sheets, rebound a path bouncing off the glass,
+  // smoke a soft cloud; yours a spark.
   const ICONS = {
     pure: '<circle cx="6" cy="6" r="4.6"/><circle cx="6" cy="6" r="2"/>',
     aura: '<circle cx="6" cy="6" r="2.3"/><circle cx="6" cy="6" r="4.8" stroke-dasharray="1.1 1.5"/>',
     original: '<path d="M6 1.3 10.2 3.7v4.6L6 10.7 1.8 8.3V3.7zM1.8 3.7 6 6.1l4.2-2.4M6 6.1v4.6"/>',
     ribbon: '<path d="M1.3 4.4c1.9-2.3 3.4 2.3 4.7 0s2.8-2.3 4.7 0M1.3 7.9c1.9-2.3 3.4 2.3 4.7 0s2.8-2.3 4.7 0"/>',
     veil: '<path d="M1.5 3.4q4.5-2.2 9 0M1.5 6.2q4.5-2.2 9 0M1.5 9q4.5-2.2 9 0"/>',
+    rebound: '<rect x="1.4" y="1.4" width="9.2" height="9.2" rx="1.6"/><path d="M3.2 3.6 6 8.4l2.8-4.8"/>',
     smoke: '<path d="M3.4 9.3h5.3a2.1 2.1 0 0 0 .3-4.2 2.9 2.9 0 0 0-5.5.7 1.8 1.8 0 0 0-.1 3.5z"/>',
     mine: '<path d="M6 1.4 7 5l3.6 1L7 7l-1 3.6L5 7 1.4 6 5 5z"/>',
     save: '<path d="M6 2.4v7.2M2.4 6h7.2"/>',
@@ -854,9 +856,8 @@ export function createUI(app) {
   // drag it along; drag it well off the bar and let go to take it away. Press the bar to add a colour
   // there, in the colour the gradient already has at that place, so nothing changes until you change it.
   // Drag a diamond to move where its blend is half done (double-click puts it back in the middle). The
-  // chosen colour is set below with the colour controls; + adds one in the widest gap and − takes the
-  // chosen one away (two to eight). The smoke follows as you go, and every stretch of the bar colours its
-  // share of the smoke. Made the first time it opens; kept in this browser when it closes.
+  // chosen colour is set below with the colour controls (two to eight colours). The smoke follows as you
+  // go, and every stretch of the bar colours its share of the smoke. Made the first time it opens; kept in this browser when it closes.
   let editor = null;
   // The two tabs, drawn like Paper's: a plain square, and a square fading across.
   const KIND_ICONS = {
@@ -870,9 +871,12 @@ export function createUI(app) {
     const controls = colourControls();
     const bar = h('div', { class: 'grad-bar', title: 'Press to add a colour here' });
     const strip = h('div', { class: 'grad' }, bar);
-    const add = h('button', { type: 'button', class: 'text-button micro icon-button', 'aria-label': 'add a colour', title: 'Add a colour' }, icon('save'));
-    const remove = h('button', { type: 'button', class: 'text-button micro icon-button', 'aria-label': 'remove this colour', title: 'Remove this colour' }, icon('minus'));
-    const actions = h('span', { class: 'head-actions' }, add, remove);
+    // − puts the window away, back into the disc it came from (from a key, at once); a colour is added by
+    // pressing the bar and taken away by dragging its pin off it, or Delete.
+    const close = h('button', {
+      type: 'button', class: 'text-button micro icon-button', 'aria-label': 'close', title: 'Close (Esc)',
+      onclick: (e) => pop.close({ instant: e.detail === 0, focus: e.detail === 0 }),
+    }, icon('minus'));
     const kinds = {
       plain: h('button', { type: 'button', role: 'radio', class: 'kind-option', 'aria-label': 'plain colour', title: 'Plain colour' }),
       gradient: h('button', { type: 'button', role: 'radio', class: 'kind-option', 'aria-label': 'gradient', title: 'Gradient' }),
@@ -891,7 +895,7 @@ export function createUI(app) {
       });
     }
     pop.el.append(
-      h('div', { class: 'section-head' }, h('div', { class: 'kind', role: 'radiogroup', 'aria-label': 'plain colour or gradient' }, kinds.plain, kinds.gradient), actions),
+      h('div', { class: 'section-head' }, h('div', { class: 'kind', role: 'radiogroup', 'aria-label': 'plain colour or gradient' }, kinds.plain, kinds.gradient), close),
       strip, controls.el);
 
     let stops = [];
@@ -947,8 +951,6 @@ export function createUI(app) {
         diamonds.delete(stop);
       }
       for (const [stop, diamond] of diamonds) if (stop === leaving) diamond.remove();
-      add.disabled = stops.length >= 8;
-      remove.disabled = stops.length <= 2;
       bar.classList.toggle('full', stops.length >= 8);
       bar.title = stops.length >= 8 ? 'Eight colours at most: take one away to add another' : 'Press to add a colour here';
     }
@@ -999,7 +1001,6 @@ export function createUI(app) {
         button.tabIndex = kind === yoursKind ? 0 : -1;
       }
       strip.hidden = yoursKind === 'plain';
-      actions.style.visibility = yoursKind === 'plain' ? 'hidden' : '';
       controls.set(yoursKind === 'plain' ? `#${plain.slice(2)}` : chosen.colour);
     }
     function setKind(kind) {
@@ -1101,14 +1102,6 @@ export function createUI(app) {
       pin.focus({ preventScroll: true });
       grab(stop, pin, e);
     });
-    // + in the middle of the widest gap, in the colour already there.
-    add.addEventListener('click', () => {
-      const s = sorted();
-      let best = 0;
-      for (let i = 1; i < s.length - 1; i++) if (s[i + 1].at - s[i].at > s[best + 1].at - s[best].at) best = i;
-      addAt((s[best].at + s[best + 1].at) / 2);
-    });
-    remove.addEventListener('click', () => drop(chosen));
 
     editor = {
       ...pop,
