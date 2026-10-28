@@ -54,8 +54,10 @@ export function createView(canvas) {
   canvas.addEventListener('pointercancel', release);
   // Capture can end without a pointerup (the browser takes the touch); never leave the drag stuck.
   canvas.addEventListener('lostpointercapture', release);
+  let wheelAt = -Infinity;
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
+    wheelAt = performance.now();
     rig.zoomTarget = Math.min(2.2, Math.max(0.6, rig.zoomTarget * Math.exp(-e.deltaY * 0.0015)));
   }, { passive: false });
 
@@ -78,6 +80,8 @@ export function createView(canvas) {
   return {
     get camera() { return lens === 'flat' ? flat : depth; },
     get dragging() { return drag !== null; },
+    // The wheel is turning (its events come every frame or so while it does).
+    get zooming() { return performance.now() - wheelAt < 200; },
     get lens() { return lens; },
     setLens(name) { lens = name; },
     // The camera's turn around the cube, read and set exactly (the loop recording drives it).

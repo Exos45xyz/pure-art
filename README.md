@@ -6,7 +6,7 @@ Particle smoke in a glass cube. Free, open source and made with three.js.
 
 **Play with it:** https://pure-smoke.vercel.app
 
-Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look with the panel on the side, then save a 4K image or record a seamless loop for your post.
+Drag to turn the cube, hover to stir the smoke, scroll to zoom (the hints at the bottom light up while you do each one; on a touch screen only the drag is listed). Change the look with the panel on the side, then save a 4K image or record a seamless loop for your post.
 
 ## Controls
 

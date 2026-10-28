@@ -523,6 +523,7 @@ function tick(now) {
 
   view.update(dt, paused ? 0 : spinRate(live.spin));
   updateStir(dt);
+  ui.lightHints({ turn: view.dragging, stir: pointer.inside && !view.dragging && stir.velocity.lengthSq() > 0.09, zoom: view.zooming });
 
   // Speed runs the smoke's own time faster or slower (the camera and the panel keep the wall clock).
   if (!paused) simStep(dt * timeScale(live.speed));

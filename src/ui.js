@@ -1673,5 +1673,17 @@ export function createUI(app) {
     setTimeout(() => { if (!touched) toast('drag to turn the cube'); }, 3500);
   }
 
-  return { reserve, frameBox, get recordOpen() { return recordOpen; }, toast, showColours, pickImage: () => fileInput.click(), sync: () => fields.forEach((f) => f.sync()) };
+  // The footer's hints: each lights while the hand does what it says (main.js asks every frame; the
+  // page is only touched when one changes).
+  const hintEls = Object.fromEntries([...document.querySelectorAll('.hint [data-hint]')].map((el) => [el.dataset.hint, el]));
+  const hintLit = {};
+  function lightHints(now) {
+    for (const [name, on] of Object.entries(now)) {
+      if (hintLit[name] === on || !hintEls[name]) continue;
+      hintLit[name] = on;
+      hintEls[name].classList.toggle('lit', on);
+    }
+  }
+
+  return { reserve, frameBox, get recordOpen() { return recordOpen; }, toast, lightHints, showColours, pickImage: () => fileInput.click(), sync: () => fields.forEach((f) => f.sync()) };
 }

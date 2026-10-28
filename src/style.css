@@ -181,6 +181,14 @@ canvas:active { cursor: grabbing; }
   gap: 6px;
 }
 .foot a { transition: opacity 200ms ease; }
+/* The hints light while you do what they say: at once when the hand starts, gently back when it stops. */
+.hint [data-hint] { transition: color 400ms ease; }
+.hint [data-hint].lit { color: var(--strong); transition-duration: 100ms; }
+/* Without a mouse there is nothing to hover and no wheel: only the drag is true. */
+@media (hover: none) { .hint .by-mouse { display: none; } }
+/* A link that leaves the page says so: a small arrow out, which leans the way it goes under the pointer. */
+.out { display: inline-flex; align-items: center; gap: 3px; }
+.out svg { width: 7px; height: 7px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; color: var(--strong); transition: transform 160ms var(--ease-out); }
 
 .brand, .foot, .credit, .panel {
   opacity: 0;
@@ -504,6 +512,7 @@ canvas:active { cursor: grabbing; }
   .text-button:hover { color: var(--strong); }
   .toast-action:hover { background: #363636; }
   .foot a:hover, .designed:hover { opacity: 0.7; }
+  .out:hover svg { transform: translate(1px, -1px); }
 }
 
 /* Reopen pill, shown while the panel is hidden */

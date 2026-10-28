@@ -40,9 +40,10 @@
     <button type="button" class="pill reopen">parameters</button>
 
     <footer class="foot">
-      <p class="micro hint">Drag to turn · hover to stir · scroll to zoom</p>
+      <!-- Each hint lights while you do what it says (main.js); a screen without a mouse shows only the drag. -->
+      <p class="micro hint"><span data-hint="turn">Drag to turn</span><span class="by-mouse"> · <span data-hint="stir">hover to stir</span> · <span data-hint="zoom">scroll to zoom</span></span></p>
       <p class="micro">
-        Free &amp; open source · <a href="https://github.com/Exos45xyz/pure-smoke" target="_blank" rel="noopener"><b>GitHub</b></a>
+        Free &amp; open source · <a class="out" href="https://github.com/Exos45xyz/pure-smoke" target="_blank" rel="noopener"><b>GitHub</b><svg viewBox="0 0 8 8" aria-hidden="true"><path d="M2 6 6 2M2.8 2H6v3.2"/></svg></a>
       </p>
     </footer>
 
