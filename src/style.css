@@ -157,25 +157,25 @@ canvas:active { cursor: grabbing; }
   pointer-events: none;
 }
 
-/* Designed by Pure Studio: the studio's wordmark, drawn in the interface's own white, centred at the foot
-   of the free space beside the panel (under the cube, where the toasts centre too) */
-.designed {
-  pointer-events: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: fit-content;
-  transition: opacity 200ms ease;
-}
+/* Designed by Pure Studio (the studio's wordmark, drawn in the interface's own white) and, under it, where
+   the code lives: centred at the foot of the free space beside the panel (under the cube, where the toasts
+   centre too). Only the links take the pointer; around them the cube still turns. */
 .credit {
   position: fixed;
   left: 0;
   right: var(--reserve-x, 0px);
   bottom: max(20px, env(safe-area-inset-bottom));
   margin-inline: auto;
+  width: fit-content;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  pointer-events: none;
 }
-/* A narrow window: over the footer's two lines, on the left (ui.js placeChrome) */
-.credit-stacked .credit { left: max(20px, env(safe-area-inset-left)); right: auto; margin: 0; bottom: calc(max(20px, env(safe-area-inset-bottom)) + 44px); }
+.credit a { pointer-events: auto; transition: opacity 200ms ease; }
+.designed { display: inline-flex; align-items: center; gap: 8px; }
+/* A narrow window: over the footer's line, on the left (ui.js placeChrome) */
+.credit-stacked .credit { left: max(20px, env(safe-area-inset-left)); right: auto; margin: 0; justify-items: start; bottom: calc(max(20px, env(safe-area-inset-bottom)) + 26px); }
 .studio-logo {
   display: block;
   height: 11px;
@@ -192,9 +192,10 @@ canvas:active { cursor: grabbing; }
   display: grid;
   gap: 6px;
 }
-.foot a { transition: opacity 200ms ease; }
-/* The hints light while you do what they say: at once when the hand starts, gently back when it stops. */
-.hint [data-hint] { transition: color 400ms ease; }
+/* Each hint has the gesture's icon, in the panel's line style. They light while you do what they say:
+   at once when the hand starts, gently back when it stops. */
+.hint [data-hint] { display: inline-flex; align-items: center; gap: 5px; vertical-align: top; transition: color 400ms ease; }
+.hint svg { width: 10px; height: 10px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
 .hint [data-hint].lit { color: var(--strong); transition-duration: 100ms; }
 /* Without a mouse there is nothing to hover and no wheel: only the drag is true. */
 @media (hover: none) { .hint .by-mouse { display: none; } }
@@ -213,7 +214,7 @@ canvas:active { cursor: grabbing; }
 /* After the first entrance they answer at UI speed (the footer leaves and returns around a render). */
 .settled .brand, .settled .foot, .settled .credit { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
 /* A link pressed by a finger dims as it does under the pointer */
-.ready .foot a:active, .ready .designed:active { opacity: 0.7; }
+.ready .credit a:active { opacity: 0.7; }
 
 /* ---- Panel --------------------------------------------------------------------------------- */
 
@@ -525,7 +526,7 @@ canvas:active { cursor: grabbing; }
   .pill-primary.recording:hover { background: #222; }
   .text-button:hover { color: var(--strong); }
   .toast-action:hover { background: #363636; }
-  .foot a:hover, .designed:hover { opacity: 0.7; }
+  .credit a:hover { opacity: 0.7; }
   .out:hover svg { transform: translate(1px, -1px); }
 }
 
@@ -904,7 +905,8 @@ canvas:active { cursor: grabbing; }
   .foot, .keys { display: none; }
   .brand { top: max(16px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); }
   /* The sheet has the foot of a phone: the credit sits under the name instead */
-  .credit { top: calc(max(16px, env(safe-area-inset-top)) + 52px); bottom: auto; left: max(16px, env(safe-area-inset-left)); right: auto; margin: 0; }
+  .credit { top: calc(max(16px, env(safe-area-inset-top)) + 52px); bottom: auto; left: max(16px, env(safe-area-inset-left)); right: auto; margin: 0; justify-items: start; }
+  .credit .source { display: none; }
   .brand .pure-art { height: 36px; }
   .reopen { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform-origin: bottom right; }
   .toast { bottom: calc(var(--sheet, 0px) + max(8px, env(safe-area-inset-bottom)) + 12px); left: 50%; }

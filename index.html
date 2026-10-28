@@ -31,20 +31,23 @@
     <header class="brand">
       <h1 class="wordmark logo"><span class="sr">Pure Smoke</span><i class="pure-art" aria-hidden="true"></i></h1>
     </header>
-    <!-- The studio's credit: centred at the foot of the free space (on a phone, under the name) -->
-    <a class="designed credit micro" href="https://www.purestudio.art/" target="_blank" rel="noopener" aria-label="Designed by Pure Studio">
-      <span>Designed by</span><i class="studio-logo" aria-hidden="true"></i>
-    </a>
+    <!-- The studio's credit and where the code lives: centred at the foot of the free space (on a phone,
+         the credit alone, under the name) -->
+    <div class="credit">
+      <a class="designed micro" href="https://www.purestudio.art/" target="_blank" rel="noopener" aria-label="Designed by Pure Studio">
+        <span>Designed by</span><i class="studio-logo" aria-hidden="true"></i>
+      </a>
+      <p class="micro source">
+        Free &amp; open source · <a class="out" href="https://github.com/Exos45xyz/pure-smoke" target="_blank" rel="noopener"><b>GitHub</b><svg viewBox="0 0 8 8" aria-hidden="true"><path d="M2 6 6 2M2.8 2H6v3.2"/></svg></a>
+      </p>
+    </div>
 
     <aside class="panel" aria-label="Parameters"></aside>
     <button type="button" class="pill reopen">parameters</button>
 
     <footer class="foot">
       <!-- Each hint lights while you do what it says (main.js); a screen without a mouse shows only the drag. -->
-      <p class="micro hint"><span data-hint="turn">Drag to turn</span><span class="by-mouse"> · <span data-hint="stir">hover to stir</span> · <span data-hint="zoom">scroll to zoom</span></span></p>
-      <p class="micro">
-        Free &amp; open source · <a class="out" href="https://github.com/Exos45xyz/pure-smoke" target="_blank" rel="noopener"><b>GitHub</b><svg viewBox="0 0 8 8" aria-hidden="true"><path d="M2 6 6 2M2.8 2H6v3.2"/></svg></a>
-      </p>
+      <p class="micro hint"><span data-hint="turn"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M10.5 6a4.5 4.5 0 1 1-4.5-4.5c1.26 0 2.46.5 3.37 1.37L10.5 4M10.5 1.5V4H8"/></svg>Drag to turn</span><span class="by-mouse"> · <span data-hint="stir"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.2 2.2 10 5.4 6.6 6.6 5.4 10z"/></svg>hover to stir</span> · <span data-hint="zoom"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="3.3" y="1.3" width="5.4" height="9.4" rx="2.7"/><path d="M6 3.4v1.8"/></svg>scroll to zoom</span></span></p>
     </footer>
 
     <div class="toast" role="status" aria-live="polite"></div>
