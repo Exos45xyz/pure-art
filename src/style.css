@@ -428,6 +428,7 @@ canvas:active { cursor: grabbing; }
   .pill-primary:hover { background: #fff; }
   .pill-primary.recording:hover { background: #222; }
   .text-button:hover { color: var(--strong); }
+  .orb-add:hover { color: var(--strong); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45); }
   .foot a:hover, .designed:hover { opacity: 0.7; }
 }
 
@@ -471,20 +472,61 @@ canvas:active { cursor: grabbing; }
 }
 .rendering canvas { pointer-events: none; }
 
-/* Image colours: thumbnail, name, and the image's main colours at their real shares */
-.image-row {
-  display: grid;
-  grid-template-columns: 28px 1fr auto;
-  gap: 10px;
-  align-items: center;
-  padding: 6px 10px 6px 6px;
-  border-radius: 7px;
-  background: var(--row);
+/* Colour: an orb per palette, filled with its own colours and lit like a sphere, then the image apart
+   (ui.js). The worn one has a ring; its name sits by the section title. */
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 2px; }
+.panel .section-head h2 { padding: 0; }
+.colour-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.colour-row { display: flex; align-items: center; gap: 10px; padding: 3px 2px; }
+.orbs { display: flex; align-items: center; gap: 10px; }
+.orb {
+  position: relative;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  transition: transform 160ms var(--ease-pill);
 }
-.image-row[hidden] { display: none; }
-.image-thumb { width: 28px; height: 28px; border-radius: 5px; object-fit: cover; display: block; }
-.image-meta { display: grid; gap: 6px; min-width: 0; }
-.image-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--strong); }
+.orb[hidden] { display: none; }
+.orb:active { transform: scale(0.94); }
+/* The worn colour's ring, a little apart from the orb; keyboard focus draws its own ring further out */
+.orb[role='radio']::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--strong);
+  opacity: 0;
+}
+.orb[aria-checked='true']::before { opacity: 1; }
+.orb:focus-visible { outline-offset: 6px; }
+.orb-fill { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; background: #2a2a2a; }
+/* The picture, softened so it reads as colour (a little larger than the orb, so the blur keeps a clean edge) */
+.orb-fill::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background: var(--picture) center / cover no-repeat;
+  filter: blur(1.5px) saturate(1.15);
+}
+/* Light from the top left and shade underneath: a sphere */
+.orb-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 42%),
+    radial-gradient(circle at 70% 82%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 62%);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+}
+.orb-white .orb-fill { background: radial-gradient(circle at 38% 34%, #fff, #d6d6d6 55%, #888); }
+.orb-dusk .orb-fill::before { background-position: 50% 44%; }
+.orb-split { width: 1px; height: 16px; background: rgba(255, 255, 255, 0.12); }
+.orb-add { display: grid; place-items: center; color: var(--muted); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24); }
+.orb-add svg { display: block; }
+@media (pointer: coarse) { .orb { width: 30px; height: 30px; } }
+.swatches[hidden] { display: none; }
 .swatches { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 1px; }
 .swatches i { display: block; min-width: 2px; }
 

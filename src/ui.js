@@ -170,9 +170,19 @@ export function createUI(app) {
     refresh();
     glideTimer = setTimeout(() => panel.classList.remove('gliding'), 260);
   };
-  // instant: from the keyboard, where an animation would only feel slow.
+  // instant: from the keyboard, where an animation would only feel slow. A look that brings a colour
+  // (aura, or one of yours) wears it, and takes it off again when a look without one follows, unless the
+  // colour was changed by hand in between. Randomize keeps whatever colour is on.
+  let worn = null;
   const applyLook = (values, name, instant = false) => {
     app.apply(values, name);
+    if (name && values.colour) {
+      worn = { colour: values.colour, before: worn?.before ?? app.state.colour };
+      app.set('colour', values.colour);
+    } else if (name && worn) {
+      if (app.state.colour === worn.colour) app.set('colour', worn.before);
+      worn = null;
+    }
     syncAll(instant);
   };
 
@@ -213,7 +223,7 @@ export function createUI(app) {
   function showMine() {
     let found = false;
     for (const { m, chip, remove } of mineChips) {
-      const on = !found && sameLook(valuesOf(m), app.state);
+      const on = !found && sameLook(valuesOf(m), app.state) && (!m.values.colour || m.values.colour === app.state.colour);
       found ||= on;
       chip.setAttribute('aria-pressed', String(on));
       remove.hidden = !on;
@@ -223,7 +233,8 @@ export function createUI(app) {
     saveChip.title = known ? 'This look is already a chip' : mine.length >= MAX_MINE ? 'Six looks kept: remove one to keep another' : 'Keep this look as a chip, in this browser';
   }
   function saveLook(keyboard) {
-    const m = { name: nextName(), values: lookOf(app.state) };
+    // A saved look keeps its colour, but not an uploaded image (it's gone once the page closes).
+    const m = { name: nextName(), values: { ...lookOf(app.state), ...(app.state.colour !== 'image' && { colour: app.state.colour }) } };
     mine.push(m);
     keepMine();
     drawMine();
@@ -257,7 +268,10 @@ export function createUI(app) {
   const byKey = (key) => controls.find((c) => c.key === key);
   const section = (title, ...children) => h('section', {}, h('h2', { class: 'micro' }, title), ...children);
 
-  // Colour from an image: pick "image" (it asks for one the first time), or drop one on the page.
+  // Colour: an orb for each palette, filled with its own colours and lit like a sphere, and apart from
+  // them the image: + brings one (or drop one anywhere on the page), and it joins as an orb of its own
+  // picture. The colour worn has a ring and its name by the title; an image's main colours show below at
+  // the share of the picture each covers, the proportions the smoke wears them in.
   const fileInput = h('input', {
     type: 'file', accept: 'image/*', hidden: true,
     onchange: () => {
@@ -265,12 +279,60 @@ export function createUI(app) {
       fileInput.value = '';
     },
   });
-  const thumb = h('img', { class: 'image-thumb', alt: '' });
-  const strip = h('div', { class: 'swatches', 'aria-hidden': 'true' });
-  const imageName = h('span', { class: 'image-name' });
-  const change = h('button', { type: 'button', class: 'text-button micro', hidden: true, onclick: () => fileInput.click() }, 'change');
-  const imageRow = h('div', { class: 'image-row', hidden: true }, thumb, h('div', { class: 'image-meta' }, imageName, strip), change);
-  const colour = section('Colour', h('div', { class: 'rows' }, field(byKey('colour'), true), imageRow, fileInput));
+  const PLUS = '<svg viewBox="0 0 10 10" width="10" height="10"><path d="M5 1.6v6.8M1.6 5h6.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
+  const orbs = {};
+  for (const value of ['white', 'dusk', 'pearl', 'image']) {
+    const fill = h('i', { class: 'orb-fill', 'aria-hidden': 'true' });
+    if (app.bundled[value]) fill.style.setProperty('--picture', `url("${app.bundled[value]}")`);
+    orbs[value] = h('button', {
+      type: 'button', role: 'radio', class: `orb orb-${value}`, 'aria-label': value, title: value,
+      onclick: () => wearColour(value), onkeydown: (e) => stepColour(e, value),
+    }, fill);
+  }
+  orbs.image.hidden = true;
+  const addImage = h('button', {
+    type: 'button', class: 'orb orb-add', 'aria-label': 'Colour from an image',
+    title: 'Colour the smoke from an image (or drop one anywhere)', onclick: () => fileInput.click(),
+  });
+  addImage.innerHTML = PLUS;
+  const colourName = h('span', { class: 'micro colour-name' });
+  const strip = h('div', { class: 'swatches', 'aria-hidden': 'true', hidden: true });
+  let imageLabel = 'image';
+  const colourField = {
+    control: byKey('colour'),
+    el: h('div', { class: 'colour-row' },
+      h('div', { class: 'orbs', role: 'radiogroup', 'aria-label': 'Colour' },
+        orbs.white, orbs.dusk, orbs.pearl, h('i', { class: 'orb-split', 'aria-hidden': 'true' }), orbs.image),
+      addImage),
+    sync() {
+      const on = app.state.colour;
+      for (const [value, o] of Object.entries(orbs)) {
+        o.setAttribute('aria-checked', String(value === on));
+        o.tabIndex = value === on ? 0 : -1;
+      }
+      colourName.textContent = on === 'image' ? imageLabel : on;
+      strip.hidden = on !== 'image';
+    },
+  };
+  fields.push(colourField);
+  function wearColour(value) {
+    app.set('colour', value);
+    colourField.sync();
+    refresh();
+  }
+  // Arrows move along the orbs (and wear each one), as in any group of choices.
+  function stepColour(e, value) {
+    const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+    if (!d) return;
+    e.preventDefault();
+    const shown = Object.keys(orbs).filter((v) => !orbs[v].hidden);
+    const next = shown[(shown.indexOf(value) + d + shown.length) % shown.length];
+    orbs[next].focus();
+    wearColour(next);
+  }
+  const colour = h('section', {},
+    h('div', { class: 'section-head' }, h('h2', { class: 'micro' }, 'Colour'), colourName),
+    colourField.el, strip, fileInput);
 
   // Record opens the record window, where the frame is chosen and an image or a video is made.
   const share = section('Share', h('div', { class: 'actions' }, record, copy));
@@ -306,14 +368,18 @@ export function createUI(app) {
   try { remembered = localStorage.getItem(TUNE_KEY); } catch {}
   showTune(remembered === 'open');
 
-  // The colours in use (a bundled palette or an uploaded image), or none for white. The strip shows
-  // the picture's main colours at the share of it each one covers.
+  // The colours in use (a bundled palette or an uploaded image), or none for white. An uploaded image
+  // becomes its orb, and the strip shows its main colours at the share of the picture each one covers.
   function showColours(picked) {
-    imageRow.hidden = !picked;
-    change.hidden = app.state.colour !== 'image';
-    if (!picked) return;
-    thumb.src = picked.thumbnail;
-    imageName.textContent = picked.name;
+    if (app.state.colour === 'image' && picked) {
+      orbs.image.querySelector('.orb-fill').style.setProperty('--picture', `url("${picked.thumbnail}")`);
+      orbs.image.hidden = false;
+      orbs.image.setAttribute('aria-label', picked.name);
+      orbs.image.title = picked.name;
+      imageLabel = picked.name;
+    }
+    colourField.sync();
+    if (!picked || app.state.colour !== 'image') return;
     strip.replaceChildren(...picked.swatches.map((sw) => {
       const bar = h('i', { title: `${Math.round(sw.share * 100)}%` });
       bar.style.background = sw.color;
@@ -327,7 +393,9 @@ export function createUI(app) {
     try {
       await app.useImage(file);
       fields.forEach((f) => f.sync());
-      toast('image colours · same proportions');
+      refresh();
+      // The orb and its strip say it where the panel shows; with the panel away, a toast does.
+      if (panel.hasAttribute('data-hidden') || recordOpen) toast('image colours · same proportions');
     } catch (e) {
       toast(e.message);
     }

@@ -589,6 +589,8 @@ async function atSize(width, height, ratio, task) {
 
 const app = {
   state,
+  // The bundled palettes' pictures, for the panel's colour orbs.
+  bundled,
   set(key, value) {
     if (state[key] === value) return;
     // Image colours need an image first: ask for one instead.
@@ -618,7 +620,9 @@ const app = {
     writeHash(state);
   },
   apply(values, look) {
-    for (const [key, value] of Object.entries(values)) if (key !== 'particles' && key !== 'format') state[key] = value;
+    // The colour is put on through set (it loads and fades the palette); the panel decides when a look's
+    // colour comes and goes (ui.js applyLook).
+    for (const [key, value] of Object.entries(values)) if (key !== 'particles' && key !== 'format' && key !== 'colour') state[key] = value;
     // The original looks start the camera where the reference clip starts. Both moves crossfade.
     if (state.lens !== view.lens) cut.pending = { ...cut.pending, lens: state.lens };
     if (clipLooks.includes(look)) cut.pending = { ...cut.pending, original: true };

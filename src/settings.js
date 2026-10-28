@@ -60,27 +60,31 @@ const original = {
   grain: 0.4, blur: 0, focus: 0.5, spin: 0.5, lens: 'flat', edges: 'red',
 };
 
+// Romain's look: the clip's breath through a depth lens, fine filaments, sharp grains, sealed glass.
+const pure = {
+  flow: 0.45, turbulence: 0.51, spread: 0, gather: 0.98, pulse: 1, escape: 0,
+  brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.42,
+  grain: 0.4, blur: 0, focus: 0.5, spin: 0.13, lens: 'depth', edges: 'white',
+};
+
+// A look may bring a colour (one of the bundled palettes); the others leave the colour as it is.
 export const presets = {
-  // Romain's look: the clip's breath through a depth lens, fine filaments, sharp grains, sealed glass.
-  pure: {
-    flow: 0.45, turbulence: 0.51, spread: 0, gather: 0.98, pulse: 1, escape: 0,
-    brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.42,
-    grain: 0.4, blur: 0, focus: 0.5, spin: 0.13, lens: 'depth', edges: 'white',
-  },
+  pure,
+  // aura: pure's breath a little softer and brighter, so the colour reads across a rounder, glowing
+  // body, worn in dusk (chosen against pearl and pure's own settings by rendering each at 5 and 15 s).
+  aura: { ...pure, turbulence: 0.42, gather: 0.9, brightness: 0.55, shadows: 0.48, glow: 0.4, grain: 0.36, colour: 'dusk' },
   original,
-  // Three other shapes for the original's camera, breath and red edges, chosen from ten by rendering
+  // Two other shapes for the original's camera, breath and red edges, chosen from ten by rendering
   // each over 30 s and scoring it (crisp strands, smooth motion), and each its own shape the whole time.
   // ribbon: bright bands arcing around a breathing body.
   ribbon: { ...original, flow: 0.32, turbulence: 0.22, gather: 0.7, pulse: 1, brightness: 0.53, shadows: 0.42, glow: 0.3, grain: 0.32 },
   // veil: slow sheets that fill the glass and touch every face.
   veil: { ...original, flow: 0.24, turbulence: 0.12, gather: 0, pulse: 0.35, brightness: 0.56, shadows: 0.45, glow: 0.22, grain: 0.24 },
-  // thread: loose loops of thread floating in the middle, with air all round.
-  thread: { ...original, flow: 0.2, turbulence: 0.1, gather: 0.15, pulse: 0.35, brightness: 0.55, shadows: 0.45, glow: 0.24, grain: 0.24 },
   smoke: {},
 };
 
-// The looks that start the camera where the reference clip starts (the original and its three shapes).
-export const clipLooks = ['original', 'ribbon', 'veil', 'thread'];
+// The looks that start the camera where the reference clip starts (the original and its two shapes).
+export const clipLooks = ['original', 'ribbon', 'veil'];
 
 export function presetValues(name) {
   return { ...base, ...presets[name] };
@@ -97,8 +101,12 @@ export function lookOf(state) {
 }
 export const sameLook = (a, b) => lookKeys.every((key) => a[key] === b[key]);
 
+// The look on screen, if it is one of the presets (one that brings a colour only while it's worn).
 export function matchingPreset(state) {
-  return Object.keys(presets).find((name) => sameLook(presetValues(name), state));
+  return Object.keys(presets).find((name) => {
+    const look = presetValues(name);
+    return sameLook(look, state) && (!look.colour || look.colour === state.colour);
+  });
 }
 
 // Randomize: every roll is one of the smoke's beautiful families, varied only inside the ranges where it
@@ -137,6 +145,8 @@ export function lookCode(state) {
   const value = (v) => (typeof v === 'string' ? `'${v}'` : String(v));
   const keys = controls.filter((c) => c.look !== false).map((c) => c.key);
   const lines = [];
+  // A bundled palette travels with the look; white is every look's own, and an upload stays in this browser.
+  if (state.colour !== 'white' && state.colour !== 'image') keys.push('colour');
   for (let i = 0; i < keys.length; i += 6) lines.push('    ' + keys.slice(i, i + 6).map((k) => `${k}: ${value(state[k])}`).join(', ') + ',');
   return `  // A Pure Smoke look: paste it into presets in src/settings.js.\n  mine: {\n${lines.join('\n')}\n  },\n`;
 }
