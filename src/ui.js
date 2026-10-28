@@ -12,6 +12,14 @@ const h = (tag, attrs = {}, ...children) => {
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
+// A button's face: an optional mark, a check (shown while the button says it's done) and its words.
+const TICK = '<svg viewBox="0 0 10 10" width="10" height="10"><path d="M1.6 5.3 4 7.6 8.4 2.7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function face(words, ...marks) {
+  const tick = h('i', { class: 'tick', 'aria-hidden': 'true' });
+  tick.innerHTML = TICK;
+  return h('span', { class: 'face' }, ...marks, tick, h('span', { class: 'words', 'aria-live': 'polite' }, words));
+}
+
 // A full-width row you drag anywhere on. Click jumps, drag scrubs, Shift is fine, double-click resets,
 // arrows step by 1 (Shift or Page keys: 10). A finger might be scrolling the sheet instead: the row waits
 // until it moves sideways (a drag) or lifts where it landed (a tap), and lets a vertical swipe scroll.
@@ -177,9 +185,12 @@ export function createUI(app) {
     h('div', { class: 'chips', role: 'group', 'aria-label': 'Look' }, Object.values(chips)));
 
   // Actions
-  const save = h('button', { type: 'button', class: 'pill pill-wide', onclick: () => saveImage() }, 'save image');
+  const save = h('button', { type: 'button', class: 'pill pill-wide', onclick: () => saveImage() }, face('save image'));
   const record = h('button', { type: 'button', class: 'pill', onclick: (e) => openRecord(true, { keyboard: e.detail === 0 }) }, h('i', { class: 'rec-dot' }), 'record');
-  const copy = h('button', { type: 'button', class: 'pill', onclick: () => copyCode() }, 'copy code');
+  const copy = h('button', {
+    type: 'button', class: 'pill', title: 'Copy this look as code: a preset to paste into src/settings.js',
+    onclick: (e) => copyCode(e.detail === 0),
+  }, face('copy code'));
 
   // Controls. The everyday path comes first: a look, a colour, then save or share. The rest waits one
   // level deeper under Fine-tune, so a first visit asks for three choices instead of twenty.
@@ -344,29 +355,57 @@ export function createUI(app) {
     toastLeft -= performance.now() - toastSince;
   });
 
-  // A large image takes a second or two to encode: the button says so while it does.
+  // A button says what it just did in its own place, where the eye already is, then its own words again
+  // after 1.5 s. The words crossfade through a slight blur, so one reads as turning into the next; from
+  // a key they change at once. rest: the words to go back to.
+  const saying = new WeakMap();
+  function sayIn(button, words, rest, instant = false) {
+    const f = button.querySelector('.face');
+    const show = (text, done, fade) => {
+      f.querySelector('.words').textContent = text;
+      button.classList.toggle('done', done);
+      if (fade) f.animate([{ opacity: 0, filter: 'blur(2px)' }, { opacity: 1, filter: 'blur(0)' }], { duration: 160, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+    };
+    clearTimeout(saying.get(button));
+    if (!button.classList.contains('done') || f.querySelector('.words').textContent !== words) show(words, true, !instant);
+    saying.set(button, setTimeout(() => show(rest, false, true), 1500));
+  }
+  // Before a button starts something new, it stops saying what it did last.
+  function hush(button) {
+    clearTimeout(saying.get(button));
+    button.classList.remove('done');
+  }
+
+  // A large image takes a second or two to encode: the button says so while it does, then that it's
+  // saved. From the S key (the record window closed, the button out of sight) a toast says it.
   async function saveImage() {
     if (save.getAttribute('aria-busy') === 'true') return;
+    const words = save.querySelector('.words');
+    hush(save);
     save.disabled = true;
     save.setAttribute('aria-busy', 'true');
-    save.textContent = 'saving…';
+    words.textContent = 'saving…';
     try {
       const size = await app.saveImage();
-      toast(`image saved · ${size}`);
+      if (recordOpen) sayIn(save, `saved · ${size}`, 'save image');
+      else {
+        words.textContent = 'save image';
+        toast(`image saved · ${size}`);
+      }
     } catch (e) {
+      words.textContent = 'save image';
       toast(e.message);
     } finally {
       save.disabled = false;
       save.removeAttribute('aria-busy');
-      save.textContent = 'save image';
     }
   }
 
   // The record window, in the panel's place: choose the frame (the canvas becomes it), then save an
   // image of it or record a video. Each option names itself, so the rows need no labels.
-  const startLabel = h('span', {}, 'start recording');
   const start = h('button', { type: 'button', class: 'pill pill-primary pill-start', onclick: () => recordVideo() },
-    h('i', { class: 'rec-dot' }), startLabel);
+    face('start recording', h('i', { class: 'rec-dot' })));
+  const startLabel = start.querySelector('.words');
   // Progress is a progressbar, not a live region: a screen reader can ask for it, instead of hearing
   // every percent read out. The toast announces the end.
   const statusText = h('span');
@@ -415,6 +454,7 @@ export function createUI(app) {
   async function recordVideo() {
     if (app.recording) return app.stopRecording();
     if (save.getAttribute('aria-busy') === 'true') return;
+    hush(start);
     const { length, loop, fps } = app.state;
     const doing = app.canLoop ? `${length} s ${loop === 'loop' ? 'loop' : 'video'} · ${fps} fps` : `${length} s live`;
     const show = (p) => {
@@ -430,9 +470,10 @@ export function createUI(app) {
     back.disabled = true;
     // The settings hold still while a video is being made.
     recordRows.inert = frameRow.inert = save.disabled = true;
+    let saved = null;
     try {
       const ext = await app.recordVideo(show);
-      toast(`${app.canLoop && loop === 'loop' ? 'loop' : 'video'} saved · ${ext}`);
+      saved = `${app.canLoop && loop === 'loop' ? 'loop' : 'video'} saved · ${ext}`;
     } catch (e) {
       toast(e.message);
     } finally {
@@ -442,13 +483,16 @@ export function createUI(app) {
       back.disabled = false;
       recordRows.inert = frameRow.inert = save.disabled = false;
     }
+    // The button says it's saved, where the eye is, then start recording again.
+    if (saved) sayIn(start, saved, 'start recording');
   }
 
-  // The look as code (every parameter, as a preset for src/settings.js), for anyone building on it.
-  async function copyCode() {
+  // The look as code (every parameter, as a preset for src/settings.js), for anyone building on it. The
+  // button says it's copied; the code's first line says where it goes.
+  async function copyCode(instant = false) {
     try {
       await navigator.clipboard.writeText(lookCode(app.state));
-      toast('code copied · paste into settings.js');
+      sayIn(copy, 'copied', 'copy code', instant);
     } catch {
       toast('this browser blocked the clipboard');
     }

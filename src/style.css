@@ -218,7 +218,7 @@ canvas:active { cursor: grabbing; }
   padding: 2px 2px 0;
 }
 .panel-head-actions { display: flex; gap: 14px; }
-.text-button { position: relative; transition: color 200ms ease, opacity 200ms ease, transform 160ms var(--ease-pill); }
+.text-button { position: relative; transition: opacity 200ms ease, transform 160ms var(--ease-pill); }
 /* Hide, Back and change are small words: an invisible margin makes them easy to hit, larger for a
    finger. It stays inside the gaps around them, clear of the next control. */
 .text-button::after { content: ''; position: absolute; inset: -8px; }
@@ -245,7 +245,7 @@ canvas:active { cursor: grabbing; }
   touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
-  transition: background-color 200ms ease, opacity 200ms ease;
+  transition: opacity 200ms ease;
 }
 .slider-fill {
   position: absolute;
@@ -255,7 +255,7 @@ canvas:active { cursor: grabbing; }
 /* A layer only while a fill moves: gliding to a look, or under the hand. */
 .gliding .slider-fill { transition: transform 240ms var(--ease-out); will-change: transform; }
 .slider.dragging .slider-fill { will-change: transform; }
-.slider-label, .slider-value { position: relative; pointer-events: none; transition: color 200ms ease; }
+.slider-label, .slider-value { position: relative; pointer-events: none; }
 .slider-value { font-variant-numeric: tabular-nums; color: var(--strong); }
 .slider.dragging { background: var(--row-hover); }
 .slider.dragging .slider-label { color: var(--strong); }
@@ -313,7 +313,7 @@ canvas:active { cursor: grabbing; }
   text-transform: lowercase;
   background: var(--row);
   color: var(--text);
-  transition: transform 160ms var(--ease-pill), background-color 200ms ease, color 200ms ease, opacity 200ms ease;
+  transition: transform 160ms var(--ease-pill), opacity 200ms ease;
 }
 .chip[aria-pressed='true'] { background: var(--strong); color: #0b0b0b; }
 .chip:active, .pill:active { transform: scale(0.97); }
@@ -343,6 +343,13 @@ canvas:active { cursor: grabbing; }
 .recording .rec-dot { opacity: 1; animation: blink 1s steps(2, start) infinite; }
 @keyframes blink { to { visibility: hidden; } }
 
+/* A button that says what it just did (ui.js sayIn): a check before its words */
+.face { display: inline-flex; align-items: center; gap: 6px; }
+.tick { display: none; width: 10px; height: 10px; }
+.tick svg { display: block; }
+.done .tick { display: block; }
+.done .rec-dot { display: none; }
+
 .keys { padding: 0 2px; color: #555; }
 
 /* Fine-tune: every other control, one level deeper */
@@ -355,7 +362,7 @@ canvas:active { cursor: grabbing; }
   border-radius: 7px;
   background: var(--row);
   color: var(--text);
-  transition: color 200ms ease, background-color 200ms ease, transform 160ms var(--ease-pill);
+  transition: transform 160ms var(--ease-pill);
 }
 .disclosure:active { transform: scale(0.98); }
 .chevron {
@@ -380,6 +387,8 @@ canvas:active { cursor: grabbing; }
 /* A control waiting on another (focus needs blur) */
 .slider.resting { opacity: 0.35; pointer-events: none; }
 
+/* Hover and selection colours change at once: the pointer crosses these rows tens of times a session,
+   and a fade would trail behind it. Presses still shrink; disabled and resting controls still fade. */
 @media (hover: hover) and (pointer: fine) {
   .slider:hover { background: var(--row-hover); }
   .slider:hover .slider-label { color: var(--strong); }
