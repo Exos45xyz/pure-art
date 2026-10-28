@@ -56,7 +56,7 @@ if (reducedMotion() && !location.hash.includes('pulse=')) state.pulse = 0;
 
 // The shaders read eased copies of the sliders, so every change glides instead of jumping.
 const live = { ...state, colourMix: 0 };
-const eased = ['flow', 'turbulence', 'spread', 'gather', 'pulse', 'escape', 'rebound', 'brightness', 'shadows', 'glow', 'film', 'grain', 'blur', 'focus', 'spin'];
+const eased = ['flow', 'turbulence', 'twist', 'spread', 'gather', 'pulse', 'escape', 'rebound', 'brightness', 'shadows', 'glow', 'film', 'grain', 'blur', 'focus', 'spin'];
 
 // ---- Scene ---------------------------------------------------------------------------------
 

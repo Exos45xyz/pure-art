@@ -19,6 +19,7 @@ The panel shows the everyday choices first: a look, a colour, then save or share
 | Smoke | source | Not in the panel: where the smoke is born (wandering clouds, a plume at the bottom, or a core in the middle). With gather on, as in pure, the smoke is born at the gather centres and the source changes nothing you see; randomize sets it where it shows. Copy code includes it. |
 | | flow | How fast the current moves. |
 | | turbulence | How many small eddies ride on the big swirls. Calm smoke also turns in bigger rolls. |
+| | twist | Each layer of smoke turns about the cube's upright axis, faster the higher it is and the other way below the middle, so the strands wind into a helix. It fades out by the side glass, where the bounce takes over. Every look keeps it at 0, where nothing changes; randomize keeps yours. |
 | | spread | How much each grain wanders on its own, which puffs thin sheets out into soft volumes. |
 | | gather | Pulls the smoke into bodies that chase two centres racing around the cube, so it moves as whole masses. |
 | | pulse | The breath: every 1.994 s the masses swell until they fill the cube, then pull back in. |

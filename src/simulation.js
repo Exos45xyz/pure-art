@@ -49,6 +49,7 @@ uniform float uTime;
 uniform float uDt;
 uniform float uSpeed;
 uniform float uTurbulence;
+uniform float uTwist;
 uniform float uSpread;
 uniform float uRebound;
 uniform float uSource;
@@ -128,6 +129,12 @@ void main() {
     target.y += uDrift * uPulse;
     target += cross(uTowardCamera, p) * uSwirl * uPulse;
   }
+
+  // Twist: each layer of smoke turns about the cube's upright axis, faster the higher it is and the other
+  // way below the middle, so the strands wind into a helix. A layer turns as a whole, so nothing bunches
+  // up; next to the side glass the turn fades out (the same ramp as the flow) and the bounce takes over.
+  // Off (0), not a grain moves differently.
+  if (uTwist > 0.001) target += vec3(-p.z, 0.0, p.x) * p.y * ramp(min(gaps.x, gaps.z) / W) * uTwist * (0.6 + 1.2 * uSpeed);
 
   // Sources shape the current: a plume rises and pools under the lid, a core breathes outward.
   float inside = step(0.0, d);
@@ -342,6 +349,7 @@ export function createSimulation(renderer, size) {
     uDt: { value: 0 },
     uSpeed: { value: 0 },
     uTurbulence: { value: 0 },
+    uTwist: { value: 0 },
     uSpread: { value: 0 },
     uRebound: { value: 0.5 },
     uGather: { value: 0 },
@@ -480,6 +488,7 @@ export function createSimulation(renderer, size) {
       vu.uSource.value = pu.uSource.value = sources[source];
       vu.uSpeed.value = speed;
       vu.uTurbulence.value = live.turbulence;
+      vu.uTwist.value = live.twist;
       vu.uSpread.value = pu.uSpread.value = live.spread;
       vu.uRebound.value = live.rebound;
       vu.uGather.value = pu.uGather.value = live.gather;
