@@ -13,6 +13,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
+import { compileAhead } from './compile.js';
 import { createCube } from './cube.js';
 import { GradeShader } from './grade.js';
 import { createSimulation } from './simulation.js';
@@ -105,7 +106,7 @@ function advance(sim, dt, at, stirring = null) {
   // breath is fed 0.2 s late; measured inside the simulation, its swell then lines up with the clip's.
   sim.step(dt, live, state.source, stirring, breathAt(at - 0.2), towardCamera);
 }
-function build(size) {
+function make(size) {
   simulation?.dispose();
   if (smoke) {
     scene.remove(smoke.object);
@@ -115,18 +116,58 @@ function build(size) {
   smoke = createSmoke(size, lighting);
   if (colours) smoke.setColours(colours.map, colourGain(colours.image));
   scene.add(smoke.object);
+}
+const SETTLE = 90;
+function build(size) {
+  make(size);
   // Let the smoke settle before anyone sees it.
   const settle = clock;
-  for (let i = 0; i < 90; i++) simStep(1 / 45, false);
+  for (let i = 0; i < SETTLE; i++) simStep(1 / 45, false);
   clock = settle;
 }
-// Let the loading screen paint "code" before the grains are built (the build holds the page). A tab
-// opened in the background never paints, so it builds after a moment anyway and is ready when shown.
+// A mark in the GPU's queue (a fence), and a wait until the GPU has reached it (checked between tasks),
+// so its work doesn't queue up far ahead of the browser drawing the page. A hidden tab doesn't wait.
+function gpuMark() {
+  const gl = renderer.getContext();
+  const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+  gl.flush();
+  return fence;
+}
+async function gpuReached(fence) {
+  const gl = renderer.getContext();
+  while (!document.hidden && gl.getSyncParameter(fence, gl.SYNC_STATUS) !== gl.SIGNALED) {
+    await new Promise((resolve) => setTimeout(resolve, 2));
+  }
+  gl.deleteSync(fence);
+}
+// Let the loading screen paint "code" before the grains are built. A tab opened in the background
+// never paints, so it builds after a moment anyway and is ready when shown.
 await Promise.race([
   new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   new Promise((resolve) => setTimeout(resolve, 100)),
 ]);
-build(state.particles);
+// The first build leaves the browser room to draw the loading bar. The passes compile on its own
+// threads (compile.js), then the smoke takes the same 90 settling steps as build, two at a time, with
+// never more than two pairs on the GPU: a step is about 9 ms of GPU work, and sent at once the 90 held
+// the screen for most of a second. A tab in the background builds at once.
+const gently = !document.hidden;
+if (gently) {
+  make(state.particles);
+  await simulation.compile();
+  const settle = clock;
+  let ahead = null;
+  for (let i = 0; i < SETTLE; i++) {
+    simStep(1 / 45, false);
+    if (i % 2 === 0) continue;
+    const mark = gpuMark();
+    if (ahead) await gpuReached(ahead);
+    ahead = mark;
+  }
+  await gpuReached(ahead);
+  clock = settle;
+} else {
+  build(state.particles);
+}
 step('grains');
 
 // ---- Post ----------------------------------------------------------------------------------
@@ -688,7 +729,13 @@ output.offsetY = pan.y;
 applyFrame();
 addEventListener('resize', fitScreen);
 
-// Two frames, so the loading screen paints "grains" before the first frame compiles the shaders.
+// The first frame's programs compile ahead too: render once with every draw a compile, then forget it
+// was drawn (the cube's edges snap on the first real frame).
+if (gently) {
+  await compileAhead(renderer, () => render(0));
+  rendered = false;
+}
+// Two frames, so the loading screen paints "grains" before the first frame.
 requestAnimationFrame(() => requestAnimationFrame((now) => {
   last = now;
   tick(now);

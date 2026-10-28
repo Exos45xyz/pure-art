@@ -3,6 +3,7 @@ import {
   PlaneGeometry, Points, Scene, ShaderMaterial, Vector3, WebGLRenderTarget,
 } from 'three';
 import { GPUComputationRenderer } from 'three/addons/misc/GPUComputationRenderer.js';
+import { compileAhead } from './compile.js';
 import { hash, noise } from './glsl.js';
 
 // The smoke lives on the GPU: one texel per grain, in two textures.
@@ -501,6 +502,13 @@ export function createSimulation(renderer, size) {
       du.tCdf.value = curve.texture;
       gpu.compute();
       du.uSnap.value = 0;
+    },
+    // Every pass a step draws, compiled ahead (compile.js): nothing is drawn and nothing moves on.
+    compile() {
+      return compileAhead(renderer, () => {
+        for (const v of [velocity, position, dye]) gpu.doRenderTarget(v.material, v.renderTargets[0]);
+        measureColours(time);
+      });
     },
     // The simulation's own clock, so a copy can replay the same steps (the loop recording).
     get time() { return time; },

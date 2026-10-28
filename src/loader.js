@@ -2,9 +2,9 @@
 // here, the grains are built, the shaders are compiled. Between steps it creeps toward the next one
 // without reaching it, and it fills only when the smoke is ready.
 //
-// The creep is a CSS transition, not a script: building the grains holds the page for a second or
-// more, and a transition on transform keeps moving through it for as long as the browser can draw at
-// all (it draws it off the page's thread), where a script stands still from the first moment.
+// The creep is a CSS transition, not a script: the browser draws it off the page's thread, so it keeps
+// moving while the page is busy for a moment (the first build is paced so it never is for long:
+// main.js, compile.js).
 
 const bar = document.querySelector('.loader .bar i');
 const order = ['code', 'grains', 'shaders'];
