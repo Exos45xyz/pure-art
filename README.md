@@ -7,7 +7,9 @@ Particle smoke in a glass cube. Free and open source under the [MIT licence](LIC
 **Play with it:** https://pure-art-smoke.vercel.app
 
 Most smoke on the web is a video. This one is alive.
+
 A million grains move through a real flow, inside real glass, under one studio lamp.
+
 You can turn it, stir it, give it your colours, and take it home as a 4K image or a loop that never shows its seam.
 
 Drag to turn the cube, hover to stir the smoke, scroll to zoom (the hints at the bottom light up while you do each one, the first few times; on a touch screen only the drag is listed).
@@ -25,9 +27,13 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom (the hints at the
 ## Why it looks like this
 
 Smoke is light. So the studio is black, and there is one lamp.
+
 The colour belongs to the smoke. So the panel is grey on black, and nothing else on the page is coloured.
+
 Most people want a look, a colour, and a way to share. So those come first; everything else waits under Fine-tune.
+
 Motion should explain, not decorate. The panel folds into the corner it comes back from. The hints light up the first few times you do what they say, then step back.
+
 The cube is the hero. On a phone it keeps to the room between the name and the sheet, so nothing covers it.
 
 ## Make it yours
