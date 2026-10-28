@@ -190,12 +190,13 @@ export function createUI(app) {
     syncAll(instant);
   };
 
-  // Looks: a list, one row each in the panel's row style; the look on screen is brighter, with a check.
+  // Looks: a list in two columns, in the panel's row style; the look on screen is brighter, with a check.
   const lookItem = (name, onclick) => h('button', { type: 'button', class: 'look-item', onclick }, h('span', { class: 'look-name' }, name), tickMark());
   for (const name of Object.keys(presets)) chips[name] = lookItem(name, () => applyLook(presetValues(name), name));
   const shuffle = (instant = false) => applyLook(shuffled(app.state), undefined, instant);
-  // Your own looks, under the others: save this look keeps the look on screen (mine 1, mine 2…), in this
-  // browser. The one on screen shows × to remove it (any of them under a mouse). Copy code turns any look into a preset for src/settings.js,
+  // Your own looks follow the others. Save this look appears only when the look on screen is new (which also
+  // says it isn't kept yet) and keeps it (mine 1, mine 2…) in this browser. The one on screen shows × to
+  // remove it (any of them under a mouse). Copy code turns any look into a preset for src/settings.js,
   // and the address bar link shares it with anyone.
   const MINE_KEY = 'pure-smoke-looks';
   const MAX_MINE = 6;
@@ -208,7 +209,6 @@ export function createUI(app) {
   // Numbered after the highest kept, so they read in the order they were made.
   const nextName = () => `mine ${Math.max(0, ...mine.map((m) => Number(m.name.match(/\d+$/)?.[0]) || 0)) + 1}`;
   const saveChip = h('button', { type: 'button', class: 'look-item look-save', onclick: (e) => saveLook(e.detail === 0) }, '+ save this look');
-  const yoursLabel = h('p', { class: 'micro looks-label' }, 'Yours');
   const looksRow = h('div', { class: 'looks-list', role: 'group', 'aria-label': 'Look' });
   let mineChips = [];
   function drawMine() {
@@ -220,7 +220,7 @@ export function createUI(app) {
       }, '×');
       return { m, chip, remove, el: h('div', { class: 'mine' }, chip, remove) };
     });
-    looksRow.replaceChildren(...Object.values(chips), ...(mine.length ? [yoursLabel] : []), ...mineChips.map((c) => c.el), saveChip);
+    looksRow.replaceChildren(...Object.values(chips), ...mineChips.map((c) => c.el), saveChip);
     downloadButton.hidden = !mine.length;
     showMine();
   }
@@ -234,8 +234,9 @@ export function createUI(app) {
       remove.hidden = !on;
     }
     const known = found || matchingPreset(app.state) !== undefined;
-    saveChip.disabled = known || mine.length >= MAX_MINE;
-    saveChip.title = known ? 'This look is already in the list' : mine.length >= MAX_MINE ? 'Six looks kept: remove one to keep another' : 'Keep this look in the list, in this browser';
+    saveChip.hidden = known;
+    saveChip.disabled = mine.length >= MAX_MINE;
+    saveChip.title = mine.length >= MAX_MINE ? 'Six looks kept: remove one to keep another' : 'Keep this look in the list, in this browser';
   }
   function saveLook(keyboard) {
     // A saved look keeps its colour, but not an uploaded image (it's gone once the page closes).
@@ -243,18 +244,18 @@ export function createUI(app) {
     mine.push(m);
     keepMine();
     drawMine();
-    // Save is now off (this look is in the list): keyboard focus goes to the new row.
+    // Save is now gone (this look is in the list): keyboard focus goes to the new row.
     if (keyboard) mineChips.at(-1).chip.focus();
   }
   function forget(m) {
     mine = mine.filter((x) => x !== m);
     keepMine();
     drawMine();
-    saveChip.focus({ preventScroll: true });
+    (saveChip.hidden ? looksRow.querySelector('button') : saveChip).focus({ preventScroll: true });
   }
-  // Your looks travel as a file: download keeps them all (a small JSON file), upload brings a file of them
-  // back, here or in another browser, or drop it anywhere on the page. Uploading only adds: a look you
-  // already have is kept once, and six at most.
+  // Your looks travel as a file, in a quiet line under the list: download keeps them all (a small JSON
+  // file), upload brings a file of them back, here or in another browser, or drop it anywhere on the page.
+  // Uploading only adds: a look you already have is kept once, and six at most.
   const looksFile = h('input', {
     type: 'file', accept: '.json,application/json', hidden: true,
     onchange: () => {
@@ -291,9 +292,8 @@ export function createUI(app) {
     if (added) sayIn(uploadButton, `${added} added`, 'upload');
     else toast(full ? 'six looks kept: remove one to add more' : 'those looks are already here');
   }
-  const look = h('section', {},
-    h('div', { class: 'section-head' }, h('h2', { class: 'micro' }, 'Look'), h('span', { class: 'head-actions' }, downloadButton, uploadButton)),
-    looksRow, looksFile);
+  const look = h('section', {}, h('h2', { class: 'micro' }, 'Look'), looksRow,
+    h('div', { class: 'looks-foot' }, downloadButton, uploadButton), looksFile);
   drawMine();
 
   // Actions

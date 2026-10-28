@@ -317,9 +317,10 @@ canvas:active { cursor: grabbing; }
 }
 .chip[aria-pressed='true'] { background: var(--strong); color: #0b0b0b; }
 .chip:active, .pill:active { transform: scale(0.97); }
-/* Looks: a list in the panel's row style (ui.js). The look on screen is brighter, with a check; yours
-   come under their label, the one on screen with × to remove it, and save this look ends the list. */
-.looks-list { display: grid; gap: 2px; }
+/* Looks: a list in two columns, in the panel's row style (ui.js). The look on screen is brighter, with a
+   check; yours follow, the one on screen with × to remove it; save this look closes the list only when
+   the look on screen is new. Download and upload sit quietly under it. */
+.looks-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
 .look-item {
   display: flex;
   align-items: center;
@@ -339,7 +340,6 @@ canvas:active { cursor: grabbing; }
 .look-item[aria-pressed='true'] { background: #262626; color: var(--strong); }
 .look-item[aria-pressed='true'] .tick { display: block; }
 .look-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.looks-label { padding: 8px 2px 2px; color: #555; }
 .mine { position: relative; transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out); }
 @starting-style { .mine { opacity: 0; transform: translateY(-4px); } }
 .mine .look-item { padding-right: 34px; }
@@ -356,11 +356,13 @@ canvas:active { cursor: grabbing; }
   color: var(--muted);
 }
 .look-remove[hidden] { display: none; }
-.look-save { margin-top: 4px; background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+.look-save { grid-column: 1 / -1; background: transparent; color: var(--strong); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22); }
+.look-save[hidden] { display: none; }
 .look-save:disabled { opacity: 0.45; cursor: default; }
+.looks-foot { display: flex; gap: 14px; padding: 2px 2px 0; }
+.looks-foot .text-button { color: #5a5a5a; }
 /* + save and + image: actions among choices, drawn as an outline */
 .chip-add { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
-.head-actions { display: flex; gap: 12px; }
 .text-button .face { gap: 4px; }
 .text-button .tick { width: 8px; height: 8px; }
 .text-button .tick svg { width: 8px; height: 8px; }
