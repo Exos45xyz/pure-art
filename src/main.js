@@ -150,7 +150,9 @@ function advance(sim, dt, at, stirring = null) {
   view.camera.getWorldDirection(towardCamera).negate();
   // The smoke answers the breath a little early (a compact mass springs back out on its own), so the
   // breath is fed 0.2 s late; measured inside the simulation, its swell then lines up with the clip's.
-  sim.step(dt, live, state.source, stirring, breathAt(at - 0.2), towardCamera);
+  // Rebound carries its momentum, which lags the breath by about a quarter second: it is fed that much
+  // earlier, so the smoke reaches the glass on the clip's beat.
+  sim.step(dt, live, state.source, stirring, breathAt(at - (live.motion === 'rebound' ? -0.05 : 0.2)), towardCamera);
 }
 function make(size) {
   simulation?.dispose();
@@ -495,6 +497,7 @@ function tick(now) {
 
   const k = 1 - Math.exp(-dt * 10);
   for (const key of eased) live[key] += (state[key] - live[key]) * k;
+  live.motion = state.motion;
   live.colourMix += ((state.colour !== 'white' && colours ? 1 : 0) - live.colourMix) * (1 - Math.exp(-dt * 6));
 
   if (!exporting) {

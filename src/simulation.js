@@ -44,6 +44,11 @@ vec3 centre(float k, float t) {
 float body(float seed) { return floor(fract(seed * 7.13) * 2.0); }
 `;
 
+// How the smoke moves (the motion setting): 0 = carried by the current, 1 = rebound (velocityShader).
+const rebounding = /* glsl */ `
+uniform float uMotion;
+`;
+
 const velocityShader = /* glsl */ `
 uniform float uTime;
 uniform float uDt;
@@ -61,6 +66,7 @@ ${noise}
 ${hash}
 ${holes}
 ${bodies}
+${rebounding}
 
 // Curl-noise flow that respects the glass (Bridson et al., "Curl-Noise for Procedural Fluid Flow").
 // v = grad(a * R) x grad(b) has no divergence, and where the ramp R reaches 0 at a wall the flow
@@ -148,6 +154,9 @@ void main() {
   vec3 across = q - uRayDirection * dot(q, uRayDirection);
   target += uStir * exp(-dot(across, across) * 16.0);
 
+  // What the current and the breath ask for, before the glass shapes it (rebound starts from this).
+  vec3 thrown = target;
+
   // Rebound off the glass. Near a closed wall the current may only run along it, never into it;
   // a grain that reaches the glass moving outward bounces straight back (at rebound 0.5 with 90% of its
   // speed and a small kick, so even slow smoke springs off), and part of the impact splashes sideways
@@ -185,6 +194,25 @@ void main() {
   vec3 slide = next - outward * dot(next, outward);
   vec3 slideTarget = target - outward * dot(target, outward);
   next += (slideTarget - slide) * (1.0 - exp(-uDt * 10.0)) * onFace;
+
+  // Rebound (the rebound look): the breath throws harder (more with the rebound slider) and keeps pushing
+  // at the glass instead of easing off before it. Each grain keeps its momentum, easing toward that over
+  // about a third of a second (a tenth above), so the smoke carries on into the glass, and the glass sends
+  // it back at the speed it came: only the way into the glass turns round, the rest carries on along the
+  // face, so smoke thrown at it again and again presses flat and slides over it. Worked out here, after
+  // the current's own answer, so that answer is computed exactly as before for every other look.
+  if (uMotion > 0.5) {
+    if (uGather > 0.001 || uPulse > 0.001) {
+      vec3 fromMiddle = p - centre(body(vel.w), t) * 0.4;
+      float atGlass = smoothstep(0.85, 1.0, max(a.x, max(a.y, a.z)));
+      float eased = uSwell > 0.0 ? 0.6 * (1.0 - atGlass) : 1.2;
+      float thrownHard = (uSwell > 0.0 ? 0.6 : 1.2) * (1.0 + 5.0 * uRebound);
+      thrown += fromMiddle * uSwell * uPulse * (thrownHard - eased);
+    }
+    next = mix(vel.xyz, thrown, pos.w < 0.015 ? 1.0 : 1.0 - exp(-uDt * 3.0));
+    float hit = dot(next, outward);
+    if (d < 0.04 && hit > 0.0 && sealed > 0.5) next -= outward * hit * 2.0;
+  }
   gl_FragColor = vec4(next, vel.w);
 }
 `;
@@ -352,6 +380,7 @@ export function createSimulation(renderer, size) {
     uTwist: { value: 0 },
     uSpread: { value: 0 },
     uRebound: { value: 0.5 },
+    uMotion: { value: 0 },
     uGather: { value: 0 },
     uPulse: { value: 0 },
     uSwell: { value: 0 },
@@ -489,6 +518,7 @@ export function createSimulation(renderer, size) {
       vu.uSpeed.value = speed;
       vu.uTurbulence.value = live.turbulence;
       vu.uTwist.value = live.twist;
+      vu.uMotion.value = live.motion === 'rebound' ? 1 : 0;
       vu.uSpread.value = pu.uSpread.value = live.spread;
       vu.uRebound.value = live.rebound;
       vu.uGather.value = pu.uGather.value = live.gather;

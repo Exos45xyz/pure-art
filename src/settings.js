@@ -9,6 +9,10 @@ export const controls = [
   // gather centres and the source changes nothing you see; the looks and randomize set it where it shows.
   { group: 'Smoke', key: 'source', label: 'source', type: 'choice', hidden: true,
     options: [['volume', 'volume'], ['plume', 'plume'], ['core', 'core']] },
+  // How the smoke moves. Not in the panel: the rebound look sets it. flow: the current carries it (every
+  // other look); rebound: it keeps its own momentum, thrown at the glass on every beat (simulation.js).
+  { group: 'Smoke', key: 'motion', label: 'motion', type: 'choice', hidden: true,
+    options: [['flow', 'flow'], ['rebound', 'rebound']] },
   { group: 'Smoke', key: 'flow', label: 'flow' },
   { group: 'Smoke', key: 'turbulence', label: 'turbulence' },
   { group: 'Smoke', key: 'twist', label: 'twist' },
@@ -47,7 +51,7 @@ export const controls = [
 
 // The studio look every other look starts from.
 const base = {
-  source: 'volume', flow: 0.45, turbulence: 0.5, twist: 0, spread: 0, gather: 0, pulse: 0, escape: 0, rebound: 0.5,
+  source: 'volume', motion: 'flow', flow: 0.45, turbulence: 0.5, twist: 0, spread: 0, gather: 0, pulse: 0, escape: 0, rebound: 0.5,
   brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.35,
   grain: 0.4, blur: 0, focus: 0.5, spin: 0.2, lens: 'depth', edges: 'white',
 };
@@ -81,11 +85,14 @@ export const presets = {
   ribbon: { ...original, flow: 0.32, turbulence: 0.22, gather: 0.7, pulse: 1, brightness: 0.53, shadows: 0.42, glow: 0.3, grain: 0.32 },
   // veil: slow sheets that fill the glass and touch every face.
   veil: { ...original, flow: 0.24, turbulence: 0.12, gather: 0, pulse: 0.35, brightness: 0.56, shadows: 0.45, glow: 0.22, grain: 0.24 },
+  // rebound: the clip as physics, on its camera. The smoke keeps its momentum and every beat throws it at
+  // the glass, where it slams, presses flat and springs back, for as long as it runs (simulation.js).
+  rebound: { ...original, motion: 'rebound', brightness: 0.55, shadows: 0.45, grain: 0.52 },
   smoke: {},
 };
 
 // The looks that start the camera where the reference clip starts (the original and its two shapes).
-export const clipLooks = ['original', 'ribbon', 'veil'];
+export const clipLooks = ['original', 'ribbon', 'veil', 'rebound'];
 
 export function presetValues(name) {
   return { ...base, ...presets[name] };
@@ -131,6 +138,8 @@ export function shuffled(state) {
     spread: 0,
     escape: 0,
     blur: 0,
+    // The families are the current's: a roll from the rebound look goes back to the flow.
+    motion: 'flow',
     rebound: r(0.3, 0.85),
     focus: r(0.3, 0.7),
   };
