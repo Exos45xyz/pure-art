@@ -417,6 +417,13 @@ canvas:active { cursor: grabbing; }
 @starting-style { .mine { opacity: 0; transform: scale(0.95); } }
 .chip-remove { padding: 0 7px; }
 .chip-remove[hidden] { display: none; }
+/* Your look on screen carries its download arrow joined to it, on the same white: one button in two parts,
+   a hairline between them. While it says it's done, a check takes the arrow's place. */
+.mine .chip[aria-pressed='true'] { border-radius: 6px 0 0 6px; }
+.mine .chip-get { margin-left: -2px; padding: 0 8px 0 7px; border-radius: 0 6px 6px 0; background: var(--strong); color: #0b0b0b; box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.14); }
+.mine .chip-get[hidden] { display: none; }
+.chip-get .look-icon { opacity: 1; }
+.chip-get.done .look-icon { display: none; }
 /* + save and + image: actions among choices, drawn as an outline */
 .chip-save, .chip-add { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
 /* Look chips: a small radius, like the panel's rows, and a line icon of the look's shape before the name */
@@ -577,7 +584,7 @@ canvas:active { cursor: grabbing; }
   .slider:hover .slider-label { color: var(--strong); }
   .row:hover .choice-option:not([aria-checked='true']):hover { color: var(--text); }
   .chip:hover { color: var(--strong); background: #1c1c1c; }
-  .chip[aria-pressed='true']:hover { background: #fff; color: #0b0b0b; }
+  .chip[aria-pressed='true']:hover, .mine .chip-get:hover { background: #fff; color: #0b0b0b; }
   .pill:hover { background: #222; }
   .disclosure:hover { background: var(--row-hover); color: var(--strong); }
   .pill-randomize:hover { background: rgba(255, 255, 255, 0.06); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }

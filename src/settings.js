@@ -111,7 +111,11 @@ export function presetValues(name) {
   return { ...base, ...presets[name] };
 }
 
-export const defaults = { ...presetValues('pure'), particles: 1024, format: 'screen', colour: 'white', length: 8, loop: 'loop', fps: 60 };
+// The colour the app opens in, and yours to start from: white that holds most of the way, then the
+// glacier blues, the deep blue under them and the charcoal of the rock they were sampled from (a picture of
+// ice on dark rock), which sinks into the black studio as the rock does in the picture.
+export const DEFAULT_GRADIENT = 'g:ffffff@0~90,5a89a1@48,3b637e@66,204058@84,2c2b2d@100';
+export const defaults = { ...presetValues('pure'), particles: 1024, format: 'screen', colour: DEFAULT_GRADIENT, length: 8, loop: 'loop', fps: 60 };
 for (const c of controls) c.default = defaults[c.key];
 
 const lookKeys = controls.filter((c) => c.look !== false).map((c) => c.key);
@@ -209,10 +213,6 @@ export function rgbAt(stops, at) {
   return x.map((v, k) => Math.round(v + (y[k] - v) * t));
 }
 export const hexOf = (rgb) => `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
-// Ice on dark rock, sampled from a reference picture light to dark: the icy crest, the glacier blues down
-// its most vivid third, the deep blue under them and the rock's charcoal, which sinks into the black studio
-// as the rock does in the picture.
-export const DEFAULT_GRADIENT = 'g:d0dce3@0,81a8bb@28,5a89a1@48,3b637e@66,204058@84,2c2b2d@100';
 // And as a plain colour, its glacier blue.
 export const DEFAULT_PLAIN = 'c:5a89a1';
 

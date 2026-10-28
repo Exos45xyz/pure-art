@@ -794,6 +794,12 @@ const dev = import.meta.env.DEV ? await import('./dev-data.js') : null;
 app.devLooks = dev?.devLooks() ?? null;
 const ui = createUI(app);
 dev?.mountDataToggle();
+// The smoke opens in your colour (the panel chose it: the blue gradient the app ships with, or the one
+// you made in this browser), on from the first frame rather than faded in.
+if (state.colour !== 'white') {
+  live.colourMix = 1;
+  useGradient(state.colour, false);
+}
 
 if (import.meta.env.DEV) {
   window.pureSmoke = {

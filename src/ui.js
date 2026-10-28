@@ -576,7 +576,8 @@ export function createUI(app) {
   for (const name of Object.keys(presets)) chips[name] = lookChip(name, name, () => applyLook(presetValues(name), name));
   const shuffle = (instant = false) => applyLook(shuffled(app.state), undefined, instant);
   // Your own looks: + save appears when the look on screen is new (which also says it isn't kept yet) and
-  // keeps it as a chip (mine 1, mine 2…), in this browser. The one on screen shows × beside it to remove it. Copy code turns any look into a preset for src/settings.js,
+  // keeps it as a chip (mine 1, mine 2…), in this browser. The one on screen carries a download arrow joined
+  // to it (that look alone, as a file upload takes back) and shows × beside it to remove it. Copy code turns any look into a preset for src/settings.js,
   // and the address bar link shares it with anyone.
   const MINE_KEY = 'pure-smoke-looks';
   const MAX_MINE = 6;
@@ -598,11 +599,15 @@ export function createUI(app) {
       // Clicked while it's the look on screen (a second click, or a double-click): its name opens to type.
       const chip = lookChip(m.name, 'mine', () => (chip.getAttribute('aria-pressed') === 'true' ? rename(m, chip) : applyLook(valuesOf(m), m.name)));
       chip.title = 'Click again to rename';
+      const get = h('button', {
+        type: 'button', class: 'chip chip-look chip-get', 'aria-label': `Download ${m.name}`, title: `Download ${m.name} as a file`, hidden: true,
+        onclick: () => downloadLook(m, get),
+      }, face('', icon('download')));
       const remove = h('button', {
         type: 'button', class: 'chip chip-look chip-remove', 'aria-label': `Remove ${m.name}`, title: `Remove ${m.name}`, hidden: true,
         onclick: () => forget(m),
       }, '×');
-      return { m, chip, remove, el: h('span', { class: 'mine' }, chip, remove) };
+      return { m, chip, get, remove, el: h('span', { class: 'mine' }, chip, get, remove) };
     });
     looksRow.replaceChildren(...Object.values(chips), ...mineChips.map((c) => c.el), saveChip);
     downloadButton.hidden = !mine.length;
@@ -611,10 +616,11 @@ export function createUI(app) {
   // Which of yours is on screen, and whether + save has anything new to keep.
   function showMine() {
     let found = false;
-    for (const { m, chip, remove } of mineChips) {
+    for (const { m, chip, get, remove } of mineChips) {
       const on = !found && sameLook(valuesOf(m), app.state);
       found ||= on;
       chip.setAttribute('aria-pressed', String(on));
+      get.hidden = !on;
       remove.hidden = !on;
     }
     const known = found || matchingPreset(app.state) !== undefined;
@@ -720,6 +726,13 @@ export function createUI(app) {
     tip.classList.remove('open');
     removeEventListener('pointerdown', hideDownloadTip, { capture: true });
     removeEventListener('keydown', escapeTip, { capture: true });
+  }
+  // One of yours alone, in the same file as all of them, so upload takes it back anywhere.
+  function downloadLook(m, button) {
+    hideDownloadTip();
+    const blob = new Blob([JSON.stringify({ app: 'pure-smoke', looks: [m] }, null, 2)], { type: 'application/json' });
+    download(blob, `pure-smoke-${m.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'look'}.json`);
+    sayIn(button, '', '');
   }
   function downloadLooks() {
     hideDownloadTip();
@@ -833,6 +846,8 @@ export function createUI(app) {
     try { localStorage.setItem(YOURS_KEY, JSON.stringify(kept)); } catch {}
   };
   const yoursValue = () => (yoursKind === 'plain' ? plain : gradient);
+  // The app opens in yours: the one you made here, or the gradient it ships with.
+  if (app.state.colour === DEFAULT_GRADIENT) app.state.colour = yoursValue();
   // As CSS: each colour where it sits, and where a blend's midpoint moved, a colour hint there.
   const cssGradient = (value) => {
     const stops = readGradient(value);
