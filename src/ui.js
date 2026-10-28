@@ -1581,12 +1581,15 @@ export function createUI(app) {
   const phone = () => matchMedia('(max-width: 720px)').matches;
   const brandEl = document.querySelector('.brand');
   const footEl = document.querySelector('.foot');
+  const creditEl = document.querySelector('.credit');
+  // What the cube's room starts under: the name, and on a phone the credit under it.
+  const topChrome = () => (phone() ? creditEl : brandEl);
 
   function reserve() {
     const shown = shownPanel();
     if (!shown) return { x: 0, y: 0 };
     // On a phone the cube sits in the band between the title and the sheet, clear of both.
-    if (phone()) return { x: 0, y: shown.offsetHeight + 8 - (brandEl.offsetTop + brandEl.offsetHeight) };
+    if (phone()) return { x: 0, y: shown.offsetHeight + 8 - (topChrome().offsetTop + topChrome().offsetHeight) };
     return { x: shown.offsetWidth + 16, y: 0 };
   }
 
@@ -1594,10 +1597,11 @@ export function createUI(app) {
   // space between the title, the footer and the panel. aspect: width / height.
   function frameBox(aspect) {
     const shown = shownPanel();
-    const top = brandEl.offsetTop + brandEl.offsetHeight + (phone() ? 16 : 24);
+    const top = topChrome().offsetTop + topChrome().offsetHeight + (phone() ? 16 : 24);
     let left = phone() ? 16 : 24;
     let right = innerWidth - (phone() ? 16 : 24);
-    let bottom = innerHeight - (phone() ? 16 : footEl.offsetHeight + 44);
+    // Above the footer, and above the credit when it stacks over the footer (a narrow window).
+    let bottom = phone() ? innerHeight - 16 : Math.min(footEl.getBoundingClientRect().top, creditEl.getBoundingClientRect().top) - 24;
     if (shown && phone()) bottom = innerHeight - shown.offsetHeight - 24;
     if (shown && !phone()) right = innerWidth - shown.offsetWidth - 40;
     const room = { w: Math.max(80, right - left), h: Math.max(80, bottom - top) };
@@ -1609,8 +1613,20 @@ export function createUI(app) {
   // The page's own chrome follows the panel: messages centre in the free space, and on a phone they
   // sit just above the sheet, where the eye already is.
   function placeChrome() {
-    document.body.style.setProperty('--reserve-x', `${reserve().x}px`);
+    const x = reserve().x;
+    document.body.style.setProperty('--reserve-x', `${x}px`);
     document.body.style.setProperty('--sheet', `${shownPanel()?.offsetHeight ?? 0}px`);
+    // The credit centres under the cube while it clears the footer's lines; in a narrow window it
+    // stacks over them on the left instead.
+    const freeCentre = (innerWidth - x) / 2;
+    const footRight = Math.max(...[...footEl.children].map((p) => footEl.offsetLeft + textWidth(p)));
+    document.body.classList.toggle('credit-stacked', !phone() && freeCentre - creditEl.offsetWidth / 2 < footRight + 32);
+  }
+  // A line's own width (a block paragraph is as wide as the footer).
+  function textWidth(el) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    return range.getBoundingClientRect().width;
   }
   addEventListener('resize', placeChrome);
   placeChrome();

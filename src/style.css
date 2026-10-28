@@ -133,16 +133,25 @@ canvas:active { cursor: grabbing; }
   pointer-events: none;
 }
 
-/* Designed by Pure Studio: the studio's wordmark, drawn in the interface's own white */
+/* Designed by Pure Studio: the studio's wordmark, drawn in the interface's own white, centred at the foot
+   of the free space beside the panel (under the cube, where the toasts centre too) */
 .designed {
   pointer-events: auto;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   width: fit-content;
-  margin-top: 6px;
   transition: opacity 200ms ease;
 }
+.credit {
+  position: fixed;
+  left: 0;
+  right: var(--reserve-x, 0px);
+  bottom: max(20px, env(safe-area-inset-bottom));
+  margin-inline: auto;
+}
+/* A narrow window: over the footer's two lines, on the left (ui.js placeChrome) */
+.credit-stacked .credit { left: max(20px, env(safe-area-inset-left)); right: auto; margin: 0; bottom: calc(max(20px, env(safe-area-inset-bottom)) + 44px); }
 .studio-logo {
   display: block;
   height: 11px;
@@ -161,16 +170,16 @@ canvas:active { cursor: grabbing; }
 }
 .foot a { transition: opacity 200ms ease; }
 
-.brand, .foot, .panel {
+.brand, .foot, .credit, .panel {
   opacity: 0;
   transform: translateY(6px);
   transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out);
 }
-.ready .brand, .ready .foot { opacity: 1; transform: none; }
+.ready .brand, .ready .foot, .ready .credit { opacity: 1; transform: none; }
 .ready .brand { transition-delay: 120ms; }
-.ready .foot { transition-delay: 240ms; }
+.ready .foot, .ready .credit { transition-delay: 240ms; }
 /* After the first entrance they answer at UI speed (the footer leaves and returns around a render). */
-.settled .brand, .settled .foot { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
+.settled .brand, .settled .foot, .settled .credit { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
 
 /* ---- Panel --------------------------------------------------------------------------------- */
 
@@ -514,7 +523,7 @@ canvas:active { cursor: grabbing; }
 .record-panel .rows[inert] { opacity: 0.4; }
 .text-button:disabled { opacity: 0.4; cursor: default; }
 /* While it renders, only the frame and the record window stay. */
-.rendering .reopen, .rendering .foot {
+.rendering .reopen, .rendering .foot, .rendering .credit {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -853,6 +862,8 @@ canvas:active { cursor: grabbing; }
   .record-panel { max-height: 64%; }
   .foot, .keys { display: none; }
   .brand { top: max(16px, env(safe-area-inset-top)); left: 16px; }
+  /* The sheet has the foot of a phone: the credit sits under the name instead */
+  .credit { top: calc(max(16px, env(safe-area-inset-top)) + 32px); bottom: auto; left: 16px; right: auto; margin: 0; }
   .reopen { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform-origin: bottom right; }
   .toast { bottom: calc(var(--sheet, 0px) + max(8px, env(safe-area-inset-bottom)) + 12px); left: 50%; }
   /* The sheet's grabber, and its head takes the finger (ui.js: drag down to put the sheet away) */
@@ -882,7 +893,7 @@ canvas:active { cursor: grabbing; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .brand, .foot, .panel, .ready .panel[data-hidden], .toast, .reopen { transform: none !important; }
+  .brand, .foot, .credit, .panel, .ready .panel[data-hidden], .toast, .reopen { transform: none !important; }
   .recording .rec-dot { animation: none; }
   /* Movement goes; opacity and colour stay. The die doesn't turn; it still lands on a new face. */
   .die { transform: none !important; }
