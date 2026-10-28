@@ -4,7 +4,7 @@ Particle smoke in a glass cube. Free and open source under the [MIT licence](LIC
 
 ![Pure Smoke: blue and white particle smoke inside a wireframe glass cube, under the Pure Art logo](public/og.png)
 
-**Play with it:** https://pure-art-smoke.vercel.app
+**Play with it:** https://pureart-xyz.vercel.app
 
 Most smoke on the web is a video. This one is alive.
 
