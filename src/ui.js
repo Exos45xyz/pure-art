@@ -15,10 +15,13 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
 // A button's face: an optional mark, a check (shown while the button says it's done) and its words.
 const TICK = '<svg viewBox="0 0 10 10" width="10" height="10"><path d="M1.6 5.3 4 7.6 8.4 2.7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-function face(words, ...marks) {
+function tickMark() {
   const tick = h('i', { class: 'tick', 'aria-hidden': 'true' });
   tick.innerHTML = TICK;
-  return h('span', { class: 'face' }, ...marks, tick, h('span', { class: 'words', 'aria-live': 'polite' }, words));
+  return tick;
+}
+function face(words, ...marks) {
+  return h('span', { class: 'face' }, ...marks, tickMark(), h('span', { class: 'words', 'aria-live': 'polite' }, words));
 }
 
 // A full-width row you drag anywhere on. Click jumps, drag scrubs, Shift is fine, double-click resets,
@@ -187,13 +190,12 @@ export function createUI(app) {
     syncAll(instant);
   };
 
-  // Looks
-  for (const name of Object.keys(presets)) {
-    chips[name] = h('button', { type: 'button', class: 'chip', onclick: () => applyLook(presetValues(name), name) }, name);
-  }
+  // Looks: a list, one row each in the panel's row style; the look on screen is brighter, with a check.
+  const lookItem = (name, onclick) => h('button', { type: 'button', class: 'look-item', onclick }, h('span', { class: 'look-name' }, name), tickMark());
+  for (const name of Object.keys(presets)) chips[name] = lookItem(name, () => applyLook(presetValues(name), name));
   const shuffle = (instant = false) => applyLook(shuffled(app.state), undefined, instant);
-  // Your own looks: + save keeps the look on screen as a chip (mine 1, mine 2…), in this browser. The one
-  // on screen shows × beside it to remove it. Copy code turns any look into a preset for src/settings.js,
+  // Your own looks, under the others: save this look keeps the look on screen (mine 1, mine 2…), in this
+  // browser. The one on screen shows × to remove it (any of them under a mouse). Copy code turns any look into a preset for src/settings.js,
   // and the address bar link shares it with anyone.
   const MINE_KEY = 'pure-smoke-looks';
   const MAX_MINE = 6;
@@ -203,21 +205,22 @@ export function createUI(app) {
   mine = mine.filter((m) => typeof m?.name === 'string' && m.values && typeof m.values === 'object').slice(0, MAX_MINE);
   const keepMine = () => { try { localStorage.setItem(MINE_KEY, JSON.stringify(mine)); } catch {} };
   const valuesOf = (m) => ({ ...presetValues('smoke'), ...m.values });
-  // Numbered after the highest kept, so the chips read in the order they were made.
+  // Numbered after the highest kept, so they read in the order they were made.
   const nextName = () => `mine ${Math.max(0, ...mine.map((m) => Number(m.name.match(/\d+$/)?.[0]) || 0)) + 1}`;
-  const saveChip = h('button', { type: 'button', class: 'chip chip-save', onclick: (e) => saveLook(e.detail === 0) }, '+ save');
-  const looksRow = h('div', { class: 'chips', role: 'group', 'aria-label': 'Look' });
+  const saveChip = h('button', { type: 'button', class: 'look-item look-save', onclick: (e) => saveLook(e.detail === 0) }, '+ save this look');
+  const yoursLabel = h('p', { class: 'micro looks-label' }, 'Yours');
+  const looksRow = h('div', { class: 'looks-list', role: 'group', 'aria-label': 'Look' });
   let mineChips = [];
   function drawMine() {
     mineChips = mine.map((m) => {
-      const chip = h('button', { type: 'button', class: 'chip', onclick: () => applyLook(valuesOf(m), m.name) }, m.name);
+      const chip = lookItem(m.name, () => applyLook(valuesOf(m), m.name));
       const remove = h('button', {
-        type: 'button', class: 'chip chip-remove', 'aria-label': `Remove ${m.name}`, hidden: true,
+        type: 'button', class: 'look-remove', 'aria-label': `Remove ${m.name}`, title: `Remove ${m.name}`, hidden: true,
         onclick: () => forget(m),
       }, '×');
-      return { m, chip, remove, el: h('span', { class: 'mine' }, chip, remove) };
+      return { m, chip, remove, el: h('div', { class: 'mine' }, chip, remove) };
     });
-    looksRow.replaceChildren(...Object.values(chips), ...mineChips.map((c) => c.el), saveChip);
+    looksRow.replaceChildren(...Object.values(chips), ...(mine.length ? [yoursLabel] : []), ...mineChips.map((c) => c.el), saveChip);
     downloadButton.hidden = !mine.length;
     showMine();
   }
@@ -232,7 +235,7 @@ export function createUI(app) {
     }
     const known = found || matchingPreset(app.state) !== undefined;
     saveChip.disabled = known || mine.length >= MAX_MINE;
-    saveChip.title = known ? 'This look is already a chip' : mine.length >= MAX_MINE ? 'Six looks kept: remove one to keep another' : 'Keep this look as a chip, in this browser';
+    saveChip.title = known ? 'This look is already in the list' : mine.length >= MAX_MINE ? 'Six looks kept: remove one to keep another' : 'Keep this look in the list, in this browser';
   }
   function saveLook(keyboard) {
     // A saved look keeps its colour, but not an uploaded image (it's gone once the page closes).
@@ -240,7 +243,7 @@ export function createUI(app) {
     mine.push(m);
     keepMine();
     drawMine();
-    // + save is now off (this look is a chip): keyboard focus goes to the new chip.
+    // Save is now off (this look is in the list): keyboard focus goes to the new row.
     if (keyboard) mineChips.at(-1).chip.focus();
   }
   function forget(m) {

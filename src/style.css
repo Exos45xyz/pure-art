@@ -301,8 +301,7 @@ canvas:active { cursor: grabbing; }
 /* The only control in its section: the section's title names it, so the options take the whole row. */
 .row.bare { grid-template-columns: 1fr; padding-left: 0; }
 
-/* Look chips and action pills: Enact's pill, lowercase */
-.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+/* Chips and action pills: Enact's pill, lowercase */
 .chip, .pill {
   height: 24px;
   padding: 0 9px;
@@ -318,14 +317,49 @@ canvas:active { cursor: grabbing; }
 }
 .chip[aria-pressed='true'] { background: var(--strong); color: #0b0b0b; }
 .chip:active, .pill:active { transform: scale(0.97); }
-/* Your own looks (ui.js): each chip with its remove button beside it while it's the look on screen, and
-   + save at the end. A new one grows in where it lands. */
-.mine { display: inline-flex; gap: 2px; transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out); }
-@starting-style { .mine { opacity: 0; transform: scale(0.95); } }
-.chip-remove { padding: 0 7px; }
-.chip-remove[hidden] { display: none; }
+/* Looks: a list in the panel's row style (ui.js). The look on screen is brighter, with a check; yours
+   come under their label, the one on screen with × to remove it, and save this look ends the list. */
+.looks-list { display: grid; gap: 2px; }
+.look-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  background: var(--row);
+  color: var(--text);
+  text-align: left;
+  text-transform: lowercase;
+  transition: transform 160ms var(--ease-pill);
+}
+.look-item:active { transform: scale(0.985); }
+.look-item[aria-pressed='true'] { background: #262626; color: var(--strong); }
+.look-item[aria-pressed='true'] .tick { display: block; }
+.look-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.looks-label { padding: 8px 2px 2px; color: #555; }
+.mine { position: relative; transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out); }
+@starting-style { .mine { opacity: 0; transform: translateY(-4px); } }
+.mine .look-item { padding-right: 34px; }
+.mine .look-item[aria-pressed='true'] .tick { display: none; }
+.look-remove {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.look-remove[hidden] { display: none; }
+.look-save { margin-top: 4px; background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14); }
+.look-save:disabled { opacity: 0.45; cursor: default; }
 /* + save and + image: actions among choices, drawn as an outline */
-.chip-save, .chip-add { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+.chip-add { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
 .head-actions { display: flex; gap: 12px; }
 .text-button .face { gap: 4px; }
 .text-button .tick { width: 8px; height: 8px; }
@@ -434,6 +468,11 @@ canvas:active { cursor: grabbing; }
   .pill-primary:hover { background: #fff; }
   .pill-primary.recording:hover { background: #222; }
   .text-button:hover { color: var(--strong); }
+  .look-item:hover { background: var(--row-hover); }
+  .look-item[aria-pressed='true']:hover { background: #262626; }
+  .look-save:not(:disabled):hover { background: transparent; color: var(--strong); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
+  .mine:hover .look-remove[hidden] { display: grid; }
+  .look-remove:hover { color: var(--strong); background: var(--row-hover); }
   .foot a:hover, .designed:hover { opacity: 0.7; }
 }
 
