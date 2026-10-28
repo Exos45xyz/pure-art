@@ -317,6 +317,14 @@ canvas:active { cursor: grabbing; }
 }
 .chip[aria-pressed='true'] { background: var(--strong); color: #0b0b0b; }
 .chip:active, .pill:active { transform: scale(0.97); }
+/* Your own looks (ui.js): each chip with its remove button beside it while it's the look on screen, and
+   + save at the end. A new one grows in where it lands. */
+.mine { display: inline-flex; gap: 2px; transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out); }
+@starting-style { .mine { opacity: 0; transform: scale(0.95); } }
+.chip-remove { padding: 0 7px; }
+.chip-remove[hidden] { display: none; }
+.chip-save { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+.chip:disabled { opacity: 0.4; cursor: default; }
 
 /* Save, record and copy: three equal buttons on one line */
 .actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
@@ -559,5 +567,5 @@ canvas:active { cursor: grabbing; }
   /* Movement goes; opacity and colour stay. The die doesn't turn; it still lands on a new face. */
   .die { transform: none !important; }
   .choice-thumb, .gliding .slider-fill, .chevron { transition: none; }
-  .tune { transform: none !important; }
+  .tune, .mine { transform: none !important; }
 }

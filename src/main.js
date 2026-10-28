@@ -17,7 +17,7 @@ import { compileAhead } from './compile.js';
 import { createCube } from './cube.js';
 import { GradeShader } from './grade.js';
 import { createSimulation } from './simulation.js';
-import { ORIGINAL_PULSE, breathAt, readHash, spinRate, writeHash } from './settings.js';
+import { ORIGINAL_PULSE, breathAt, clipLooks, readHash, spinRate, writeHash } from './settings.js';
 import { createLighting, createSmoke } from './smoke.js';
 import { createUI } from './ui.js';
 import { createView } from './view.js';
@@ -619,9 +619,9 @@ const app = {
   },
   apply(values, look) {
     for (const [key, value] of Object.entries(values)) if (key !== 'particles' && key !== 'format') state[key] = value;
-    // The original look starts the camera where the reference clip starts. Both moves crossfade.
+    // The original looks start the camera where the reference clip starts. Both moves crossfade.
     if (state.lens !== view.lens) cut.pending = { ...cut.pending, lens: state.lens };
-    if (look === 'original') cut.pending = { ...cut.pending, original: true };
+    if (clipLooks.includes(look)) cut.pending = { ...cut.pending, original: true };
     writeHash(state);
   },
   // Colour the grains from an image file, in the image's own proportions.

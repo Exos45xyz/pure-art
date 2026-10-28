@@ -52,7 +52,14 @@ const base = {
 };
 
 // "original" is the reference clip's camera (flat lens, 16.85° down, 62.66°/s) and red edges.
-// See README › The original look.
+// See README › The original look. The reference clip's camera, edges and breath, with pure's smoke and
+// particles: the clip's own speed (flow 1) washes the strands into fog, so the smoke keeps pure's pace.
+const original = {
+  flow: 0.45, turbulence: 0.51, spread: 0, gather: 0.98, pulse: 1, escape: 0,
+  brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.42,
+  grain: 0.4, blur: 0, focus: 0.5, spin: 0.5, lens: 'flat', edges: 'red',
+};
+
 export const presets = {
   // Romain's look: the clip's breath through a depth lens, fine filaments, sharp grains, sealed glass.
   pure: {
@@ -60,19 +67,20 @@ export const presets = {
     brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.42,
     grain: 0.4, blur: 0, focus: 0.5, spin: 0.13, lens: 'depth', edges: 'white',
   },
-  // The reference clip's camera, edges and breath, with pure's smoke and particles: the clip's own
-  // speed (flow 1) washes the strands into fog, so the smoke keeps pure's pace.
-  original: {
-    flow: 0.45, turbulence: 0.51, spread: 0, gather: 0.98, pulse: 1, escape: 0,
-    brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.42,
-    grain: 0.4, blur: 0, focus: 0.5, spin: 0.5, lens: 'flat', edges: 'red',
-  },
+  original,
+  // Three other shapes for the original's camera, breath and red edges, chosen from ten by rendering
+  // each over 30 s and scoring it (crisp strands, smooth motion), and each its own shape the whole time.
+  // ribbon: bright bands arcing around a breathing body.
+  ribbon: { ...original, flow: 0.32, turbulence: 0.22, gather: 0.7, pulse: 1, brightness: 0.53, shadows: 0.42, glow: 0.3, grain: 0.32 },
+  // veil: slow sheets that fill the glass and touch every face.
+  veil: { ...original, flow: 0.24, turbulence: 0.12, gather: 0, pulse: 0.35, brightness: 0.56, shadows: 0.45, glow: 0.22, grain: 0.24 },
+  // thread: loose loops of thread floating in the middle, with air all round.
+  thread: { ...original, flow: 0.2, turbulence: 0.1, gather: 0.15, pulse: 0.35, brightness: 0.55, shadows: 0.45, glow: 0.24, grain: 0.24 },
   smoke: {},
-  storm: { flow: 0.82, turbulence: 0.92, shadows: 0.78, glow: 0.5, brightness: 0.46, grain: 0.32 },
-  silk: { flow: 0.22, turbulence: 0.12, escape: 0, shadows: 0.42, glow: 0.22, brightness: 0.58, grain: 0.22, spin: 0.15 },
-  plume: { source: 'plume', flow: 0.55, turbulence: 0.55, shadows: 0.7, glow: 0.4 },
-  core: { source: 'core', flow: 0.6, turbulence: 0.72, shadows: 0.72, glow: 0.45, brightness: 0.55 },
 };
+
+// The looks that start the camera where the reference clip starts (the original and its three shapes).
+export const clipLooks = ['original', 'ribbon', 'veil', 'thread'];
 
 export function presetValues(name) {
   return { ...base, ...presets[name] };
@@ -83,11 +91,14 @@ for (const c of controls) c.default = defaults[c.key];
 
 const lookKeys = controls.filter((c) => c.look !== false).map((c) => c.key);
 
+// The look in a state: every control a look sets (not the colour, the count or the output).
+export function lookOf(state) {
+  return Object.fromEntries(lookKeys.map((key) => [key, state[key]]));
+}
+export const sameLook = (a, b) => lookKeys.every((key) => a[key] === b[key]);
+
 export function matchingPreset(state) {
-  return Object.keys(presets).find((name) => {
-    const look = presetValues(name);
-    return lookKeys.every((key) => look[key] === state[key]);
-  });
+  return Object.keys(presets).find((name) => sameLook(presetValues(name), state));
 }
 
 // Randomize: every roll is one of the smoke's beautiful families, varied only inside the ranges where it

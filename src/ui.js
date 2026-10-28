@@ -1,4 +1,4 @@
-import { controls, defaults, lookCode, matchingPreset, presets, presetValues, shuffled } from './settings.js';
+import { controls, defaults, lookCode, lookOf, matchingPreset, presets, presetValues, sameLook, shuffled } from './settings.js';
 
 const h = (tag, attrs = {}, ...children) => {
   const el = document.createElement(tag);
@@ -152,6 +152,7 @@ export function createUI(app) {
   const refresh = () => {
     const active = matchingPreset(app.state);
     for (const [name, chip] of Object.entries(chips)) chip.setAttribute('aria-pressed', String(name === active));
+    showMine();
     // A control that only works with another one (focus needs blur) rests until that one is on.
     for (const { el, control } of fields) {
       if (!control.needs) continue;
@@ -180,9 +181,63 @@ export function createUI(app) {
     chips[name] = h('button', { type: 'button', class: 'chip', onclick: () => applyLook(presetValues(name), name) }, name);
   }
   const shuffle = (instant = false) => applyLook(shuffled(app.state), undefined, instant);
-  const look = h('section', {},
-    h('h2', { class: 'micro' }, 'Look'),
-    h('div', { class: 'chips', role: 'group', 'aria-label': 'Look' }, Object.values(chips)));
+  // Your own looks: + save keeps the look on screen as a chip (mine 1, mine 2…), in this browser. The one
+  // on screen shows × beside it to remove it. Copy code turns any look into a preset for src/settings.js,
+  // and the address bar link shares it with anyone.
+  const MINE_KEY = 'pure-smoke-looks';
+  const MAX_MINE = 6;
+  let mine = [];
+  try { mine = JSON.parse(localStorage.getItem(MINE_KEY)) ?? []; } catch {}
+  if (!Array.isArray(mine)) mine = [];
+  mine = mine.filter((m) => typeof m?.name === 'string' && m.values && typeof m.values === 'object').slice(0, MAX_MINE);
+  const keepMine = () => { try { localStorage.setItem(MINE_KEY, JSON.stringify(mine)); } catch {} };
+  const valuesOf = (m) => ({ ...presetValues('smoke'), ...m.values });
+  // Numbered after the highest kept, so the chips read in the order they were made.
+  const nextName = () => `mine ${Math.max(0, ...mine.map((m) => Number(m.name.match(/\d+$/)?.[0]) || 0)) + 1}`;
+  const saveChip = h('button', { type: 'button', class: 'chip chip-save', onclick: (e) => saveLook(e.detail === 0) }, '+ save');
+  const looksRow = h('div', { class: 'chips', role: 'group', 'aria-label': 'Look' });
+  let mineChips = [];
+  function drawMine() {
+    mineChips = mine.map((m) => {
+      const chip = h('button', { type: 'button', class: 'chip', onclick: () => applyLook(valuesOf(m), m.name) }, m.name);
+      const remove = h('button', {
+        type: 'button', class: 'chip chip-remove', 'aria-label': `Remove ${m.name}`, hidden: true,
+        onclick: () => forget(m),
+      }, '×');
+      return { m, chip, remove, el: h('span', { class: 'mine' }, chip, remove) };
+    });
+    looksRow.replaceChildren(...Object.values(chips), ...mineChips.map((c) => c.el), saveChip);
+    showMine();
+  }
+  // Which of yours is on screen, and whether + save has anything new to keep.
+  function showMine() {
+    let found = false;
+    for (const { m, chip, remove } of mineChips) {
+      const on = !found && sameLook(valuesOf(m), app.state);
+      found ||= on;
+      chip.setAttribute('aria-pressed', String(on));
+      remove.hidden = !on;
+    }
+    const known = found || matchingPreset(app.state) !== undefined;
+    saveChip.disabled = known || mine.length >= MAX_MINE;
+    saveChip.title = known ? 'This look is already a chip' : mine.length >= MAX_MINE ? 'Six looks kept: remove one to keep another' : 'Keep this look as a chip, in this browser';
+  }
+  function saveLook(keyboard) {
+    const m = { name: nextName(), values: lookOf(app.state) };
+    mine.push(m);
+    keepMine();
+    drawMine();
+    // + save is now off (this look is a chip): keyboard focus goes to the new chip.
+    if (keyboard) mineChips.at(-1).chip.focus();
+  }
+  function forget(m) {
+    mine = mine.filter((x) => x !== m);
+    keepMine();
+    drawMine();
+    saveChip.focus({ preventScroll: true });
+  }
+  const look = h('section', {}, h('h2', { class: 'micro' }, 'Look'), looksRow);
+  drawMine();
 
   // Actions
   const save = h('button', { type: 'button', class: 'pill pill-wide', onclick: () => saveImage() }, face('save image'));
