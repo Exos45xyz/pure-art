@@ -1,6 +1,6 @@
 # Pure Smoke
 
-Particle smoke in a glass cube. Free, open source, made with three.js.
+Particle smoke in a glass cube. Free and open source under the [MIT licence](LICENSE), made with three.js.
 
 ![Pure Smoke: blue and white particle smoke inside a wireframe glass cube, under the Pure Art logo](public/og.png)
 
