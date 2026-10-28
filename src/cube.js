@@ -2,11 +2,16 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  DataTexture,
   DoubleSide,
+  LinearFilter,
   Group,
   Mesh,
   NormalBlending,
+  RGBAFormat,
+  SRGBColorSpace,
   ShaderMaterial,
+  UnsignedByteType,
   Vector2,
   Vector3,
 } from 'three';
@@ -26,6 +31,9 @@ const colors = { white: new Color(1, 1, 1), red: new Color(0.82, 0.021, 0.105), 
 // Any other edge colour is one picked in the panel (#rrggbb, read as a screen colour).
 const picked = new Color();
 const colourOf = (choice) => colors[choice] ?? (/^#[0-9a-f]{6}$/i.test(choice) ? picked.set(choice) : colors.white);
+// The choice "smoke": the smoke's colours as one gradient (main.js edgeRamp), running down the cube, its
+// first colour at the top. Read as screen colours, as a picked colour is.
+export const RAMP = 256;
 
 const vertexShader = /* glsl */ `
   attribute vec3 other;
@@ -66,6 +74,8 @@ const vertexShader = /* glsl */ `
 
 const fragmentShader = /* glsl */ `
   uniform vec3 uColor;
+  uniform sampler2D uRamp;
+  uniform float uRampMix;
   uniform float uOpacity;
   uniform float uExposure;
   varying float vAcross;
@@ -89,7 +99,9 @@ const fragmentShader = /* glsl */ `
     shade = mix(shade, shade * shade * (3.0 - 2.0 * shade), 0.3);
     float a = clamp(core * seenThrough(vPoint) * uOpacity, 0.0, 1.0);
     if (a <= 0.002) discard;
-    gl_FragColor = vec4(uColor * shade, a);
+    vec3 tint = uColor;
+    if (uRampMix > 0.0) tint = mix(uColor, texture2D(uRamp, vec2(0.5 - 0.5 * vPoint.y, 0.5)).rgb, uRampMix);
+    gl_FragColor = vec4(tint * shade, a);
   }`;
 
 function edgeGeometry(a, b) {
@@ -110,12 +122,18 @@ function edgeGeometry(a, b) {
 
 // lighting: from createLighting (smoke.js), shared with the grains.
 export function createCube(lighting) {
+  const ramp = new DataTexture(new Uint8Array(RAMP * 4).fill(255), RAMP, 1, RGBAFormat, UnsignedByteType);
+  ramp.colorSpace = SRGBColorSpace;
+  ramp.minFilter = ramp.magFilter = LinearFilter;
+  ramp.needsUpdate = true;
   // DoubleSide: the strips are flat on the screen, so which way they wind must never hide them.
   const material = new ShaderMaterial({
     vertexShader, fragmentShader, side: DoubleSide,
     uniforms: {
       ...lighting.uniforms,
       uColor: { value: new Color() },
+      uRamp: { value: ramp },
+      uRampMix: { value: 0 },
       uOpacity: { value: 1 },
       uExposure: { value: 1 },
       uWidth: { value: 1.4 },
@@ -149,6 +167,7 @@ export function createCube(lighting) {
 
   const color = colors.white.clone();
   let strength = 1;
+  let rampMix = 0;
   const toCamera = new Vector3();
   const view = new Vector3();
 
@@ -159,13 +178,23 @@ export function createCube(lighting) {
       material.uniforms.uResolution.value.set(width, height);
       material.uniforms.uWidth.value = lineWidth;
     },
+    // The smoke's colours for the choice "smoke": RAMP colours, top to bottom, as rgb bytes.
+    setRamp(rgb) {
+      const data = ramp.image.data;
+      for (let i = 0; i < RAMP; i++) data.set(rgb.subarray(i * 3, i * 3 + 3), i * 4);
+      ramp.needsUpdate = true;
+    },
     // Called every frame with the edge choice, the camera and the smoke's exposure. dt = Infinity jumps
     // straight to the choice.
     update(choice, camera, dt, exposure) {
       const k = dt === Infinity ? 1 : 1 - Math.exp(-dt * 12);
       if (choice !== 'off') color.lerp(colourOf(choice), k);
       strength += ((choice === 'off' ? 0 : 1) - strength) * k;
+      // Off fades the edges in the colours they wore.
+      if (choice !== 'off') rampMix += ((choice === 'smoke' ? 1 : 0) - rampMix) * k;
+      if (rampMix < 0.001) rampMix = 0;
       material.uniforms.uColor.value.copy(color);
+      material.uniforms.uRampMix.value = rampMix;
       material.uniforms.uOpacity.value = strength;
       material.uniforms.uExposure.value = exposure;
       group.visible = strength > 0.005;

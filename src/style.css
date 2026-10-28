@@ -95,12 +95,33 @@ canvas:active { cursor: grabbing; }
 .pure-art {
   display: block;
   height: 40px;
-  aspect-ratio: 1200 / 372;
+  aspect-ratio: 1200 / 375;
   background: var(--strong);
   -webkit-mask: url(/pure-art.png) no-repeat center / contain;
   mask: url(/pure-art.png) no-repeat center / contain;
 }
-.loader .pure-art { height: 48px; }
+/* On the loading screen the lettering stays and the dragon flies: it sways in a wave that runs from its
+   head down its body to its tail, as a dragon dances in the air, while it rises and sinks a little. It is
+   24 bands of the dragon, each on its own clock a beat behind the one above; transforms only, so it keeps
+   flying while the page is busy building the smoke. */
+.loader .logo { --h: 48px; position: relative; }
+.loader .pure-art { height: var(--h); }
+.pure-art.name { -webkit-mask-image: url(/pure-art-name.png); mask-image: url(/pure-art-name.png); }
+.flight { position: absolute; inset: 0; transform-origin: 82% 50%; animation: soar 2.6s ease-in-out -1.3s infinite alternate; }
+.flight i {
+  position: absolute;
+  left: 0;
+  width: calc(var(--h) * 1200 / 375);
+  top: calc(var(--i) * var(--h) / 24);
+  height: calc(var(--h) / 24 + 0.5px);
+  background: var(--strong);
+  -webkit-mask: url(/pure-art-dragon.png) no-repeat 0 calc(var(--i) * var(--h) / -24) / calc(var(--h) * 1200 / 375) var(--h);
+  mask: url(/pure-art-dragon.png) no-repeat 0 calc(var(--i) * var(--h) / -24) / calc(var(--h) * 1200 / 375) var(--h);
+  animation: sway 1.4s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * 0.11s - 6s);
+}
+@keyframes sway { from { transform: translateX(-2px); } to { transform: translateX(2px); } }
+@keyframes soar { from { transform: translateY(1.5px) rotate(-1.5deg); } to { transform: translateY(-1.5px) rotate(1.5deg); } }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 .micro {
@@ -172,12 +193,16 @@ canvas:active { cursor: grabbing; }
   gap: 6px;
   pointer-events: none;
 }
-.credit a { pointer-events: auto; transition: opacity 200ms ease; }
+.credit a, .foot a { pointer-events: auto; transition: opacity 200ms ease; }
+/* Where the code lives, at the bottom left, level with the credit; in a window too narrow for both on one
+   row, it goes under the credit, centred, and the credit rises a line (ui.js placeChrome) */
+.foot { position: fixed; left: max(20px, env(safe-area-inset-left)); bottom: max(20px, env(safe-area-inset-bottom)); }
+.credit-stacked .foot { left: 0; right: var(--reserve-x, 0px); margin-inline: auto; width: fit-content; }
+.credit-stacked .credit { bottom: calc(max(20px, env(safe-area-inset-bottom)) + 18px); }
+.credit-stacked .toast { bottom: calc(max(20px, env(safe-area-inset-bottom)) + 76px); }
 .sheet-credit { display: none; }
 .sheet-credit a { transition: opacity 200ms ease; }
 .designed { display: inline-flex; align-items: center; gap: 8px; }
-/* A narrow window: over the footer's line, on the left (ui.js placeChrome) */
-.credit-stacked .credit { left: max(20px, env(safe-area-inset-left)); right: auto; margin: 0; justify-items: start; bottom: calc(max(20px, env(safe-area-inset-bottom)) + 26px); }
 .studio-logo {
   display: block;
   height: 11px;
@@ -187,13 +212,8 @@ canvas:active { cursor: grabbing; }
   mask: url(/pure-studio.svg) no-repeat center / contain;
 }
 
-.foot {
-  position: fixed;
-  left: max(20px, env(safe-area-inset-left));
-  bottom: max(20px, env(safe-area-inset-bottom));
-  display: grid;
-  gap: 6px;
-}
+/* The hints lead the foot, a little apart from the credit under them */
+.credit .hint { margin-bottom: 8px; }
 /* Each hint has the gesture's icon, in the panel's line style. The first few times you do what one says,
    it lights: at once when the hand starts, gently back when it stops (ui.js lightHints). */
 .hint [data-hint] { display: inline-flex; align-items: center; gap: 5px; vertical-align: top; transition: color 400ms ease; }
@@ -205,18 +225,18 @@ canvas:active { cursor: grabbing; }
 .out { display: inline-flex; align-items: center; gap: 3px; }
 .out svg { width: 7px; height: 7px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; color: var(--strong); transition: transform 160ms var(--ease-out); }
 
-.brand, .foot, .credit, .panel {
+.brand, .credit, .foot, .panel {
   opacity: 0;
   transform: translateY(6px);
   transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out);
 }
-.ready .brand, .ready .foot, .ready .credit { opacity: 1; transform: none; }
+.ready .brand, .ready .credit, .ready .foot { opacity: 1; transform: none; }
 .ready .brand { transition-delay: 120ms; }
-.ready .foot, .ready .credit { transition-delay: 240ms; }
+.ready .credit, .ready .foot { transition-delay: 240ms; }
 /* After the first entrance they answer at UI speed (the footer leaves and returns around a render). */
-.settled .brand, .settled .foot, .settled .credit { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
+.settled .brand, .settled .credit, .settled .foot { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
 /* A link pressed by a finger dims as it does under the pointer */
-.ready .credit a:active, .sheet-credit a:active { opacity: 0.7; transition-duration: 100ms; }
+.ready .credit a:active, .ready .foot a:active, .sheet-credit a:active { opacity: 0.7; transition-duration: 100ms; }
 
 /* ---- Panel --------------------------------------------------------------------------------- */
 
@@ -410,7 +430,43 @@ canvas:active { cursor: grabbing; }
 /* A look of yours being named: the chip as a field, in its selected colours */
 .chip-name { border: 0; outline: none; font: inherit; background: var(--strong); color: #0b0b0b; text-transform: lowercase; cursor: text; }
 /* Wide enough apart that the icons' hit margins (8 px, 12 px for a finger) only meet */
-.head-actions { display: flex; gap: 16px; }
+.head-actions { position: relative; display: flex; gap: 16px; }
+/* The bubble under the download arrow, the first time you keep a look (ui.js): it grows a little out of
+   the arrow it points at and fades, quick in and quicker out. --arrow: the arrow's centre from the right. */
+.tip {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: -4px;
+  z-index: 3;
+  width: max-content;
+  max-width: 200px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #1f1f1f;
+  box-shadow: var(--lift);
+  color: var(--strong);
+  font: 400 11px/1.4 var(--sans);
+  text-transform: none;
+  letter-spacing: 0;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.97);
+  transform-origin: calc(100% - var(--arrow, 30px) - 4px) -6px;
+  transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out), visibility 0s linear 120ms;
+}
+.tip::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  right: calc(var(--arrow, 30px) + 4px - 4px);
+  width: 8px;
+  height: 8px;
+  background: inherit;
+  transform: rotate(45deg);
+  border-radius: 1px;
+}
+.tip.open { opacity: 1; visibility: visible; transform: none; transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out); }
 @media (pointer: coarse) { .head-actions { gap: 24px; } }
 .text-button .face { gap: 4px; }
 /* The heads' icon buttons (ui.js: hide, back, download, upload): a 12 px line icon in the muted colour, the
@@ -529,7 +585,7 @@ canvas:active { cursor: grabbing; }
   .pill-primary.recording:hover { background: #222; }
   .text-button:hover { color: var(--strong); }
   .toast-action:hover { background: #363636; }
-  .credit a:hover, .sheet-credit a:hover { opacity: 0.7; }
+  .credit a:hover, .foot a:hover, .sheet-credit a:hover { opacity: 0.7; }
   .out:hover svg { transform: translate(1px, -1px); }
 }
 
@@ -571,7 +627,7 @@ canvas:active { cursor: grabbing; }
 .record-panel .rows[inert] { opacity: 0.4; }
 .text-button:disabled { opacity: 0.4; cursor: default; }
 /* While it renders, only the frame and the record window stay. */
-.rendering .reopen, .rendering .foot, .rendering .credit {
+.rendering .reopen, .rendering .credit, .rendering .foot {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -826,10 +882,10 @@ canvas:active { cursor: grabbing; }
 }
 .dropping .dropzone { opacity: 1; transition: opacity 200ms var(--ease-out); }
 
-/* Toast, centred in the space the panel leaves, above the footer (on a narrower screen they would meet) */
+/* Toast, centred in the space the panel leaves, above the hints and the credit */
 .toast {
   position: fixed;
-  bottom: calc(max(20px, env(safe-area-inset-bottom)) + 42px);
+  bottom: calc(max(20px, env(safe-area-inset-bottom)) + 58px);
   left: calc((100% - var(--reserve-x, 0px)) / 2);
   /* Its own width (a fixed box whose left sits mid-screen would otherwise wrap at half the screen), up to
      the screen less a margin, where a long message wraps instead of running off */
@@ -946,10 +1002,11 @@ canvas:active { cursor: grabbing; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .brand, .foot, .credit, .panel, .ready .panel[data-hidden], .toast, .reopen { transform: none !important; }
+  .brand, .credit, .foot, .panel, .ready .panel[data-hidden], .toast, .reopen { transform: none !important; }
   .recording .rec-dot { animation: none; }
+  .flight, .flight i { animation: none; }
   /* Movement goes; opacity and colour stay. The die doesn't turn; it still lands on a new face. */
   .die { transform: none !important; }
   .choice-lit, .gliding .slider-fill, .slider.jump .slider-fill, .chevron { transition: none; }
-  .tune, .mine, .picker, .grad-stop { transform: none !important; }
+  .tune, .mine, .picker, .grad-stop, .tip { transform: none !important; }
 }

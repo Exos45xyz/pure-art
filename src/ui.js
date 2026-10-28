@@ -409,13 +409,15 @@ function edgeColours() {
   return edgePicker;
 }
 
-// The cube's edges: white, a colour of your own, or off, as small discs in their row. Your colour opens the
-// colour picker beside it and the cube follows live as you pick; it is remembered for next time.
+// The cube's edges: white, the smoke's colours, a colour of your own, or off, as small discs in their row.
+// The smoke's disc wears the gradient the edges would take, and shows only while the smoke has colours
+// (or the edges wear it). Your colour opens the colour picker beside it and the cube follows live as you
+// pick; it is remembered for next time.
 const EDGE_KEY = 'pure-smoke-edge-colour';
 function edgeField(control, app, onChange) {
   let yours = '#8ab4ff';
   try { yours = readHex(localStorage.getItem(EDGE_KEY) ?? '') ?? yours; } catch {}
-  const names = { white: 'white edges', colour: 'edges in your colour', off: 'no edges' };
+  const names = { white: 'white edges', smoke: 'edges in the smoke\'s colours', colour: 'edges in your colour', off: 'no edges' };
   const orbs = {};
   for (const [kind, label] of Object.entries(names)) {
     orbs[kind] = h('button', {
@@ -455,7 +457,7 @@ function edgeField(control, app, onChange) {
       done: () => { try { localStorage.setItem(EDGE_KEY, yours); } catch {} },
     });
   }
-  const kindOf = (v) => (v === 'white' || v === 'off' ? v : 'colour');
+  const kindOf = (v) => (v === 'white' || v === 'off' || v === 'smoke' ? v : 'colour');
   function sync() {
     const v = app.state[control.key];
     const on = kindOf(v);
@@ -470,7 +472,7 @@ function edgeField(control, app, onChange) {
     const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
     if (!d) return;
     e.preventDefault();
-    const kinds = Object.keys(orbs);
+    const kinds = Object.keys(orbs).filter((k) => !orbs[k].hidden);
     const next = kinds[(kinds.indexOf(kind) + d + kinds.length) % kinds.length];
     orbs[next].focus();
     if (next !== 'colour') edgePicker?.close({ instant: true });
@@ -478,8 +480,20 @@ function edgeField(control, app, onChange) {
   }
   const el = h('div', { class: 'row', title: control.hint },
     h('span', { class: 'row-label' }, control.label),
-    h('div', { class: 'edge-orbs', role: 'radiogroup', 'aria-label': control.label }, orbs.white, orbs.colour, orbs.off));
-  return { el, sync };
+    h('div', { class: 'edge-orbs', role: 'radiogroup', 'aria-label': control.label }, orbs.white, orbs.smoke, orbs.colour, orbs.off));
+  // The smoke's colours (main.js edgeRamp), top to bottom, on its disc; white smoke has none to show.
+  let smokeWhite = true;
+  function showRamp(rgb, white) {
+    const at = (i) => `rgb(${rgb[i * 3]} ${rgb[i * 3 + 1]} ${rgb[i * 3 + 2]})`;
+    const n = rgb.length / 3;
+    const stops = Array.from({ length: 9 }, (_, k) => `${at(Math.round((k / 8) * (n - 1)))} ${k * 12.5}%`);
+    orbs.smoke.firstChild.style.background = `linear-gradient(180deg, ${stops.join(', ')})`;
+    smokeWhite = white;
+    hideSmoke();
+  }
+  const hideSmoke = () => { orbs.smoke.hidden = smokeWhite && app.state[control.key] !== 'smoke'; };
+  const syncAll = sync;
+  return { el, sync: () => { syncAll(); hideSmoke(); }, showRamp };
 }
 
 export function createUI(app) {
@@ -616,6 +630,7 @@ export function createUI(app) {
     drawMine();
     // + save is now gone (this look is a chip): keyboard focus goes to the new chip.
     if (keyboard) mineChips.at(-1).chip.focus();
+    if (mine.length === 1) showDownloadTip();
   }
   // Name one of yours: the chip becomes a field in its place, Enter or a click away keeps the name,
   // Escape leaves it as it was. Names stay short (24) and their own (a taken one gets a number).
@@ -677,7 +692,37 @@ export function createUI(app) {
   // Icons, so they don't read as labels beside the section's title; each says what it did in words.
   const downloadButton = h('button', { type: 'button', class: 'text-button micro icon-button', title: 'Download your looks as a file', 'aria-label': 'download your looks', onclick: () => downloadLooks() }, face('', icon('download')));
   const uploadButton = h('button', { type: 'button', class: 'text-button micro icon-button', title: 'Upload a file of looks you downloaded', 'aria-label': 'upload looks', onclick: () => looksFile.click() }, face('', icon('upload')));
+  // The first look you keep, the download arrow appears: a bubble under it says where your looks live and
+  // how to keep them anywhere. Once per browser. It goes on its own after a few seconds, at a click or
+  // Escape, or when you download.
+  const TIP_KEY = 'pure-smoke-download-tip';
+  const tip = h('span', { class: 'tip', role: 'status' });
+  let tipTimer = 0;
+  function showDownloadTip() {
+    try {
+      if (localStorage.getItem(TIP_KEY)) return;
+      localStorage.setItem(TIP_KEY, '1');
+    } catch { return; }
+    const actions = downloadButton.parentElement;
+    tip.style.setProperty('--arrow', `${actions.offsetWidth - downloadButton.offsetLeft - downloadButton.offsetWidth / 2}px`);
+    tip.textContent = 'Kept in this browser. Download to keep your looks anywhere.';
+    tip.classList.add('open');
+    tipTimer = setTimeout(hideDownloadTip, 6000);
+    // From the next press on: the one that kept the look is over.
+    setTimeout(() => {
+      addEventListener('pointerdown', hideDownloadTip, { capture: true });
+      addEventListener('keydown', escapeTip, { capture: true });
+    });
+  }
+  function escapeTip(e) { if (e.key === 'Escape') hideDownloadTip(); }
+  function hideDownloadTip() {
+    clearTimeout(tipTimer);
+    tip.classList.remove('open');
+    removeEventListener('pointerdown', hideDownloadTip, { capture: true });
+    removeEventListener('keydown', escapeTip, { capture: true });
+  }
   function downloadLooks() {
+    hideDownloadTip();
     const blob = new Blob([JSON.stringify({ app: 'pure-smoke', looks: mine }, null, 2)], { type: 'application/json' });
     download(blob, `pure-smoke-looks-${stamp()}.json`);
     sayIn(downloadButton, 'downloaded', '');
@@ -705,7 +750,7 @@ export function createUI(app) {
     else toast(full ? 'six looks kept: remove one to add more' : 'those looks are already here');
   }
   const look = h('section', {},
-    h('div', { class: 'section-head' }, h('h2', { class: 'micro' }, 'Look'), h('span', { class: 'head-actions' }, downloadButton, uploadButton)),
+    h('div', { class: 'section-head' }, h('h2', { class: 'micro' }, 'Look'), h('span', { class: 'head-actions' }, downloadButton, uploadButton, tip)),
     looksRow, looksFile);
   drawMine();
 
@@ -746,8 +791,12 @@ export function createUI(app) {
   // a disc of its own picture). Yours, pressed again while worn, open again: the gradient its editor, the
   // image the choice of another. The colour worn has a ring and its name by the title; an image's main
   // colours show below at the share of the picture each covers, the proportions the smoke wears them in.
+  // "image/*" makes Chrome on a Mac look up every image type the system knows before its dialog opens
+  // (seconds); naming the types a browser can read opens it at once. A touch screen keeps image/*, which
+  // brings its photo library.
+  const imageTypes = matchMedia('(pointer: coarse)').matches ? 'image/*' : 'image/png,image/jpeg,image/webp,image/gif,image/avif';
   const fileInput = h('input', {
-    type: 'file', accept: 'image/*', hidden: true,
+    type: 'file', accept: imageTypes, hidden: true,
     onchange: () => {
       if (fileInput.files[0]) loadImage(fileInput.files[0]);
       fileInput.value = '';
@@ -1583,8 +1632,8 @@ export function createUI(app) {
   const shownPanel = () => (recordOpen ? recordPanel : panel.hasAttribute('data-hidden') ? null : panel);
   const phone = () => matchMedia('(max-width: 720px)').matches;
   const brandEl = document.querySelector('.brand');
-  const footEl = document.querySelector('.foot');
   const creditEl = document.querySelector('.credit');
+  const footEl = document.querySelector('.foot');
 
   function reserve() {
     const shown = shownPanel();
@@ -1609,7 +1658,7 @@ export function createUI(app) {
     const top = brandEl.offsetTop + brandEl.offsetHeight + (phone() ? 16 : 24);
     let left = phone() ? 16 : 24;
     let right = innerWidth - (phone() ? 16 : 24);
-    // Above the footer, and above the credit when it stacks over the footer (a narrow window).
+    // Above the credit and the line beside it.
     let bottom = phone() ? innerHeight - 16 : Math.min(footEl.getBoundingClientRect().top, creditEl.getBoundingClientRect().top) - 24;
     if (shown && phone()) bottom = innerHeight - shown.offsetHeight - 24;
     if (shown && !phone()) right = innerWidth - shown.offsetWidth - 40;
@@ -1625,17 +1674,13 @@ export function createUI(app) {
     const x = reserve().x;
     document.body.style.setProperty('--reserve-x', `${x}px`);
     document.body.style.setProperty('--sheet', `${shownPanel()?.offsetHeight ?? 0}px`);
-    // The credit centres under the cube while it clears the footer's lines; in a narrow window it
-    // stacks over them on the left instead.
+    // The code's line sits at the bottom left while it clears the credit centred beside it; in a narrow
+    // window it goes under the credit instead.
     const freeCentre = (innerWidth - x) / 2;
-    const footRight = Math.max(...[...footEl.children].map((p) => footEl.offsetLeft + textWidth(p)));
-    document.body.classList.toggle('credit-stacked', !phone() && freeCentre - creditEl.offsetWidth / 2 < footRight + 32);
-  }
-  // A line's own width (a block paragraph is as wide as the footer).
-  function textWidth(el) {
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    return range.getBoundingClientRect().width;
+    const designed = creditEl.querySelector('.designed');
+    document.body.classList.remove('credit-stacked');
+    const lineRight = footEl.offsetLeft + footEl.offsetWidth;
+    document.body.classList.toggle('credit-stacked', !phone() && freeCentre - designed.offsetWidth / 2 < lineRight + 32);
   }
   addEventListener('resize', placeChrome);
   placeChrome();
@@ -1710,5 +1755,8 @@ export function createUI(app) {
     }
   }
 
-  return { reserve, room, frameBox, get recordOpen() { return recordOpen; }, toast, lightHints, showColours, pickImage: () => fileInput.click(), sync: () => fields.forEach((f) => f.sync()) };
+  // The smoke's colours for the edges' disc (main.js wear).
+  const showEdgeRamp = (rgb, white) => fields.find((f) => f.control?.key === 'edges')?.showRamp(rgb, white);
+
+  return { reserve, room, frameBox, get recordOpen() { return recordOpen; }, toast, lightHints, showColours, showEdgeRamp, pickImage: () => fileInput.click(), sync: () => fields.forEach((f) => f.sync()) };
 }

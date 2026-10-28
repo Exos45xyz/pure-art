@@ -11,7 +11,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 import { compileAhead } from './compile.js';
-import { createCube } from './cube.js';
+import { RAMP, createCube } from './cube.js';
 import { GradeShader } from './grade.js';
 import { createSimulation } from './simulation.js';
 import { beatPeriod, breathAt, clipLooks, isGradient, readGradient, readHash, rgbAt, spinRate, timeScale, writeHash } from './settings.js';
@@ -87,6 +87,39 @@ function wear(choice, turn = true) {
   colours = palettes[slotOf(choice)] ?? null;
   if (colours) smoke.setColours(colours.map, colourGain(colours.image), turn);
   ui.showColours(colours?.image ?? null);
+  const ramp = edgeRamp(choice);
+  cube.setRamp(ramp);
+  ui.showEdgeRamp(ramp, !colours);
+}
+// The smoke's colours as one gradient, for the edges that wear them: your gradient (or plain colour)
+// exactly as its bar shows it; a palette or a picture across its colour map hue by hue, each at a light
+// shade of itself (the map's upper rows) and softened over its neighbours, lifted as the smoke is; white
+// for white.
+function edgeRamp(choice) {
+  const rgb = new Uint8Array(RAMP * 3).fill(255);
+  const stops = readGradient(choice);
+  if (stops) {
+    for (let i = 0; i < RAMP; i++) rgb.set(rgbAt(stops, (i / (RAMP - 1)) * 100), i * 3);
+    return rgb;
+  }
+  if (!colours) return rgb;
+  const { data } = colours.map.texture.image;
+  const size = colours.map.size;
+  const gain = colourGain(colours.image);
+  for (let i = 0; i < RAMP; i++) {
+    const x0 = Math.floor((i / RAMP) * size);
+    const sum = [0, 0, 0];
+    let n = 0;
+    for (let x = Math.max(0, x0 - 8); x < Math.min(size, x0 + 9); x++) {
+      for (const y of [0.6, 0.7, 0.8]) {
+        const o = (Math.floor(y * size) * size + x) * 4;
+        for (let c = 0; c < 3; c++) sum[c] += data[o + c];
+        n++;
+      }
+    }
+    rgb.set(sum.map((v) => Math.min(255, Math.round((v / n) * gain))), i * 3);
+  }
+  return rgb;
 }
 // Your gradient as colours: 512 samples along it, read like a picture's pixels (palette.js colourList),
 // so every stretch of the bar colours its share of the smoke. While it is edited it is read every frame,

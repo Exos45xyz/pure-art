@@ -31,8 +31,9 @@ export const controls = [
 
   { group: 'Glass', key: 'rebound', label: 'rebound', hint: 'How hard the smoke bounces off the glass (in the rebound look, how hard each beat throws it)' },
   { group: 'Glass', key: 'escape', label: 'escape', hint: 'Opens holes in the glass that let the smoke out' },
-  // The cube's edges: white, a colour of your own (#rrggbb, picked in the panel), or off.
-  { group: 'Glass', key: 'edges', label: 'edges', type: 'edge', hint: 'The cube\'s edges: white, a colour of your own, or none' },
+  // The cube's edges: white, the smoke's colours (smoke), a colour of your own (#rrggbb, picked in the
+  // panel), or off.
+  { group: 'Glass', key: 'edges', label: 'edges', type: 'edge', hint: 'The cube\'s edges: white, the smoke\'s colours, a colour of your own, or none' },
 
   { group: 'Light', key: 'brightness', label: 'brightness', hint: 'How bright the smoke is' },
   { group: 'Light', key: 'shadows', label: 'shadows', hint: 'How dense the smoke is to the light: how deep its shadows fall' },
@@ -167,7 +168,7 @@ export function lookCode(state) {
 }
 
 // An edge colour: white, off, a colour of your own (#rrggbb), or red (the clip's, in older links and looks).
-export const isEdge = (v) => typeof v === 'string' && (['white', 'off', 'red'].includes(v) || /^#[0-9a-f]{6}$/i.test(v));
+export const isEdge = (v) => typeof v === 'string' && (['white', 'smoke', 'off', 'red'].includes(v) || /^#[0-9a-f]{6}$/i.test(v));
 
 // Your gradient as a colour: g: and its stops, two to eight, each a colour, where it sits on the bar
 // (0–100) and, after ~, where its blend into the next one is half done (1–99, as a share of the way;
