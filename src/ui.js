@@ -1,5 +1,5 @@
 import { download, stamp } from './capture.js';
-import { DEFAULT_GRADIENT, blendAt, cleanLook, controls, defaults, gradientValue, isGradient, lookCode, lookOf, matchingPreset, mixHex, presets, presetValues, readGradient, sameLook, shuffled } from './settings.js';
+import { DEFAULT_GRADIENT, DEFAULT_PLAIN, cleanLook, controls, defaults, gradientValue, hexOf, isGradient, isPlain, lookCode, lookOf, matchingPreset, plainValue, presets, presetValues, readGradient, rgbAt, sameLook, shuffled } from './settings.js';
 
 const h = (tag, attrs = {}, ...children) => {
   const el = document.createElement(tag);
@@ -237,9 +237,11 @@ function colourControls() {
     if (document.activeElement !== hex) hex.value = now.slice(1).toUpperCase();
     return now;
   }
+  // A colour from outside (another stop chosen, plain or gradient) replaces what the hex shows, even while
+  // it has focus: left there, it would apply to the new colour when it loses it.
   function set(colour) {
     hsv = keepHue(hexToHsv(readHex(colour) ?? '#ffffff'));
-    draw();
+    hex.value = draw().slice(1).toUpperCase();
   }
   const change = (next) => {
     hsv = { ...hsv, ...next };
@@ -741,26 +743,36 @@ export function createUI(app) {
     },
   });
   const orbs = {};
-  for (const value of ['white', 'dusk', 'pearl', 'gradient', 'image']) {
+  for (const value of ['white', 'dusk', 'pearl', 'yours', 'image']) {
     const fill = h('i', { class: 'orb-fill', 'aria-hidden': 'true' });
     orbs[value] = h('button', {
       type: 'button', role: 'radio', class: `orb orb-${value}`, 'aria-label': value, title: value,
       onclick: (e) => pressColour(value, e.detail === 0), onkeydown: (e) => stepColour(e, value),
     }, fill);
   }
-  orbs.gradient.title = 'Your gradient (click to edit it)';
-  orbs.gradient.setAttribute('aria-label', 'your gradient');
-  orbs.gradient.setAttribute('aria-haspopup', 'dialog');
-  orbs.gradient.setAttribute('aria-expanded', 'false');
+  orbs.yours.title = 'Your colour: plain or a gradient (click to make it)';
+  orbs.yours.setAttribute('aria-label', 'your colour');
+  orbs.yours.setAttribute('aria-haspopup', 'dialog');
+  orbs.yours.setAttribute('aria-expanded', 'false');
   orbs.image.hidden = true;
-  // Your gradient: kept in this browser, and the one a look brings becomes yours to edit.
-  const GRADIENT_KEY = 'pure-smoke-gradient';
+  // Yours: a plain colour or a gradient, made in the editor, worn by its disc, and kept in this browser
+  // (only what you changed, so the defaults stay the app's own). Both start from the ice-on-rock picture.
+  const YOURS_KEY = 'pure-smoke-yours';
   let gradient = DEFAULT_GRADIENT;
+  let plain = DEFAULT_PLAIN;
+  let yoursKind = 'gradient';
   try {
-    const kept = localStorage.getItem(GRADIENT_KEY);
-    // The first default (peach to violet) was kept by anyone who opened the editor: today's replaces it.
-    if (isGradient(kept) && kept !== 'g:ffc6a5@0,ff6b8b@50,7b6cff@100') gradient = kept;
+    localStorage.removeItem('pure-smoke-gradient'); // the first editor's: it gives way to the ice gradient
+    const kept = JSON.parse(localStorage.getItem(YOURS_KEY) ?? '{}');
+    if (isGradient(kept.gradient) && !isPlain(kept.gradient)) gradient = kept.gradient;
+    if (isPlain(kept.plain)) plain = kept.plain;
+    if (kept.kind === 'plain') yoursKind = 'plain';
   } catch {}
+  const keepYours = () => {
+    const kept = { kind: yoursKind, ...(gradient !== DEFAULT_GRADIENT && { gradient }), ...(plain !== DEFAULT_PLAIN && { plain }) };
+    try { localStorage.setItem(YOURS_KEY, JSON.stringify(kept)); } catch {}
+  };
+  const yoursValue = () => (yoursKind === 'plain' ? plain : gradient);
   // As CSS: each colour where it sits, and where a blend's midpoint moved, a colour hint there.
   const cssGradient = (value) => {
     const stops = readGradient(value);
@@ -770,8 +782,8 @@ export function createUI(app) {
     });
     return `linear-gradient(90deg, ${parts.join(', ')})`;
   };
-  const colourKind = (v) => (isGradient(v) ? 'gradient' : v);
-  const colourValue = (kind) => (kind === 'gradient' ? gradient : kind);
+  const colourKind = (v) => (isGradient(v) ? 'yours' : v);
+  const colourValue = (kind) => (kind === 'yours' ? yoursValue() : kind);
   const addImage = h('button', {
     type: 'button', class: 'chip chip-add',
     title: 'Colour the smoke from an image: choose one, drop one anywhere, or paste one', onclick: () => fileInput.click(),
@@ -783,19 +795,23 @@ export function createUI(app) {
     control: byKey('colour'),
     el: h('div', { class: 'colour-row' },
       h('div', { class: 'orbs', role: 'radiogroup', 'aria-label': 'Colour' },
-        orbs.white, orbs.dusk, orbs.pearl, h('i', { class: 'orb-split', 'aria-hidden': 'true' }), orbs.gradient, orbs.image),
+        orbs.white, orbs.dusk, orbs.pearl, h('i', { class: 'orb-split', 'aria-hidden': 'true' }), orbs.yours, orbs.image),
       addImage),
     sync() {
       const on = colourKind(app.state.colour);
-      if (on === 'gradient') gradient = app.state.colour;
-      orbs.gradient.firstChild.style.background = cssGradient(gradient);
+      if (on === 'yours') {
+        yoursKind = isPlain(app.state.colour) ? 'plain' : 'gradient';
+        if (yoursKind === 'plain') plain = app.state.colour;
+        else gradient = app.state.colour;
+      }
+      orbs.yours.firstChild.style.background = yoursKind === 'plain' ? `#${plain.slice(2)}` : cssGradient(gradient);
       // Once there is an image its disc takes the place of + image (pressed again, it asks for another).
       addImage.hidden = !orbs.image.hidden;
       for (const [value, o] of Object.entries(orbs)) {
         o.setAttribute('aria-checked', String(value === on));
         o.tabIndex = value === on ? 0 : -1;
       }
-      colourName.textContent = on === 'image' ? imageLabel : on;
+      colourName.textContent = on === 'image' ? imageLabel : on === 'yours' ? `your ${yoursKind === 'plain' ? 'colour' : 'gradient'}` : on;
       colourName.title = on === 'image' ? imageLabel : '';
       strip.hidden = on !== 'image';
     },
@@ -807,7 +823,7 @@ export function createUI(app) {
     refresh();
   }
   function pressColour(kind, instant) {
-    if (kind === 'gradient') return editGradient(instant);
+    if (kind === 'yours') return editYours(instant);
     if (kind === 'image' && app.state.colour === 'image') return fileInput.click();
     editor?.close({ instant: true });
     wearColour(kind);
@@ -820,11 +836,13 @@ export function createUI(app) {
     const shown = Object.keys(orbs).filter((v) => !orbs[v].hidden);
     const next = shown[(shown.indexOf(value) + d + shown.length) % shown.length];
     orbs[next].focus();
-    if (next !== 'gradient') editor?.close({ instant: true });
+    if (next !== 'yours') editor?.close({ instant: true });
     wearColour(next);
   }
 
-  // Your gradient's editor, as in Paper: a bar of the gradient, a pin under it for each colour, pointing
+  // Your colour's editor, as in Paper: two tabs, a plain colour or a gradient. A plain colour is the colour
+  // controls alone. Each tab keeps its own, so switching never loses the other. The gradient: a bar of it,
+  // a pin under it for each colour, pointing
   // at its place, and a diamond above it for each blend, where it is half done. Press a pin to choose it and
   // drag it along; drag it well off the bar and let go to take it away. Press the bar to add a colour
   // there, in the colour the gradient already has at that place, so nothing changes until you change it.
@@ -833,6 +851,11 @@ export function createUI(app) {
   // chosen one away (two to eight). The smoke follows as you go, and every stretch of the bar colours its
   // share of the smoke. Made the first time it opens; kept in this browser when it closes.
   let editor = null;
+  // The two tabs, drawn like Paper's: a plain square, and a square fading across.
+  const KIND_ICONS = {
+    plain: '<svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><rect x="1.5" y="1.5" width="11" height="11" rx="3" fill="currentColor"/></svg>',
+    gradient: '<svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true"><defs><linearGradient id="kind-fade" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="currentColor"/><stop offset="1" stop-color="currentColor" stop-opacity="0.12"/></linearGradient></defs><rect x="1.5" y="1.5" width="11" height="11" rx="3" fill="url(#kind-fade)" stroke="currentColor" stroke-opacity="0.5"/></svg>',
+  };
   const PIN = '<svg viewBox="0 0 18 20" aria-hidden="true"><path d="M9 1.2 16.8 7.3V17a2 2 0 0 1-2 2H3.2a2 2 0 0 1-2-2V7.3Z"/></svg>';
   function gradientEditor() {
     if (editor) return editor;
@@ -842,8 +865,26 @@ export function createUI(app) {
     const strip = h('div', { class: 'grad' }, bar);
     const add = h('button', { type: 'button', class: 'text-button micro icon-button', 'aria-label': 'add a colour', title: 'Add a colour' }, icon('save'));
     const remove = h('button', { type: 'button', class: 'text-button micro icon-button', 'aria-label': 'remove this colour', title: 'Remove this colour' }, icon('minus'));
+    const actions = h('span', { class: 'head-actions' }, add, remove);
+    const kinds = {
+      plain: h('button', { type: 'button', role: 'radio', class: 'kind-option', 'aria-label': 'plain colour', title: 'Plain colour' }),
+      gradient: h('button', { type: 'button', role: 'radio', class: 'kind-option', 'aria-label': 'gradient', title: 'Gradient' }),
+    };
+    kinds.plain.innerHTML = KIND_ICONS.plain;
+    kinds.gradient.innerHTML = KIND_ICONS.gradient;
+    for (const [kind, button] of Object.entries(kinds)) {
+      button.addEventListener('click', () => setKind(kind));
+      // Arrows move to the other tab and choose it, as in any group of choices.
+      button.addEventListener('keydown', (e) => {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+        e.preventDefault();
+        const other = kind === 'plain' ? 'gradient' : 'plain';
+        kinds[other].focus();
+        setKind(other);
+      });
+    }
     pop.el.append(
-      h('div', { class: 'section-head' }, h('span', { class: 'micro micro-strong' }, 'Gradient'), h('span', { class: 'head-actions' }, add, remove)),
+      h('div', { class: 'section-head' }, h('div', { class: 'kind', role: 'radiogroup', 'aria-label': 'plain colour or gradient' }, kinds.plain, kinds.gradient), actions),
       strip, controls.el);
 
     let stops = [];
@@ -860,14 +901,7 @@ export function createUI(app) {
     // Where a blend is half done, on the bar (0–100).
     const midOf = (a, b) => a.at + a.mid * (b.at - a.at);
     // The colour the gradient has at a place (0–100), as the bar draws it.
-    function colourAt(at) {
-      const s = sorted();
-      if (at <= s[0].at) return s[0].colour;
-      if (at >= s[s.length - 1].at) return s[s.length - 1].colour;
-      const i = s.findIndex((x) => x.at >= at);
-      const [a, b] = [s[i - 1], s[i]];
-      return mixHex(a.colour, b.colour, blendAt((at - a.at) / (b.at - a.at || 1), a.mid));
-    }
+    const colourAt = (at) => hexOf(rgbAt(sorted(), at));
 
     function draw() {
       const order = sorted();
@@ -908,6 +942,8 @@ export function createUI(app) {
       for (const [stop, diamond] of diamonds) if (stop === leaving) diamond.remove();
       add.disabled = stops.length >= 8;
       remove.disabled = stops.length <= 2;
+      bar.classList.toggle('full', stops.length >= 8);
+      bar.title = stops.length >= 8 ? 'Eight colours at most: take one away to add another' : 'Press to add a colour here';
     }
     function changed() {
       gradient = gradientValue(kept());
@@ -942,9 +978,30 @@ export function createUI(app) {
       return stop;
     }
     controls.onPick = (hex) => {
+      if (yoursKind === 'plain') {
+        plain = plainValue(hex);
+        wearColour('yours');
+        return;
+      }
       chosen.colour = hex;
       changed();
     };
+    function showKind() {
+      for (const [kind, button] of Object.entries(kinds)) {
+        button.setAttribute('aria-checked', String(kind === yoursKind));
+        button.tabIndex = kind === yoursKind ? 0 : -1;
+      }
+      strip.hidden = yoursKind === 'plain';
+      actions.style.visibility = yoursKind === 'plain' ? 'hidden' : '';
+      controls.set(yoursKind === 'plain' ? `#${plain.slice(2)}` : chosen.colour);
+    }
+    function setKind(kind) {
+      if (kind === yoursKind) return;
+      yoursKind = kind;
+      showKind();
+      wearColour('yours');
+      pop.place();
+    }
 
     // A drag follows the hand along the bar, 1:1, off it too; 28 px above or below it, the pin lets go.
     function grab(stop, pin, e) {
@@ -1051,29 +1108,19 @@ export function createUI(app) {
         diamonds.forEach((diamond) => diamond.remove());
         diamonds.clear();
         choose(stops[0]);
+        showKind();
       },
-      focus: () => pins.get(chosen)?.focus({ preventScroll: true }),
+      focus: () => (yoursKind === 'plain' ? controls.focus() : pins.get(chosen)?.focus({ preventScroll: true })),
     };
     return editor;
   }
-  // The gradient's disc wears your gradient and opens its editor; pressed again, it closes it.
-  function editGradient(instant) {
+  // Your colour's disc wears it and opens its editor; pressed again, it closes it.
+  function editYours(instant) {
     const ed = gradientEditor();
-    if (ed.isOpenOn(orbs.gradient)) return ed.close({ instant, focus: instant });
-    if (colourKind(app.state.colour) !== 'gradient') wearColour('gradient');
+    if (ed.isOpenOn(orbs.yours)) return ed.close({ instant, focus: instant });
+    if (colourKind(app.state.colour) !== 'yours') wearColour('yours');
     ed.load(gradient);
-    ed.open(orbs.gradient, {
-      label: 'your gradient',
-      instant,
-      focus: ed.focus,
-      done: () => {
-        // Only a gradient you changed is kept, so the default stays the app's own.
-        try {
-          if (gradient === DEFAULT_GRADIENT) localStorage.removeItem(GRADIENT_KEY);
-          else localStorage.setItem(GRADIENT_KEY, gradient);
-        } catch {}
-      },
-    });
+    ed.open(orbs.yours, { label: 'your colour', instant, focus: ed.focus, done: keepYours });
   }
   const colour = h('section', {},
     h('div', { class: 'section-head' }, h('h2', { class: 'micro' }, 'Colour'), colourName),

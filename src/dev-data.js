@@ -29,8 +29,10 @@ export function devLooks() {
   return which in sets ? structuredClone(sets[which]) : null;
 }
 
-// The switch: fixed at the bottom centre, plain on purpose (it is not part of the design under test).
+// The switch: fixed at the bottom centre, plain on purpose (it is not part of the design under test). It
+// shows only when the address asks for test data (?data=…), so the dev server looks like the real page.
 export function mountDataToggle() {
+  if (!new URLSearchParams(location.search).has('data')) return;
   const current = new URLSearchParams(location.search).get('data') ?? 'demo';
   const bar = document.createElement('div');
   bar.setAttribute('style', 'position:fixed;left:50%;bottom:6px;transform:translateX(-50%);z-index:99;display:flex;gap:2px;padding:2px;border-radius:8px;background:#444;font:12px system-ui;');

@@ -17,11 +17,11 @@ import { compileAhead } from './compile.js';
 import { createCube } from './cube.js';
 import { GradeShader } from './grade.js';
 import { createSimulation } from './simulation.js';
-import { ORIGINAL_PULSE, breathAt, clipLooks, gradientRamp, isGradient, readHash, spinRate, writeHash } from './settings.js';
+import { ORIGINAL_PULSE, breathAt, clipLooks, isGradient, readGradient, readHash, rgbAt, spinRate, writeHash } from './settings.js';
 import { createLighting, createSmoke } from './smoke.js';
 import { createUI } from './ui.js';
 import { createView } from './view.js';
-import { colourMap, readImage } from './palette.js';
+import { colourList, colourMap, readImage } from './palette.js';
 import { download, formatSize, recordVideo, saveImage, stamp } from './capture.js';
 
 const canvas = document.querySelector('canvas');
@@ -80,7 +80,7 @@ const bundled = {
 };
 const palettes = {}; // colour choice → { image, map } (your gradient: under 'gradient', with its value)
 let colours = null; // the palette the grains wear now, or null for white
-let retired = []; // replaced colour maps (an upload, an earlier gradient), freed once no grain turns from them
+let retired = []; // replaced uploads' colour maps, freed once no grain turns from them
 // Lifts dark images so the smoke keeps about the brightness it has in white.
 const colourGain = (image) => Math.min(2.5, Math.max(1, 0.7 / Math.max(image.meanLuminance, 0.01)));
 const slotOf = (choice) => (isGradient(choice) ? 'gradient' : choice);
@@ -91,42 +91,48 @@ function wear(choice, turn = true) {
   if (colours) smoke.setColours(colours.map, colourGain(colours.image), turn);
   ui.showColours(colours?.image ?? null);
 }
-// Your gradient as a picture: a band 256 px across, each stop's colour where it sits, so every colour
-// colours the share of the smoke its stretch of the gradient covers, as a picture's colours do.
-async function gradientPalette(value) {
-  const canvas = new OffscreenCanvas(256, 4);
-  const ctx = canvas.getContext('2d');
-  const fill = ctx.createLinearGradient(0, 0, 256, 0);
-  for (const stop of gradientRamp(value)) fill.addColorStop(stop.at / 100, stop.colour);
-  ctx.fillStyle = fill;
-  ctx.fillRect(0, 0, 256, 4);
-  const image = await readImage(canvas, 'gradient');
-  URL.revokeObjectURL(image.thumbnail);
-  return { image, map: colourMap(image), value };
+// Your gradient as colours: 512 samples along it, read like a picture's pixels (palette.js colourList),
+// so every stretch of the bar colours its share of the smoke. While it is edited it is read every frame,
+// so it is written into two colour maps in turn, the one the smoke isn't wearing, instead of a new one
+// each time; no picture is drawn or decoded (that took about 85 ms a reading, and a drag stuttered).
+const gradientMaps = [null, null];
+let gradientSide = 0;
+function gradientPalette(value) {
+  const stops = readGradient(value);
+  const rgb = new Uint8Array(512 * 3);
+  for (let i = 0; i < 512; i++) rgb.set(rgbAt(stops, (i / 511) * 100), i * 3);
+  const image = colourList(rgb, 'gradient');
+  // Both maps are made and sent to the GPU with the first reading (as the editor opens), so the first
+  // drag doesn't wait for the second one.
+  if (!gradientMaps[0]) {
+    gradientMaps[0] = colourMap(image);
+    gradientMaps[1] = colourMap(image);
+    for (const map of gradientMaps) renderer.initTexture(map.texture);
+  }
+  gradientSide = 1 - gradientSide;
+  gradientMaps[gradientSide] = colourMap(image, gradientMaps[gradientSide]);
+  return { image, map: gradientMaps[gradientSide], value };
 }
-// A drag changes the gradient every frame: it is read again as soon as the last reading is done, always
-// the newest one, so the smoke follows as fast as the readings go (a few milliseconds each).
+// A drag changes the gradient on every move: it is read once a frame, always the newest.
 let gradientWanted = null;
 let gradientTurn = false;
-let gradientBusy = false;
-async function useGradient(value, turn) {
+let gradientFrame = 0;
+let gradientDark = null; // the too-dark gradient the panel was told about, so it is said once
+function useGradient(value, turn) {
   gradientWanted = value;
   gradientTurn ||= turn;
-  if (gradientBusy) return;
-  gradientBusy = true;
-  try {
-    while (palettes.gradient?.value !== gradientWanted) {
-      const next = await gradientPalette(gradientWanted);
-      if (palettes.gradient) retired.push(palettes.gradient.map.texture);
-      palettes.gradient = next;
+  gradientFrame ||= requestAnimationFrame(() => {
+    gradientFrame = 0;
+    try {
+      if (palettes.gradient?.value !== gradientWanted) palettes.gradient = gradientPalette(gradientWanted);
+      if (state.colour === gradientWanted) wear(gradientWanted, gradientTurn);
+      gradientTurn = false;
+      gradientDark = null;
+    } catch {
+      if (gradientDark === null) ui.toast('that gradient is too dark to colour the smoke', { error: true });
+      gradientDark = gradientWanted;
     }
-    if (state.colour === gradientWanted) wear(gradientWanted, gradientTurn);
-    gradientTurn = false;
-  } catch {
-    ui.toast('that gradient is too dark to colour the smoke', { error: true });
-  } finally {
-    gradientBusy = false;
-  }
+  });
 }
 async function loadBundled(choice) {
   if (palettes[choice]) return;

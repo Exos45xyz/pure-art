@@ -53,6 +53,23 @@ export async function readImage(file, name = file.name) {
   };
 }
 
+// Colours that are not a picture (your gradient, as rgb triplets), read the way a picture's pixels are:
+// black left out, the rest kept in their proportions. No thumbnail and no strip: nothing shows them.
+export function colourList(rgb, name) {
+  const pixels = new Uint8Array(rgb.length);
+  let n = 0;
+  let luminance = 0;
+  for (let i = 0; i < rgb.length; i += 3) {
+    const l = 0.2126 * rgb[i] + 0.7152 * rgb[i + 1] + 0.0722 * rgb[i + 2];
+    if (l < 20) continue;
+    pixels.set(rgb.subarray(i, i + 3), n * 3);
+    luminance += l;
+    n++;
+  }
+  if (!n) throw new Error('These colours are all black.');
+  return { name, pixels: pixels.subarray(0, n * 3), count: n, meanLuminance: luminance / n / 255, swatches: [] };
+}
+
 // How far apart two colours look: green counts most, blue least, as the eye sees them.
 const distance = (a, b) => 2 * (a[0] - b[0]) ** 2 + 4 * (a[1] - b[1]) ** 2 + 3 * (a[2] - b[2]) ** 2;
 
@@ -106,7 +123,8 @@ function swatches(pixels, n, k = 8) {
 // fills its share of the map, so a grain that wanders over it evenly meets every colour as often as the
 // picture shows it.
 const MAP = 512;
-export function colourMap(image) {
+// into: a colour map made before, written over instead of making a new one (your gradient while it is edited).
+export function colourMap(image, into = null) {
   const n = image.count;
   const px = image.pixels;
   const key = new Float32Array(n);
@@ -131,7 +149,7 @@ export function colourMap(image) {
   for (let i = 0; i < n; i++) key[i] = hue[i] < 0 ? 2 + light[i] / 255 : (hue[i] - origin + 1) % 1;
   const order = Uint32Array.from({ length: n }, (_, i) => i).sort((a, b) => key[a] - key[b]);
 
-  const data = new Uint8Array(MAP * MAP * 4);
+  const data = into?.texture.image.data ?? new Uint8Array(MAP * MAP * 4);
   for (let x = 0; x < MAP; x++) {
     const from = Math.min(n - 1, Math.floor((x * n) / MAP));
     const to = Math.min(n, Math.max(from + 1, Math.floor(((x + 1) * n) / MAP)));
@@ -144,6 +162,10 @@ export function colourMap(image) {
       data[o + 2] = px[p + 2];
       data[o + 3] = 255;
     }
+  }
+  if (into) {
+    into.texture.needsUpdate = true;
+    return into;
   }
   // Kept as the image's own values: the smoke's light is graded as display values, like the picture.
   const texture = new DataTexture(data, MAP, MAP, RGBAFormat, UnsignedByteType);

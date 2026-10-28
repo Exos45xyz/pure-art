@@ -659,6 +659,26 @@ canvas:active { cursor: grabbing; }
 @media (hover: hover) and (pointer: fine) {
   .picker-drop:hover { color: var(--strong); background: var(--row-hover); }
 }
+/* Your colour's two tabs (ui.js gradientEditor), plain or gradient, as in Paper: the chosen one raised like
+   a choice row's thumb. They change at once: a tab is a choice, not a journey. */
+.kind { display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--row); }
+.kind-option {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 22px;
+  border-radius: 5px;
+  color: var(--muted);
+  transition: transform 160ms var(--ease-pill);
+}
+.kind-option svg { display: block; }
+.kind-option[aria-checked='true'] { color: var(--strong); background: var(--thumb); box-shadow: inset 0 1px 0 0 #ffffff0d; }
+.kind-option:active { transform: scale(0.95); }
+@media (hover: hover) and (pointer: fine) {
+  .kind-option:not([aria-checked='true']):hover { color: var(--text); }
+}
+@media (pointer: coarse) { .kind-option { width: 38px; height: 28px; } }
+.grad[hidden] { display: none; }
 /* Your gradient's bar (ui.js gradientEditor), as in Paper: a diamond above it for each blend's midpoint, a
    pin under it for each colour, its point at the colour's place. The chosen pin is drawn in white and a
    little larger; one dragged off the bar fades before it goes. */
@@ -685,6 +705,8 @@ canvas:active { cursor: grabbing; }
 .grad-stop.chosen { z-index: 1; transform: scale(1.1); transform-origin: 50% 0; }
 .grad-stop.chosen path { stroke: #fff; stroke-width: 2; }
 .grad-stop.leaving { opacity: 0.35; }
+.grad-stop:active { cursor: grabbing; }
+.grad-bar.full { cursor: default; }
 .grad-stop:focus-visible { outline-offset: 3px; }
 .grad-mid {
   position: absolute;
