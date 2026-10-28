@@ -545,9 +545,98 @@ canvas:active { cursor: grabbing; }
 .orb-edge-colour .orb-fill { background: var(--edge, #8ab4ff); }
 .orb-edge-off .orb-fill { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
 .orb-edge-off .orb-fill::after { background: linear-gradient(135deg, transparent 45%, rgba(255, 255, 255, 0.5) 45% 55%, transparent 55%); box-shadow: none; }
-/* The system's colour picker opens from here, by your colour's orb */
-.edge-picker { position: absolute; left: 30px; top: 50%; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; }
 @media (pointer: coarse) { .orb { width: 30px; height: 30px; } .orb-edge { width: 20px; height: 20px; } }
+
+/* The colour picker (ui.js colourPicker), like Figma's, in the panel's own glass: it grows out of the
+   disc that opened it (ui.js sets the origin) and leaves a little faster than it came. */
+.picker {
+  position: fixed;
+  z-index: 10;
+  width: 232px;
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+  background: var(--panel);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(20px) saturate(140%);
+  border-radius: 14px;
+  box-shadow: var(--lift);
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
+  transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.picker[hidden] { display: none; }
+.picker.open { opacity: 1; transform: none; pointer-events: auto; transition-duration: 160ms; }
+.picker.instant { transition: none; }
+/* Saturation across, brightness down, over the hue (--hue) */
+.picker-square {
+  position: relative;
+  height: 168px;
+  border-radius: 8px;
+  background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, var(--hue));
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+  cursor: crosshair;
+  touch-action: none;
+}
+.picker-row { display: flex; align-items: center; gap: 10px; }
+.picker-drop {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: -4px;
+  border-radius: 6px;
+  color: var(--text);
+  transition: transform 160ms var(--ease-pill);
+}
+.picker-drop[hidden] { display: none; }
+.picker-drop:active { transform: scale(0.95); }
+.picker-hue {
+  position: relative;
+  flex: 1;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #f00, #ff0 16.67%, #0f0 33.33%, #0ff 50%, #00f 66.67%, #f0f 83.33%, #f00);
+  cursor: pointer;
+  touch-action: none;
+}
+/* The bar is thin to look at and taller to hit */
+.picker-hue::after { content: ''; position: absolute; inset: -8px 0; }
+/* A white ring around the colour under it, with a dark hairline so it reads on white too */
+.picker-knob {
+  position: absolute;
+  z-index: 1;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 2.5px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.picker-square .picker-knob { background: var(--now); }
+.picker-hue .picker-knob { top: 50%; background: var(--hue); }
+.picker-field { display: flex; align-items: center; gap: 10px; height: 28px; padding: 0 10px; border-radius: 7px; background: var(--row); cursor: text; }
+.picker-field:focus-within { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16); }
+.picker-hex {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--strong);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+@media (hover: hover) and (pointer: fine) {
+  .picker-drop:hover { color: var(--strong); background: var(--row-hover); }
+}
+/* A phone zooms the page into a field with smaller type */
+@media (pointer: coarse) { .picker-hex { font-size: 16px; } .picker-hue { height: 16px; border-radius: 8px; } }
 .swatches[hidden] { display: none; }
 .swatches { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 1px; }
 .swatches i { display: block; min-width: 2px; }
@@ -664,5 +753,5 @@ canvas:active { cursor: grabbing; }
   /* Movement goes; opacity and colour stay. The die doesn't turn; it still lands on a new face. */
   .die { transform: none !important; }
   .choice-thumb, .gliding .slider-fill, .slider.jump .slider-fill, .chevron { transition: none; }
-  .tune, .mine { transform: none !important; }
+  .tune, .mine, .picker { transform: none !important; }
 }

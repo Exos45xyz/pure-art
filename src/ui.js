@@ -172,37 +172,256 @@ function choice(control, app, onChange, bare = false) {
   return { el, sync };
 }
 
+// Colours as hue (0–360), saturation and brightness (0–1), the picker's own terms, and back to #rrggbb.
+const hsvToHex = ({ h: hue, s, v }) => {
+  const f = (n) => {
+    const k = (n + hue / 60) % 6;
+    return Math.round(255 * (v - v * s * Math.max(0, Math.min(k, 4 - k, 1))));
+  };
+  return `#${[f(5), f(3), f(1)].map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+};
+const hexToHsv = (hex) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const v = Math.max(r, g, b);
+  const d = v - Math.min(r, g, b);
+  const hue = d === 0 ? 0 : v === r ? ((g - b) / d + 6) % 6 : v === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { h: hue * 60, s: v === 0 ? 0 : d / v, v };
+};
+// 'abc', '#ABC', 'aabbcc' → '#aabbcc'; anything else → null.
+const readHex = (text, short = true) => {
+  const t = text.trim().replace(/^#/, '').toLowerCase();
+  if (short && /^[0-9a-f]{3}$/.test(t)) return `#${[...t].map((c) => c + c).join('')}`;
+  return /^[0-9a-f]{6}$/.test(t) ? `#${t}` : null;
+};
+
+// The eyedropper, drawn upright like the look icons and turned to lie on its side: bulb, collar, tube.
+const PIPETTE = '<svg viewBox="0 0 12 12" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(45 6 6)"><rect x="4.6" y="0.8" width="2.8" height="3.8" rx="1.4"/><path d="M3.5 4.9h5M5 4.9v4.3L6 11l1-1.8V4.9"/></g></svg>';
+
+// A colour picker like Figma's, opened by a control and set beside it: a square of saturation (across) and
+// brightness (down), a hue bar, an eyedropper where the browser has one, and the hex. A press puts the
+// knob where it lands and a drag follows the hand 1:1, off the square too (pointer capture); the colour
+// changes live. It grows out of its control, closes on Escape, a press outside or its control again, and
+// from a key it opens and closes at once. One picker serves the page; it is made the first time it opens.
+let thePicker = null;
+function colourPicker() {
+  if (thePicker) return thePicker;
+  const knob = () => h('i', { class: 'picker-knob', 'aria-hidden': 'true' });
+  const square = h('div', { class: 'picker-square', role: 'slider', tabindex: 0, 'aria-label': 'saturation and brightness' }, knob());
+  const hue = h('div', { class: 'picker-hue', role: 'slider', tabindex: 0, 'aria-label': 'hue', 'aria-valuemin': 0, 'aria-valuemax': 360 }, knob());
+  const drop = h('button', { type: 'button', class: 'picker-drop', title: 'Pick a colour from the screen', 'aria-label': 'pick a colour from the screen' });
+  drop.innerHTML = PIPETTE;
+  drop.hidden = !('EyeDropper' in window);
+  const hex = h('input', { class: 'picker-hex', 'aria-label': 'hex', spellcheck: 'false', autocomplete: 'off', autocapitalize: 'characters', maxlength: 7 });
+  const el = h('div', { class: 'picker', role: 'dialog', hidden: true },
+    square,
+    h('div', { class: 'picker-row' }, drop, hue),
+    h('label', { class: 'picker-field' }, h('span', { class: 'micro' }, 'hex'), hex));
+  document.body.append(el);
+
+  let hsv = { h: 0, s: 0, v: 1 };
+  let anchor = null;
+  let onPick = null;
+  let onDone = null;
+  let hiding = 0;
+  // Greys have no hue of their own: the square keeps the one it had instead of jumping to red.
+  const keepHue = (next) => (next.s === 0 ? { ...next, h: hsv.h } : next);
+
+  function draw() {
+    const now = hsvToHex(hsv);
+    el.style.setProperty('--hue', `hsl(${hsv.h} 100% 50%)`);
+    el.style.setProperty('--now', now);
+    square.firstChild.style.left = `${hsv.s * 100}%`;
+    square.firstChild.style.top = `${(1 - hsv.v) * 100}%`;
+    hue.firstChild.style.left = `calc(7px + ${hsv.h / 360} * (100% - 14px))`;
+    square.setAttribute('aria-valuetext', `saturation ${Math.round(hsv.s * 100)}%, brightness ${Math.round(hsv.v * 100)}%`);
+    hue.setAttribute('aria-valuenow', Math.round(hsv.h));
+    // The hex follows, except while it is being typed in.
+    if (document.activeElement !== hex) hex.value = now.slice(1).toUpperCase();
+    return now;
+  }
+  const change = (next) => {
+    hsv = { ...hsv, ...next };
+    onPick?.(draw());
+  };
+
+  function drag(area, at) {
+    let box = null;
+    area.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      area.focus({ preventScroll: true });
+      area.setPointerCapture(e.pointerId);
+      box = area.getBoundingClientRect();
+      change(at(e, box));
+    });
+    area.addEventListener('pointermove', (e) => { if (box && area.hasPointerCapture(e.pointerId)) change(at(e, box)); });
+    area.addEventListener('lostpointercapture', () => { box = null; });
+  }
+  drag(square, (e, b) => ({ s: clamp01((e.clientX - b.left) / b.width), v: 1 - clamp01((e.clientY - b.top) / b.height) }));
+  drag(hue, (e, b) => ({ h: 360 * clamp01((e.clientX - b.left - 7) / (b.width - 14)) }));
+
+  // Arrows step by 1% (or 1°), with Shift by 10; from the keyboard the knob moves at once.
+  square.addEventListener('keydown', (e) => {
+    const d = e.shiftKey ? 0.1 : 0.01;
+    const next = { ArrowLeft: { s: hsv.s - d }, ArrowRight: { s: hsv.s + d }, ArrowUp: { v: hsv.v + d }, ArrowDown: { v: hsv.v - d } }[e.key];
+    if (!next) return;
+    e.preventDefault();
+    change(Object.fromEntries(Object.entries(next).map(([k, v]) => [k, clamp01(v)])));
+  });
+  hue.addEventListener('keydown', (e) => {
+    const d = e.shiftKey ? 10 : 1;
+    const next = { ArrowLeft: hsv.h - d, ArrowDown: hsv.h - d, ArrowRight: hsv.h + d, ArrowUp: hsv.h + d, Home: 0, End: 360 }[e.key];
+    if (next == null) return;
+    e.preventDefault();
+    change({ h: Math.min(360, Math.max(0, next)) });
+  });
+
+  // Six digits apply as they are typed; three (or a slip) on Enter or leaving the field.
+  hex.addEventListener('input', () => {
+    const v = readHex(hex.value, false);
+    if (v) change(keepHue(hexToHsv(v)));
+  });
+  hex.addEventListener('change', () => {
+    const v = readHex(hex.value);
+    if (v) change(keepHue(hexToHsv(v)));
+    hex.value = hsvToHex(hsv).slice(1).toUpperCase();
+  });
+  hex.addEventListener('focus', () => hex.select());
+
+  drop.addEventListener('click', async () => {
+    try {
+      const { sRGBHex } = await new window.EyeDropper().open();
+      const v = readHex(sRGBHex);
+      if (v) change(keepHue(hexToHsv(v)));
+    } catch {} // Escape put the eyedropper away
+  });
+
+  // Beside the panel, level with its control; on a phone, above the sheet over its control.
+  function place() {
+    const w = el.offsetWidth;
+    const ht = el.offsetHeight;
+    const a = anchor.getBoundingClientRect();
+    const panel = anchor.closest('.panel')?.getBoundingClientRect() ?? a;
+    const ax = a.left + a.width / 2;
+    const ay = a.top + a.height / 2;
+    const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+    let left;
+    let top;
+    if (panel.left - 12 - w >= 16) {
+      left = panel.left - 12 - w;
+      top = clamp(ay - ht / 2, 16, innerHeight - 16 - ht);
+      el.style.transformOrigin = `100% ${ay - top}px`;
+    } else {
+      left = clamp(ax - w / 2, 16, innerWidth - 16 - w);
+      top = Math.max(16, panel.top - 12 - ht);
+      el.style.transformOrigin = `${ax - left}px 100%`;
+    }
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }
+
+  const outside = (e) => { if (!el.contains(e.target) && !anchor?.contains(e.target)) close(); };
+  const keys = (e) => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    close({ instant: true, focus: true });
+  };
+  const resized = () => close({ instant: true });
+  const moved = () => anchor && place();
+  // The panel hides (H) or turns into the record window: the picker goes with it.
+  const watch = new MutationObserver(() => { if (anchor?.closest('[data-hidden]')) close({ instant: true }); });
+
+  function open(trigger, colour, { label, pick, done, instant = false }) {
+    if (anchor) close({ instant: true });
+    anchor = trigger;
+    onPick = pick;
+    onDone = done;
+    hsv = hexToHsv(readHex(colour) ?? '#ffffff');
+    draw();
+    el.setAttribute('aria-label', label);
+    clearTimeout(hiding);
+    el.hidden = false;
+    el.classList.toggle('instant', instant);
+    place();
+    el.getBoundingClientRect();
+    el.classList.add('open');
+    trigger.setAttribute('aria-expanded', 'true');
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', keys);
+    addEventListener('resize', resized);
+    trigger.closest('.panel')?.addEventListener('scroll', moved, { passive: true });
+    const panel = trigger.closest('.panel');
+    if (panel) watch.observe(panel, { attributes: true, attributeFilter: ['data-hidden'] });
+    // From a key, focus goes in with it; from a press it stays on the disc, so the next press closes it.
+    if (instant) square.focus({ preventScroll: true });
+  }
+  function close({ instant = false, focus = false } = {}) {
+    if (!anchor) return;
+    const was = anchor;
+    anchor = null;
+    el.classList.toggle('instant', instant);
+    el.classList.remove('open');
+    clearTimeout(hiding);
+    hiding = setTimeout(() => { el.hidden = true; }, instant ? 0 : 160);
+    was.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('pointerdown', outside, true);
+    document.removeEventListener('keydown', keys);
+    removeEventListener('resize', resized);
+    was.closest('.panel')?.removeEventListener('scroll', moved);
+    watch.disconnect();
+    const done = onDone;
+    onPick = onDone = null;
+    done?.();
+    if (focus || el.contains(document.activeElement)) was.focus({ preventScroll: true });
+  }
+  thePicker = { open, close, isOpenOn: (trigger) => anchor === trigger };
+  return thePicker;
+}
+
 // The cube's edges: white, a colour of your own, or off, as small discs in their row. Your colour opens the
-// system's colour picker and the cube follows live as you pick; it is remembered for next time.
+// colour picker beside it and the cube follows live as you pick; it is remembered for next time.
 const EDGE_KEY = 'pure-smoke-edge-colour';
 function edgeField(control, app, onChange) {
   let yours = '#8ab4ff';
-  try { yours = localStorage.getItem(EDGE_KEY) ?? yours; } catch {}
-  const picker = h('input', { type: 'color', class: 'edge-picker', value: yours, tabindex: -1, 'aria-hidden': 'true' });
+  try { yours = readHex(localStorage.getItem(EDGE_KEY) ?? '') ?? yours; } catch {}
   const names = { white: 'white edges', colour: 'edges in your colour', off: 'no edges' };
   const orbs = {};
   for (const [kind, label] of Object.entries(names)) {
     orbs[kind] = h('button', {
       type: 'button', role: 'radio', class: `orb orb-edge orb-edge-${kind}`, 'aria-label': label, title: label,
-      onclick: () => pick(kind), onkeydown: (e) => step(e, kind),
+      onclick: (e) => pick(kind, e.detail === 0), onkeydown: (e) => step(e, kind),
     }, h('i', { class: 'orb-fill', 'aria-hidden': 'true' }));
   }
   orbs.colour.title = 'Edges in your colour (click to pick it)';
+  orbs.colour.setAttribute('aria-haspopup', 'dialog');
+  orbs.colour.setAttribute('aria-expanded', 'false');
   const set = (v) => {
     app.set(control.key, v);
     sync();
     onChange();
   };
-  function pick(kind) {
-    if (kind !== 'colour') return set(kind);
+  // Your colour's disc opens the picker on the colour the edges wear (a link may have brought one), and
+  // closes it again.
+  function pick(kind, instant) {
+    if (kind !== 'colour') {
+      thePicker?.close({ instant: true });
+      return set(kind);
+    }
+    const picker = colourPicker();
+    if (picker.isOpenOn(orbs.colour)) return picker.close({ instant, focus: instant });
+    const worn = readHex(app.state[control.key], false);
+    if (worn) yours = worn;
     set(yours);
-    picker.showPicker ? picker.showPicker() : picker.click();
+    picker.open(orbs.colour, yours, {
+      label: 'edge colour',
+      instant,
+      pick: (hex) => {
+        yours = hex;
+        set(yours);
+      },
+      done: () => { try { localStorage.setItem(EDGE_KEY, yours); } catch {} },
+    });
   }
-  picker.addEventListener('input', () => {
-    yours = picker.value.toLowerCase();
-    try { localStorage.setItem(EDGE_KEY, yours); } catch {}
-    set(yours);
-  });
   const kindOf = (v) => (v === 'white' || v === 'off' ? v : 'colour');
   function sync() {
     const v = app.state[control.key];
@@ -213,7 +432,7 @@ function edgeField(control, app, onChange) {
     }
     orbs.colour.firstChild.style.setProperty('--edge', on === 'colour' ? (v === 'red' ? '#d1051b' : v) : yours);
   }
-  // Arrows move along the orbs, as in any group of choices (the picker opens only with a click).
+  // Arrows move along the orbs, as in any group of choices (the picker opens only with a click, Enter or Space).
   function step(e, kind) {
     const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
     if (!d) return;
@@ -221,11 +440,12 @@ function edgeField(control, app, onChange) {
     const kinds = Object.keys(orbs);
     const next = kinds[(kinds.indexOf(kind) + d + kinds.length) % kinds.length];
     orbs[next].focus();
+    if (next !== 'colour') thePicker?.close({ instant: true });
     set(next === 'colour' ? yours : next);
   }
   const el = h('div', { class: 'row' },
     h('span', { class: 'row-label' }, control.label),
-    h('div', { class: 'edge-orbs', role: 'radiogroup', 'aria-label': control.label }, orbs.white, orbs.colour, orbs.off, picker));
+    h('div', { class: 'edge-orbs', role: 'radiogroup', 'aria-label': control.label }, orbs.white, orbs.colour, orbs.off));
   return { el, sync };
 }
 

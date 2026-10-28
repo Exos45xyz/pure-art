@@ -191,14 +191,25 @@ export function readHash() {
   return state;
 }
 
+// A drag changes the state every frame, and Safari refuses (throws) after about a hundred address changes
+// in a few seconds: the link is written at once, then at most every 250 ms, and always ends on the last state.
+let hashWritten = 0;
+let hashTimer = 0;
 export function writeHash(state) {
+  clearTimeout(hashTimer);
+  const wait = hashWritten + 250 - performance.now();
+  if (wait > 0) {
+    hashTimer = setTimeout(() => writeHash(state), wait);
+    return;
+  }
+  hashWritten = performance.now();
   const params = new URLSearchParams();
   for (const c of controls) {
     if (c.look === false) continue;
     if (state[c.key] !== c.default) params.set(c.key, String(state[c.key]));
   }
   const hash = params.toString();
-  history.replaceState(null, '', hash ? `#${hash}` : location.pathname + location.search);
+  try { history.replaceState(null, '', hash ? `#${hash}` : location.pathname + location.search); } catch {}
 }
 
 // The reference clip's camera, measured on all 734 frames.
