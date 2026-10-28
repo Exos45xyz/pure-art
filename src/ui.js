@@ -209,7 +209,43 @@ export function createUI(app) {
   // Numbered after the highest kept, so they read in the order they were made.
   const nextName = () => `mine ${Math.max(0, ...mine.map((m) => Number(m.name.match(/\d+$/)?.[0]) || 0)) + 1}`;
   const saveChip = h('button', { type: 'button', class: 'look-item look-save', onclick: (e) => saveLook(e.detail === 0) }, '+ save this look');
-  const looksRow = h('div', { class: 'looks-list', role: 'group', 'aria-label': 'Look' });
+  const looksRow = h('div', { class: 'looks-list', role: 'group', 'aria-label': 'Looks' });
+  const mineRow = h('div', { class: 'looks-list', role: 'group', 'aria-label': 'Your looks' });
+  const mineEmpty = h('p', { class: 'looks-empty' }, 'Change a look, then save it here.');
+  // A toggle between the looks that come with the app and yours, in the sliding style of the other
+  // choices. Clicks glide the thumb; from a key it moves at once.
+  const tabThumb = h('div', { class: 'choice-thumb' });
+  tabThumb.style.width = 'calc((100% - 6px) / 2)';
+  const tabNames = ['looks', 'yours'];
+  const tabButtons = tabNames.map((tab, i) => h('button', {
+    type: 'button', role: 'radio', class: 'choice-option',
+    onclick: () => showTab(tab),
+    onkeydown: (e) => {
+      const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+      if (!d) return;
+      e.preventDefault();
+      const next = tabNames[(i + d + 2) % 2];
+      tabThumb.style.transition = 'none';
+      showTab(next);
+      tabButtons[tabNames.indexOf(next)].focus();
+      requestAnimationFrame(() => requestAnimationFrame(() => { tabThumb.style.transition = ''; }));
+    },
+  }, tab));
+  const lookTabs = h('div', { class: 'row bare' }, h('div', { class: 'choice', role: 'radiogroup', 'aria-label': 'Looks' }, tabThumb, tabButtons));
+  let lookTab = 'looks';
+  function showTab(tab) {
+    lookTab = tab;
+    const i = tabNames.indexOf(tab);
+    tabThumb.style.transform = `translateX(${i * 100}%)`;
+    tabButtons.forEach((b, j) => {
+      b.setAttribute('aria-checked', String(j === i));
+      b.tabIndex = j === i ? 0 : -1;
+    });
+    looksRow.hidden = tab !== 'looks';
+    mineRow.hidden = tab !== 'yours' || !mine.length;
+    mineEmpty.hidden = tab !== 'yours' || mine.length > 0;
+    looksFoot.hidden = tab !== 'yours';
+  }
   let mineChips = [];
   function drawMine() {
     mineChips = mine.map((m) => {
@@ -220,7 +256,10 @@ export function createUI(app) {
       }, '×');
       return { m, chip, remove, el: h('div', { class: 'mine' }, chip, remove) };
     });
-    looksRow.replaceChildren(...Object.values(chips), ...mineChips.map((c) => c.el), saveChip);
+    looksRow.replaceChildren(...Object.values(chips));
+    mineRow.replaceChildren(...mineChips.map((c) => c.el));
+    tabButtons[1].textContent = mine.length ? `yours · ${mine.length}` : 'yours';
+    showTab(lookTab);
     downloadButton.hidden = !mine.length;
     showMine();
   }
@@ -244,14 +283,16 @@ export function createUI(app) {
     mine.push(m);
     keepMine();
     drawMine();
-    // Save is now gone (this look is in the list): keyboard focus goes to the new row.
+    // It went into yours: the toggle turns there, to show it. Save is now gone (this look is kept), so
+    // keyboard focus goes to the new row.
+    showTab('yours');
     if (keyboard) mineChips.at(-1).chip.focus();
   }
   function forget(m) {
     mine = mine.filter((x) => x !== m);
     keepMine();
     drawMine();
-    (saveChip.hidden ? looksRow.querySelector('button') : saveChip).focus({ preventScroll: true });
+    (saveChip.hidden ? (mineRow.querySelector('button') ?? tabButtons[1]) : saveChip).focus({ preventScroll: true });
   }
   // Your looks travel as a file, in a quiet line under the list: download keeps them all (a small JSON
   // file), upload brings a file of them back, here or in another browser, or drop it anywhere on the page.
@@ -289,11 +330,14 @@ export function createUI(app) {
     }
     keepMine();
     drawMine();
-    if (added) sayIn(uploadButton, `${added} added`, 'upload');
+    if (added) {
+      showTab('yours');
+      sayIn(uploadButton, `${added} added`, 'upload');
+    }
     else toast(full ? 'six looks kept: remove one to add more' : 'those looks are already here');
   }
-  const look = h('section', {}, h('h2', { class: 'micro' }, 'Look'), looksRow,
-    h('div', { class: 'looks-foot' }, downloadButton, uploadButton), looksFile);
+  const looksFoot = h('div', { class: 'looks-foot' }, downloadButton, uploadButton);
+  const look = h('section', {}, h('h2', { class: 'micro' }, 'Look'), lookTabs, looksRow, mineRow, mineEmpty, saveChip, looksFoot, looksFile);
   drawMine();
 
   // Actions
