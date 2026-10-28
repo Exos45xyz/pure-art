@@ -1,4 +1,5 @@
-import { controls, defaults, lookCode, lookOf, matchingPreset, presets, presetValues, sameLook, shuffled } from './settings.js';
+import { download, stamp } from './capture.js';
+import { cleanLook, controls, defaults, lookCode, lookOf, matchingPreset, presets, presetValues, sameLook, shuffled } from './settings.js';
 
 const h = (tag, attrs = {}, ...children) => {
   const el = document.createElement(tag);
@@ -217,6 +218,7 @@ export function createUI(app) {
       return { m, chip, remove, el: h('span', { class: 'mine' }, chip, remove) };
     });
     looksRow.replaceChildren(...Object.values(chips), ...mineChips.map((c) => c.el), saveChip);
+    downloadButton.hidden = !mine.length;
     showMine();
   }
   // Which of yours is on screen, and whether + save has anything new to keep.
@@ -247,7 +249,48 @@ export function createUI(app) {
     drawMine();
     saveChip.focus({ preventScroll: true });
   }
-  const look = h('section', {}, h('h2', { class: 'micro' }, 'Look'), looksRow);
+  // Your looks travel as a file: download keeps them all (a small JSON file), upload brings a file of them
+  // back, here or in another browser, or drop it anywhere on the page. Uploading only adds: a look you
+  // already have is kept once, and six at most.
+  const looksFile = h('input', {
+    type: 'file', accept: '.json,application/json', hidden: true,
+    onchange: () => {
+      if (looksFile.files[0]) uploadLooks(looksFile.files[0]);
+      looksFile.value = '';
+    },
+  });
+  const downloadButton = h('button', { type: 'button', class: 'text-button micro', title: 'Download your looks as a file', onclick: () => downloadLooks() }, face('download'));
+  const uploadButton = h('button', { type: 'button', class: 'text-button micro', title: 'Upload a file of looks you downloaded', onclick: () => looksFile.click() }, face('upload'));
+  function downloadLooks() {
+    const blob = new Blob([JSON.stringify({ app: 'pure-smoke', looks: mine }, null, 2)], { type: 'application/json' });
+    download(blob, `pure-smoke-looks-${stamp()}.json`);
+    sayIn(downloadButton, 'downloaded', 'download');
+  }
+  async function uploadLooks(file) {
+    let looks = null;
+    try { looks = JSON.parse(await file.text())?.looks; } catch {}
+    if (!Array.isArray(looks)) return toast('that file has no Pure Smoke looks');
+    let added = 0;
+    let full = false;
+    for (const l of looks) {
+      const values = cleanLook(l?.values);
+      if (!values) continue;
+      const m = { name: '', values };
+      if (mine.some((x) => sameLook(valuesOf(x), valuesOf(m)) && x.values.colour === values.colour)) continue;
+      if (mine.length >= MAX_MINE) { full = true; break; }
+      const given = typeof l.name === 'string' ? l.name.trim().slice(0, 24) : '';
+      m.name = given && !mine.some((x) => x.name === given) && !presets[given] ? given : nextName();
+      mine.push(m);
+      added++;
+    }
+    keepMine();
+    drawMine();
+    if (added) sayIn(uploadButton, `${added} added`, 'upload');
+    else toast(full ? 'six looks kept: remove one to add more' : 'those looks are already here');
+  }
+  const look = h('section', {},
+    h('div', { class: 'section-head' }, h('h2', { class: 'micro' }, 'Look'), h('span', { class: 'head-actions' }, downloadButton, uploadButton)),
+    looksRow, looksFile);
   drawMine();
 
   // Actions
@@ -270,8 +313,9 @@ export function createUI(app) {
 
   // Colour: an orb for each palette, filled with its own colours and lit like a sphere, and apart from
   // them the image: + brings one (or drop one anywhere on the page), and it joins as an orb of its own
-  // picture. The colour worn has a ring and its name by the title; an image's main colours show below at
-  // the share of the picture each covers, the proportions the smoke wears them in.
+  // picture (+ image, a drop anywhere, or a paste). The colour worn has a ring and its name by the title;
+  // an image's main colours show below at the share of the picture each covers, the proportions the smoke
+  // wears them in.
   const fileInput = h('input', {
     type: 'file', accept: 'image/*', hidden: true,
     onchange: () => {
@@ -279,7 +323,6 @@ export function createUI(app) {
       fileInput.value = '';
     },
   });
-  const PLUS = '<svg viewBox="0 0 10 10" width="10" height="10"><path d="M5 1.6v6.8M1.6 5h6.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
   const orbs = {};
   for (const value of ['white', 'dusk', 'pearl', 'image']) {
     const fill = h('i', { class: 'orb-fill', 'aria-hidden': 'true' });
@@ -291,10 +334,9 @@ export function createUI(app) {
   }
   orbs.image.hidden = true;
   const addImage = h('button', {
-    type: 'button', class: 'orb orb-add', 'aria-label': 'Colour from an image',
-    title: 'Colour the smoke from an image (or drop one anywhere)', onclick: () => fileInput.click(),
-  });
-  addImage.innerHTML = PLUS;
+    type: 'button', class: 'chip chip-add',
+    title: 'Colour the smoke from an image: choose one, drop one anywhere, or paste one', onclick: () => fileInput.click(),
+  }, '+ image');
   const colourName = h('span', { class: 'micro colour-name' });
   const strip = h('div', { class: 'swatches', 'aria-hidden': 'true', hidden: true });
   let imageLabel = 'image';
@@ -403,8 +445,12 @@ export function createUI(app) {
 
   let dragDepth = 0;
   const hasFile = (e) => [...(e.dataTransfer?.items ?? [])].some((item) => item.kind === 'file');
+  const dropText = document.querySelector('.dropzone p');
   addEventListener('dragenter', (e) => {
     if (!hasFile(e)) return;
+    // The drop says what it will do: colour the smoke, or add looks from a file.
+    const looksFile = [...e.dataTransfer.items].some((item) => item.type === 'application/json');
+    dropText.innerHTML = looksFile ? '<b>Drop the file</b> to add its looks' : '<b>Drop an image</b> to colour the smoke';
     dragDepth++;
     document.body.classList.add('dropping');
   });
@@ -417,8 +463,18 @@ export function createUI(app) {
     e.preventDefault();
     dragDepth = 0;
     document.body.classList.remove('dropping');
-    const file = [...e.dataTransfer.files].find((f) => f.type.startsWith('image/'));
-    if (file) loadImage(file);
+    const files = [...e.dataTransfer.files];
+    const image = files.find((f) => f.type.startsWith('image/'));
+    const looksJson = files.find((f) => f.type === 'application/json' || f.name.endsWith('.json'));
+    if (image) loadImage(image);
+    else if (looksJson) uploadLooks(looksJson);
+  });
+  // Paste an image (⌘V) to colour the smoke with it, as + image or a drop does.
+  addEventListener('paste', (e) => {
+    const image = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
+    if (!image) return;
+    e.preventDefault();
+    loadImage(image);
   });
 
   const head = h('div', { class: 'panel-head' },
@@ -701,9 +757,12 @@ export function createUI(app) {
       if (e.key === 'Escape') openRecord(false, { instant: true, keyboard: true });
       return;
     }
-    if (e.target.closest('button, [role=slider], input, a')) return;
+    // Space presses a focused button (or steps nothing on a slider) by itself, so it pauses only from
+    // elsewhere. The letters work wherever focus is: a click leaves focus on the button it pressed, and
+    // there is no text field to type them into.
     const key = e.key.toLowerCase();
     if (key === ' ') {
+      if (e.target.closest('button, [role=slider], input, a')) return;
       e.preventDefault();
       toast(app.togglePause() ? 'paused' : 'playing', true);
     } else if (key === 'r') {

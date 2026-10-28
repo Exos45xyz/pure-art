@@ -225,7 +225,8 @@ canvas:active { cursor: grabbing; }
 @media (pointer: coarse) { .text-button::after { inset: -12px; } }
 .text-button:active { transform: scale(0.96); }
 
-.panel section { display: grid; gap: 8px; }
+/* min-width 0: a long name (an image's file name) shortens with … instead of widening the panel */
+.panel section { display: grid; gap: 8px; min-width: 0; }
 .panel h2 { padding: 0 2px; }
 .rows { display: grid; gap: 4px; }
 
@@ -323,7 +324,12 @@ canvas:active { cursor: grabbing; }
 @starting-style { .mine { opacity: 0; transform: scale(0.95); } }
 .chip-remove { padding: 0 7px; }
 .chip-remove[hidden] { display: none; }
-.chip-save { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+/* + save and + image: actions among choices, drawn as an outline */
+.chip-save, .chip-add { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+.head-actions { display: flex; gap: 12px; }
+.text-button .face { gap: 4px; }
+.text-button .tick { width: 8px; height: 8px; }
+.text-button .tick svg { width: 8px; height: 8px; }
 .chip:disabled { opacity: 0.4; cursor: default; }
 
 /* Save, record and copy: three equal buttons on one line */
@@ -428,7 +434,6 @@ canvas:active { cursor: grabbing; }
   .pill-primary:hover { background: #fff; }
   .pill-primary.recording:hover { background: #222; }
   .text-button:hover { color: var(--strong); }
-  .orb-add:hover { color: var(--strong); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45); }
   .foot a:hover, .designed:hover { opacity: 0.7; }
 }
 
@@ -474,7 +479,7 @@ canvas:active { cursor: grabbing; }
 
 /* Colour: an orb per palette, filled with its own colours and lit like a sphere, then the image apart
    (ui.js). The worn one has a ring; its name sits by the section title. */
-.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 2px; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 2px; min-width: 0; }
 .panel .section-head h2 { padding: 0; }
 .colour-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .colour-row { display: flex; align-items: center; gap: 10px; padding: 3px 2px; }
@@ -523,8 +528,6 @@ canvas:active { cursor: grabbing; }
 .orb-white .orb-fill { background: radial-gradient(circle at 38% 34%, #fff, #d6d6d6 55%, #888); }
 .orb-dusk .orb-fill::before { background-position: 50% 44%; }
 .orb-split { width: 1px; height: 16px; background: rgba(255, 255, 255, 0.12); }
-.orb-add { display: grid; place-items: center; color: var(--muted); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24); }
-.orb-add svg { display: block; }
 @media (pointer: coarse) { .orb { width: 30px; height: 30px; } }
 .swatches[hidden] { display: none; }
 .swatches { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 1px; }

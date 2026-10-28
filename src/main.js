@@ -46,6 +46,9 @@ const accumulate = renderer.extensions.has('EXT_color_buffer_float') && renderer
 
 // ---- State ---------------------------------------------------------------------------------
 
+// Opening a link opens the look it holds; reloading the page starts again from pure. (The address bar
+// keeps a link to the look on screen as you go, so the look can still be shared.)
+if (performance.getEntriesByType('navigation')[0]?.type === 'reload') history.replaceState(null, '', location.pathname + location.search);
 const state = readHash();
 // Phones start light. Computers start at a million grains and step down if they can't keep up.
 state.particles = coarse ? 256 : 1024;

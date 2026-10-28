@@ -151,6 +151,21 @@ export function lookCode(state) {
   return `  // A Pure Smoke look: paste it into presets in src/settings.js.\n  mine: {\n${lines.join('\n')}\n  },\n`;
 }
 
+// A look from outside (a file of looks): only the look controls, each a real value (a slider 0–1, a
+// choice one of its options, a colour one of the bundled ones or white). null when nothing is usable.
+export function cleanLook(values) {
+  if (!values || typeof values !== 'object') return null;
+  const look = {};
+  for (const c of controls) {
+    if ((c.look === false && c.key !== 'colour') || !(c.key in values)) continue;
+    const v = values[c.key];
+    if (c.type === 'choice') {
+      if (c.options.some(([o]) => o === v) && v !== 'image') look[c.key] = v;
+    } else if (typeof v === 'number' && Number.isFinite(v)) look[c.key] = Math.min(1, Math.max(0, v));
+  }
+  return Object.keys(look).length ? look : null;
+}
+
 // The link carries every look control that differs from its default: #flow=0.62&edges=red
 export function readHash() {
   const state = { ...defaults };
