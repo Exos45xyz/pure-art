@@ -1,3 +1,9 @@
+/* Linked from index.html, so the browser waits for the fonts and this sheet before the first paint.
+   (Imported from the code instead, the dev server put it on the page only once the code had loaded,
+   and the bare page showed until then.) */
+@import '@fontsource-variable/archivo/wdth.css';
+@import '@fontsource-variable/inter';
+
 /* Type and voice from Pure Studio's Enact concept, turned to black:
    Archivo Expanded for the wordmark and uppercase micro labels, a neutral sans in lowercase for controls. */
 

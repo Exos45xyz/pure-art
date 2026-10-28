@@ -7,8 +7,10 @@
     <meta name="description" content="Particle smoke in a glass cube. A free, open-source three.js toy by Pure Studio." />
     <meta name="theme-color" content="#000000" />
     <meta name="color-scheme" content="dark" />
-    <!-- Black from the first byte: the stylesheet comes a moment later, and the page must not flash white. -->
+    <!-- Black from the first byte, then the stylesheet, which the first paint waits for: the page is never
+         shown bare or white. -->
     <style>html, body { background: #000; }</style>
+    <link rel="stylesheet" href="/src/style.css" />
     <meta property="og:title" content="Pure Smoke" />
     <meta property="og:description" content="Particle smoke in a glass cube. Free and open source, made with three.js by Pure Studio." />
     <meta property="og:image" content="/og.png" />

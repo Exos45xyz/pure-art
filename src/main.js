@@ -1,6 +1,3 @@
-import '@fontsource-variable/archivo/wdth.css';
-import '@fontsource-variable/inter';
-import './style.css';
 // First, so the loading screen marks the code as here before anything heavy runs.
 import { step } from './loader.js';
 
