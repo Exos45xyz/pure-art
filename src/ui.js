@@ -131,15 +131,19 @@ function slider(control, app, onChange) {
   return { el, sync: () => show(app.state[control.key], el.closest('.panel')?.classList.contains('gliding') ? 240 : 0) };
 }
 
-// A row with its label on the left and a sliding thumb behind the chosen option. bare: no label, for a
-// row that is the only control in its section (the section's title already names it).
+// A row with its label on the left and the chosen option lit. bare: no label, for a row that is the only
+// control in its section (the section's title already names it).
 function choice(control, app, onChange, bare = false) {
-  const thumb = h('div', { class: 'choice-thumb' });
   // Each option's share of the row follows its words, with the same air (two letters' worth) around
   // each: a long one like 262k gets the room it needs and a short one like 1m doesn't float in a wide
-  // slot. The thumb takes the chosen option's share, inside the row's 3 px padding.
+  // slot.
   const weights = control.options.map(([, label]) => String(label).length + 2);
   const total = weights.reduce((a, b) => a + b, 0);
+  // The row twice: the options, and over them the same words lit on the thumb's grey, clipped to the
+  // chosen one. A choice moves the clip, so the grey and the bright words travel as one, with no colour
+  // to time against the move (Emil Kowalski, "The magic of clip-path"). Only the clip animates.
+  const lit = h('div', { class: 'choice-lit', 'aria-hidden': 'true' },
+    control.options.map(([, label], i) => h('span', { style: `flex: ${weights[i]} 1 0` }, label)));
   const buttons = control.options.map(([value, label], i) =>
     h('button', {
       type: 'button', role: 'radio', class: 'choice-option', style: `flex: ${weights[i]} 1 0`,
@@ -156,19 +160,19 @@ function choice(control, app, onChange, bare = false) {
         const next = buttons[(i + d + n) % n];
         next.focus();
         // Keyboard changes land at once; only clicks glide.
-        thumb.style.transition = 'none';
+        lit.style.transition = 'none';
         next.click();
-        requestAnimationFrame(() => requestAnimationFrame(() => { thumb.style.transition = ''; }));
+        requestAnimationFrame(() => requestAnimationFrame(() => { lit.style.transition = ''; }));
       },
     }, label));
-  const group = h('div', { class: 'choice', role: 'radiogroup', 'aria-label': control.label }, thumb, buttons);
+  const group = h('div', { class: 'choice', role: 'radiogroup', 'aria-label': control.label }, buttons, lit);
   const el = h('div', { class: bare ? 'row bare' : 'row' }, bare ? [] : h('span', { class: 'row-label' }, control.label), group);
 
   function sync() {
     const index = control.options.findIndex(([value]) => value === app.state[control.key]);
     const before = weights.slice(0, index).reduce((a, b) => a + b, 0);
-    thumb.style.width = `calc((100% - 6px) * ${weights[index] / total})`;
-    thumb.style.transform = `translateX(${(before / weights[index]) * 100}%)`;
+    const after = total - before - weights[index];
+    lit.style.clipPath = `inset(0 ${(after / total) * 100}% 0 ${(before / total) * 100}% round 5px)`;
     buttons.forEach((b, i) => {
       b.setAttribute('aria-checked', String(i === index));
       b.tabIndex = i === index ? 0 : -1;

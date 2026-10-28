@@ -232,7 +232,8 @@ canvas:active { cursor: grabbing; }
    finger. It stays inside the gaps around them, clear of the next control. */
 .text-button::after { content: ''; position: absolute; inset: -8px; }
 @media (pointer: coarse) { .text-button::after { inset: -12px; } }
-.text-button:active { transform: scale(0.96); }
+/* Small targets (12 px icons, short words) press a little deeper than wide ones to read */
+.text-button:active { transform: scale(0.95); }
 
 /* min-width 0: a long name (an image's file name) shortens with … instead of widening the panel */
 .panel section { display: grid; gap: 8px; min-width: 0; }
@@ -293,28 +294,31 @@ canvas:active { cursor: grabbing; }
   height: 100%;
   padding: 3px;
 }
-.choice-thumb {
-  position: absolute;
-  top: 3px;
-  bottom: 3px;
-  left: 3px;
-  max-width: calc(100% - 6px);
-  border-radius: 5px;
-  background: var(--thumb);
-  box-shadow: inset 0 1px 0 0 #ffffff0d;
-  /* It moves and takes the next option's width together (one small absolute box: no other layout moves) */
-  transition: transform 220ms var(--ease-out), width 220ms var(--ease-out);
-}
+/* The options, and over them the lit copy (ui.js choice), clipped to the chosen one: the move is the
+   press's answer, so the options have no press scale of their own (it would split the two layers). */
 .choice-option {
   position: relative;
   min-width: 0;
   white-space: nowrap;
   border-radius: 5px;
   color: var(--muted);
-  transition: color 200ms ease, transform 160ms var(--ease-pill);
 }
-.choice-option:active { transform: scale(0.96); }
-.choice-option[aria-checked='true'] { color: var(--strong); }
+.choice-lit {
+  position: absolute;
+  inset: 3px;
+  display: flex;
+  align-items: center;
+  border-radius: 5px;
+  background: var(--thumb);
+  box-shadow: inset 0 1px 0 0 #ffffff0d;
+  color: var(--strong);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: clip-path 220ms var(--ease-out);
+}
+.choice-lit span { min-width: 0; text-align: center; }
 /* The only control in its section: the section's title names it, so the options take the whole row. */
 .row.bare { grid-template-columns: 1fr; padding-left: 0; }
 
@@ -704,7 +708,8 @@ canvas:active { cursor: grabbing; }
   margin-left: -9px;
   cursor: grab;
   touch-action: none;
-  transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out);
+  /* Choosing a pin is instant, from a press or a key: only a pin dragged off the bar fades */
+  transition: opacity 120ms var(--ease-out);
 }
 .grad-stop svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .grad-stop path { fill: var(--stop); stroke: rgba(255, 255, 255, 0.72); stroke-width: 1.25; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
@@ -855,6 +860,6 @@ canvas:active { cursor: grabbing; }
   .recording .rec-dot { animation: none; }
   /* Movement goes; opacity and colour stay. The die doesn't turn; it still lands on a new face. */
   .die { transform: none !important; }
-  .choice-thumb, .gliding .slider-fill, .slider.jump .slider-fill, .chevron { transition: none; }
+  .choice-lit, .gliding .slider-fill, .slider.jump .slider-fill, .chevron { transition: none; }
   .tune, .mine, .picker, .grad-stop { transform: none !important; }
 }
