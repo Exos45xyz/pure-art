@@ -1,12 +1,42 @@
 # Pure Smoke
 
-Particle smoke in a glass cube. Free, open source and made with three.js.
+Particle smoke in a glass cube. Free, open source, made with three.js.
 
-![Pure Smoke: white particle smoke inside a wireframe glass cube](public/og.png)
+![Pure Smoke: blue and white particle smoke inside a wireframe glass cube, under the Pure Art logo](public/og.png)
 
-**Play with it:** https://pure-smoke.vercel.app
+**Play with it:** https://pure-art.vercel.app
 
-Drag to turn the cube, hover to stir the smoke, scroll to zoom (the hints at the bottom light up while you do each one, the first few times; on a touch screen only the drag is listed). Change the look with the panel on the side, then save a 4K image or record a seamless loop for your post.
+Most smoke on the web is a video. This one is alive.
+A million grains move through a real flow, inside real glass, under one studio lamp.
+You can turn it, stir it, give it your colours, and take it home as a 4K image or a loop that never shows its seam.
+
+Drag to turn the cube, hover to stir the smoke, scroll to zoom (the hints at the bottom light up while you do each one, the first few times; on a touch screen only the drag is listed).
+
+## What's in it
+
+- **Seven looks.** Each one a different shape of the same smoke. Randomize only rolls the ones that stay beautiful.
+- **Your colours, as data.** A gradient you draw, a palette, or any picture: every pixel colours its share of the smoke.
+- **Glass that acts like glass.** The smoke slides along the faces and springs back. The edges take the smoke's own light, or its colours.
+- **Rebound.** The smoke as physics, thrown at the glass on every beat.
+- **Take it with you.** A 4K image, or a seamless loop in MP4 for your post.
+- **Keep your looks.** Save them as chips, download them as a file, share any look with the link.
+- **On a phone too.** The panel becomes a sheet and the cube fits the room above it.
+
+## Why it looks like this
+
+Smoke is light. So the studio is black, and there is one lamp.
+The colour belongs to the smoke. So the panel is grey on black, and nothing else on the page is coloured.
+Most people want a look, a colour, and a way to share. So those come first; everything else waits under Fine-tune.
+Motion should explain, not decorate. The panel folds into the corner it comes back from. The hints light up the first few times you do what they say, then step back.
+The cube is the hero. On a phone it keeps to the room between the name and the sheet, so nothing covers it.
+
+## Make it yours
+
+Fork it, change it, ship it. Three places to start:
+
+- **A look of your own.** Find it in the panel, press **copy code**, and paste the block into `presets` in `src/settings.js`. It becomes a chip.
+- **The colour it opens in.** `DEFAULT_GRADIENT` in `src/settings.js`: a gradient's stops, as the editor writes them.
+- **The flow itself.** `src/simulation.js`: the velocity shader that moves every grain.
 
 ## Controls
 
@@ -79,6 +109,10 @@ Every grain is one texel in two float textures (position and age, velocity and s
 - **Edges:** a plain stroke, one width end to end, drawn as anti-aliased screen-space strips after the grade, with round joins at the corners. Each point of an edge reads the same opacity maps as the grains and takes the light a grain would take there, through the same exposure and film roll-off: brightest nearest the lamp, darker away from it and where smoke shades it, and hidden by smoke in front of it.
 
 All of it is in `src/`. Start with `settings.js` for the controls and looks, and `simulation.js` for the flow.
+
+## Contributing
+
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it is short, and it says how to check that a change keeps the smoke as it is.
 
 ## Credits
 

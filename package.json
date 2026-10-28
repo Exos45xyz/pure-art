@@ -5,6 +5,23 @@
   "type": "module",
   "license": "MIT",
   "author": "Pure Studio (https://www.purestudio.art)",
+  "homepage": "https://pure-art.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Exos45xyz/pure-smoke.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Exos45xyz/pure-smoke/issues"
+  },
+  "keywords": [
+    "three.js",
+    "webgl",
+    "particles",
+    "smoke",
+    "gpgpu",
+    "generative-art",
+    "curl-noise"
+  ],
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5321",
     "build": "vite build",
