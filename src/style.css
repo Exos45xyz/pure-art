@@ -255,6 +255,11 @@ canvas:active { cursor: grabbing; }
 }
 /* A layer only while a fill moves: gliding to a look, or under the hand. */
 .gliding .slider-fill { transition: transform 240ms var(--ease-out); will-change: transform; }
+/* A press (or a double-click back to the default) glides the fill to where it landed; a drag follows 1:1 */
+.slider.jump .slider-fill { transition: transform 200ms var(--ease-out); }
+/* Under the hand, a fine bright line marks the fill's edge: exactly where the value is */
+.slider-fill::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 1px; background: transparent; }
+.slider.dragging .slider-fill::after { background: rgba(255, 255, 255, 0.55); }
 .slider.dragging .slider-fill { will-change: transform; }
 .slider-label, .slider-value { position: relative; pointer-events: none; }
 .slider-value { font-variant-numeric: tabular-nums; color: var(--strong); }
@@ -334,6 +339,8 @@ canvas:active { cursor: grabbing; }
 .look-icon { display: block; flex: none; width: 12px; height: 12px; opacity: 0.75; }
 .look-icon svg { display: block; }
 .chip[aria-pressed='true'] .look-icon { opacity: 1; }
+/* A look of yours being named: the chip as a field, in its selected colours */
+.chip-name { border: 0; outline: none; font: inherit; background: var(--strong); color: #0b0b0b; text-transform: lowercase; cursor: text; }
 .head-actions { display: flex; gap: 12px; }
 .text-button .face { gap: 4px; }
 .text-button .tick { width: 8px; height: 8px; }
@@ -619,6 +626,6 @@ canvas:active { cursor: grabbing; }
   .recording .rec-dot { animation: none; }
   /* Movement goes; opacity and colour stay. The die doesn't turn; it still lands on a new face. */
   .die { transform: none !important; }
-  .choice-thumb, .gliding .slider-fill, .chevron { transition: none; }
+  .choice-thumb, .gliding .slider-fill, .slider.jump .slider-fill, .chevron { transition: none; }
   .tune, .mine { transform: none !important; }
 }

@@ -21,7 +21,7 @@ function face(words, ...marks) {
   return h('span', { class: 'face' }, ...marks, tick, h('span', { class: 'words', 'aria-live': 'polite' }, words));
 }
 
-// A full-width row you drag anywhere on. Click jumps, drag scrubs, Shift is fine, double-click resets,
+// A full-width row you drag anywhere on. Click glides there, drag scrubs, Shift is fine, double-click resets,
 // arrows step by 1 (Shift or Page keys: 10). A finger might be scrolling the sheet instead: the row waits
 // until it moves sideways (a drag) or lifts where it landed (a tap), and lets a vertical swipe scroll.
 function slider(control, app, onChange) {
@@ -32,14 +32,36 @@ function slider(control, app, onChange) {
     'aria-label': control.label, 'aria-valuemin': 0, 'aria-valuemax': 100,
   }, fill, h('span', { class: 'slider-label' }, control.label), value);
 
-  const show = (v) => {
-    fill.style.transform = `translateX(${(v - 1) * 100}%)`;
-    value.textContent = Math.round(v * 100);
-    el.setAttribute('aria-valuenow', Math.round(v * 100));
+  // The number follows its fill. When the fill glides (a look applied, a click far along the row, a
+  // double-click back to the default), the number counts along on the same ease-out; under the hand
+  // and from the keyboard both change at once.
+  let shownNumber = null;
+  let counting = 0;
+  const showNumber = (n) => {
+    shownNumber = n;
+    value.textContent = Math.round(n * 100);
   };
-  const set = (v) => {
+  const show = (v, ms = 0) => {
+    fill.style.transform = `translateX(${(v - 1) * 100}%)`;
+    el.setAttribute('aria-valuenow', Math.round(v * 100));
+    cancelAnimationFrame(counting);
+    const from = shownNumber ?? v;
+    if (!ms || from === v || matchMedia('(prefers-reduced-motion: reduce)').matches) return showNumber(v);
+    // On the wall clock from the first frame, as the CSS glide of the fill starts when it is first drawn.
+    let t0 = null;
+    const count = () => {
+      t0 ??= performance.now();
+      const p = Math.min(1, (performance.now() - t0) / ms);
+      showNumber(p < 1 ? from + (v - from) * (1 - (1 - p) ** 5) : v);
+      if (p < 1) counting = requestAnimationFrame(count);
+    };
+    counting = requestAnimationFrame(count);
+  };
+  // jump: the fill glides to a value it jumped to (style.css .slider.jump), and the number counts.
+  const set = (v, jump = false) => {
     v = Math.round(clamp01(v) * 100) / 100;
-    show(v);
+    el.classList.toggle('jump', jump);
+    show(v, jump ? 200 : 0);
     app.set(control.key, v);
     onChange();
   };
@@ -53,17 +75,20 @@ function slider(control, app, onChange) {
   let start = null;
   let touch = null;
   const scrub = (e) => set(start.value + ((e.clientX - start.x) / start.width) * (e.shiftKey ? 0.2 : 1));
-  const grab = (e, x, value) => {
+  // A press glides the fill to where it landed; a drag takes over at once, 1:1, but only once the pointer
+  // has really moved (3 px): the browser reports a move at the press itself, and a hand shakes a little.
+  const grab = (e, x, value, jump = false) => {
     still();
     el.setPointerCapture(e.pointerId);
     el.classList.add('dragging');
-    start = { x, value, width: el.getBoundingClientRect().width };
-    scrub(e);
+    start = { x, value, width: el.getBoundingClientRect().width, moved: !jump };
+    if (jump) set(value, true);
+    else scrub(e);
   };
   el.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     if (e.pointerType === 'touch') touch = { id: e.pointerId, x: e.clientX, value: at(e) };
-    else grab(e, e.clientX, at(e));
+    else grab(e, e.clientX, at(e), true);
   });
   el.addEventListener('pointermove', (e) => {
     if (touch?.id === e.pointerId) {
@@ -72,23 +97,27 @@ function slider(control, app, onChange) {
       touch = null;
       return grab(e, x, value);
     }
-    if (start && el.hasPointerCapture(e.pointerId)) scrub(e);
+    if (!start || !el.hasPointerCapture(e.pointerId)) return;
+    if (!start.moved && Math.abs(e.clientX - start.x) < 3) return;
+    start.moved = true;
+    scrub(e);
   });
   const end = () => { start = null; el.classList.remove('dragging'); };
   el.addEventListener('pointerup', (e) => {
     if (touch?.id === e.pointerId) {
       still();
-      set(touch.value);
+      set(touch.value, true);
     }
     touch = null;
     end();
   });
   // The browser took the finger to scroll the sheet: the value stays as it was.
   el.addEventListener('pointercancel', () => { touch = null; end(); });
-  el.addEventListener('dblclick', () => set(defaults[control.key]));
+  el.addEventListener('dblclick', () => set(defaults[control.key], true));
   el.addEventListener('keydown', (e) => {
     const step = e.shiftKey ? 0.1 : 0.01;
     const now = app.state[control.key];
+    // From the keyboard the value changes at once.
     if (e.key === 'ArrowRight' || e.key === 'ArrowUp') set(now + step);
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') set(now - step);
     else if (e.key === 'PageUp') set(now + 0.1);
@@ -99,7 +128,7 @@ function slider(control, app, onChange) {
     e.preventDefault();
   });
 
-  return { el, sync: () => show(app.state[control.key]) };
+  return { el, sync: () => show(app.state[control.key], el.closest('.panel')?.classList.contains('gliding') ? 240 : 0) };
 }
 
 // A row with its label on the left and a sliding thumb behind the chosen option. bare: no label, for a
@@ -226,7 +255,9 @@ export function createUI(app) {
   let mineChips = [];
   function drawMine() {
     mineChips = mine.map((m) => {
-      const chip = lookChip(m.name, 'mine', () => applyLook(valuesOf(m), m.name));
+      // Clicked while it's the look on screen (a second click, or a double-click): its name opens to type.
+      const chip = lookChip(m.name, 'mine', () => (chip.getAttribute('aria-pressed') === 'true' ? rename(m, chip) : applyLook(valuesOf(m), m.name)));
+      chip.title = 'Click again to rename';
       const remove = h('button', {
         type: 'button', class: 'chip chip-look chip-remove', 'aria-label': `Remove ${m.name}`, title: `Remove ${m.name}`, hidden: true,
         onclick: () => forget(m),
@@ -259,6 +290,39 @@ export function createUI(app) {
     drawMine();
     // + save is now gone (this look is a chip): keyboard focus goes to the new chip.
     if (keyboard) mineChips.at(-1).chip.focus();
+  }
+  // Name one of yours: the chip becomes a field in its place, Enter or a click away keeps the name,
+  // Escape leaves it as it was. Names stay short (24) and their own (a taken one gets a number).
+  function rename(m, chip) {
+    const field = h('input', {
+      class: 'chip chip-look chip-name', value: m.name, maxlength: 24, size: Math.max(4, m.name.length + 1),
+      spellcheck: 'false', autocomplete: 'off', 'aria-label': `Name for ${m.name}`,
+    });
+    chip.replaceWith(field);
+    field.focus();
+    field.select();
+    field.addEventListener('input', () => { field.size = Math.max(4, field.value.length + 1); });
+    let done = false;
+    const finish = (keep) => {
+      if (done) return;
+      done = true;
+      const name = field.value.trim().replace(/\s+/g, ' ').slice(0, 24);
+      if (keep && name && name !== m.name) {
+        const taken = (n) => presets[n] || mine.some((x) => x !== m && x.name === n);
+        let unique = name;
+        for (let i = 2; taken(unique); i++) unique = `${name} ${i}`;
+        m.name = unique;
+        keepMine();
+      }
+      drawMine();
+      mineChips.find((c) => c.m === m)?.chip.focus({ preventScroll: true });
+    };
+    field.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    });
+    field.addEventListener('blur', () => finish(true));
   }
   function forget(m) {
     mine = mine.filter((x) => x !== m);
@@ -774,9 +838,10 @@ export function createUI(app) {
       if (e.key === 'Escape') openRecord(false, { instant: true, keyboard: true });
       return;
     }
+    // Typing a look's name: the keys are the name's.
+    if (e.target.closest('input, textarea')) return;
     // Space presses a focused button (or steps nothing on a slider) by itself, so it pauses only from
-    // elsewhere. The letters work wherever focus is: a click leaves focus on the button it pressed, and
-    // there is no text field to type them into.
+    // elsewhere. The letters work wherever else focus is: a click leaves focus on the button it pressed.
     const key = e.key.toLowerCase();
     if (key === ' ') {
       if (e.target.closest('button, [role=slider], input, a')) return;
