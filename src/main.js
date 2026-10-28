@@ -592,8 +592,6 @@ async function atSize(width, height, ratio, task) {
 
 const app = {
   state,
-  // The bundled palettes' pictures, for the panel's colour orbs.
-  bundled,
   set(key, value) {
     if (state[key] === value) return;
     // Image colours need an image first: ask for one instead.

@@ -23,6 +23,9 @@ import { opacityGlsl } from './smoke.js';
 
 // The edge's own colour, sRGB, lit to at most about 0.98. Red is the reference clip's edge colour.
 const colors = { white: new Color(1, 1, 1), red: new Color(0.82, 0.021, 0.105), off: new Color(1, 1, 1) };
+// Any other edge colour is one picked in the panel (#rrggbb, read as a screen colour).
+const picked = new Color();
+const colourOf = (choice) => colors[choice] ?? (/^#[0-9a-f]{6}$/i.test(choice) ? picked.set(choice) : colors.white);
 
 const vertexShader = /* glsl */ `
   attribute vec3 other;
@@ -160,7 +163,7 @@ export function createCube(lighting) {
     // straight to the choice.
     update(choice, camera, dt, exposure) {
       const k = dt === Infinity ? 1 : 1 - Math.exp(-dt * 12);
-      if (choice !== 'off') color.lerp(colors[choice], k);
+      if (choice !== 'off') color.lerp(colourOf(choice), k);
       strength += ((choice === 'off' ? 0 : 1) - strength) * k;
       material.uniforms.uColor.value.copy(color);
       material.uniforms.uOpacity.value = strength;

@@ -492,7 +492,7 @@ canvas:active { cursor: grabbing; }
 }
 .rendering canvas { pointer-events: none; }
 
-/* Colour: an orb per palette, filled with its own colours and lit like a sphere, then the image apart
+/* Colour: a flat disc per palette, filled with its own colours, then the image apart
    (ui.js). The worn one has a ring; its name sits by the section title. */
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 2px; min-width: 0; }
 .panel .section-head h2 { padding: 0; }
@@ -521,29 +521,29 @@ canvas:active { cursor: grabbing; }
 .orb[aria-checked='true']::before { opacity: 1; }
 .orb:focus-visible { outline-offset: 6px; }
 .orb-fill { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; background: #2a2a2a; }
-/* The picture, softened so it reads as colour (a little larger than the orb, so the blur keeps a clean edge) */
-.orb-fill::before {
-  content: '';
-  position: absolute;
-  inset: -20%;
-  background: var(--picture) center / cover no-repeat;
-  filter: blur(1.5px) saturate(1.15);
-}
-/* Light from the top left and shade underneath: a sphere */
+/* A flat disc: no light or shade, only a hairline rim so a dark colour still parts from the panel */
 .orb-fill::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 42%),
-    radial-gradient(circle at 70% 82%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 62%);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.16);
 }
-.orb-white .orb-fill { background: radial-gradient(circle at 38% 34%, #fff, #d6d6d6 55%, #888); }
-.orb-dusk .orb-fill::before { background-position: 50% 44%; }
+.orb-white .orb-fill, .orb-edge-white .orb-fill { background: #f2f2f2; }
+/* Each palette's main shades (palette.js reads them for the strip), left to right from light, without the
+   black of its picture's studio: a flat band of its colours, not a lit ball */
+.orb-dusk .orb-fill { background: linear-gradient(90deg, rgb(217, 196, 182), rgb(207, 161, 176), rgb(202, 132, 139), rgb(187, 106, 99), rgb(158, 80, 61)); }
+.orb-pearl .orb-fill { background: linear-gradient(90deg, rgb(242, 239, 246), rgb(219, 214, 232), rgb(193, 185, 217), rgb(164, 156, 194), rgb(135, 127, 165)); }
 .orb-split { width: 1px; height: 16px; background: rgba(255, 255, 255, 0.12); }
-@media (pointer: coarse) { .orb { width: 30px; height: 30px; } }
+/* The cube's edges in Fine-tune (ui.js edgeField): white, yours, off, as small orbs in their row */
+.edge-orbs { position: relative; display: flex; align-items: center; gap: 12px; padding-left: 4px; }
+.orb-edge { width: 16px; height: 16px; }
+.orb-edge-colour .orb-fill { background: var(--edge, #8ab4ff); }
+.orb-edge-off .orb-fill { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
+.orb-edge-off .orb-fill::after { background: linear-gradient(135deg, transparent 45%, rgba(255, 255, 255, 0.5) 45% 55%, transparent 55%); box-shadow: none; }
+/* The system's colour picker opens from here, by your colour's orb */
+.edge-picker { position: absolute; left: 30px; top: 50%; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+@media (pointer: coarse) { .orb { width: 30px; height: 30px; } .orb-edge { width: 20px; height: 20px; } }
 .swatches[hidden] { display: none; }
 .swatches { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 1px; }
 .swatches i { display: block; min-width: 2px; }

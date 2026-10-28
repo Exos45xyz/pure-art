@@ -30,8 +30,8 @@ export const controls = [
 
   { group: 'Form', key: 'spin', label: 'spin' },
   { group: 'Form', key: 'lens', label: 'lens', type: 'choice', options: [['flat', 'flat'], ['depth', 'depth']] },
-  { group: 'Form', key: 'edges', label: 'edges', type: 'choice',
-    options: [['white', 'white'], ['red', 'red'], ['off', 'off']] },
+  // The cube's edges: white, a colour of your own (#rrggbb, picked in the panel), or off.
+  { group: 'Form', key: 'edges', label: 'edges', type: 'edge' },
 
   { group: 'Output', key: 'format', label: 'format', type: 'choice', look: false,
     options: [['screen', 'screen'], ['16:9', '16:9'], ['9:16', '9:16'], ['4:5', '4:5'], ['1:1', '1:1']] },
@@ -51,13 +51,13 @@ const base = {
   grain: 0.4, blur: 0, focus: 0.5, spin: 0.2, lens: 'depth', edges: 'white',
 };
 
-// "original" is the reference clip's camera (flat lens, 16.85° down, 62.66°/s) and red edges.
-// See README › The original look. The reference clip's camera, edges and breath, with pure's smoke and
-// particles: the clip's own speed (flow 1) washes the strands into fog, so the smoke keeps pure's pace.
+// "original" is the reference clip's camera (flat lens, 16.85° down, 62.66°/s) and breath (the clip's
+// red edges are white now: the edge colour is yours to choose). See README › The original look. With
+// pure's smoke and particles: the clip's own speed (flow 1) washes the strands into fog.
 const original = {
   flow: 0.45, turbulence: 0.51, spread: 0, gather: 0.98, pulse: 1, escape: 0,
   brightness: 0.5, shadows: 0.6, glow: 0.35, film: 0.42,
-  grain: 0.4, blur: 0, focus: 0.5, spin: 0.5, lens: 'flat', edges: 'red',
+  grain: 0.4, blur: 0, focus: 0.5, spin: 0.5, lens: 'flat', edges: 'white',
 };
 
 // Romain's look: the clip's breath through a depth lens, fine filaments, sharp grains, sealed glass.
@@ -74,7 +74,7 @@ export const presets = {
   // body, worn in dusk (chosen against pearl and pure's own settings by rendering each at 5 and 15 s).
   aura: { ...pure, turbulence: 0.42, gather: 0.9, brightness: 0.55, shadows: 0.48, glow: 0.4, grain: 0.36, colour: 'dusk' },
   original,
-  // Two other shapes for the original's camera, breath and red edges, chosen from ten by rendering
+  // Two other shapes for the original's camera and breath, chosen from ten by rendering
   // each over 30 s and scoring it (crisp strands, smooth motion), and each its own shape the whole time.
   // ribbon: bright bands arcing around a breathing body.
   ribbon: { ...original, flow: 0.32, turbulence: 0.22, gather: 0.7, pulse: 1, brightness: 0.53, shadows: 0.42, glow: 0.3, grain: 0.32 },
@@ -151,6 +151,9 @@ export function lookCode(state) {
   return `  // A Pure Smoke look: paste it into presets in src/settings.js.\n  mine: {\n${lines.join('\n')}\n  },\n`;
 }
 
+// An edge colour: white, off, a colour of your own (#rrggbb), or red (the clip's, in older links and looks).
+export const isEdge = (v) => typeof v === 'string' && (['white', 'off', 'red'].includes(v) || /^#[0-9a-f]{6}$/i.test(v));
+
 // A look from outside (a file of looks): only the look controls, each a real value (a slider 0–1, a
 // choice one of its options, a colour one of the bundled ones or white). null when nothing is usable.
 export function cleanLook(values) {
@@ -161,6 +164,8 @@ export function cleanLook(values) {
     const v = values[c.key];
     if (c.type === 'choice') {
       if (c.options.some(([o]) => o === v) && v !== 'image') look[c.key] = v;
+    } else if (c.type === 'edge') {
+      if (isEdge(v)) look[c.key] = v.toLowerCase();
     } else if (typeof v === 'number' && Number.isFinite(v)) look[c.key] = Math.min(1, Math.max(0, v));
   }
   return Object.keys(look).length ? look : null;
@@ -176,6 +181,8 @@ export function readHash() {
     if (c.type === 'choice') {
       const option = c.options.find(([value]) => String(value) === raw);
       if (option) state[c.key] = option[0];
+    } else if (c.type === 'edge') {
+      if (isEdge(raw)) state[c.key] = raw.toLowerCase();
     } else {
       const n = Number(raw);
       if (Number.isFinite(n)) state[c.key] = Math.min(1, Math.max(0, n));

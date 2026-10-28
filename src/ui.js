@@ -172,6 +172,63 @@ function choice(control, app, onChange, bare = false) {
   return { el, sync };
 }
 
+// The cube's edges: white, a colour of your own, or off, as small discs in their row. Your colour opens the
+// system's colour picker and the cube follows live as you pick; it is remembered for next time.
+const EDGE_KEY = 'pure-smoke-edge-colour';
+function edgeField(control, app, onChange) {
+  let yours = '#8ab4ff';
+  try { yours = localStorage.getItem(EDGE_KEY) ?? yours; } catch {}
+  const picker = h('input', { type: 'color', class: 'edge-picker', value: yours, tabindex: -1, 'aria-hidden': 'true' });
+  const names = { white: 'white edges', colour: 'edges in your colour', off: 'no edges' };
+  const orbs = {};
+  for (const [kind, label] of Object.entries(names)) {
+    orbs[kind] = h('button', {
+      type: 'button', role: 'radio', class: `orb orb-edge orb-edge-${kind}`, 'aria-label': label, title: label,
+      onclick: () => pick(kind), onkeydown: (e) => step(e, kind),
+    }, h('i', { class: 'orb-fill', 'aria-hidden': 'true' }));
+  }
+  orbs.colour.title = 'Edges in your colour (click to pick it)';
+  const set = (v) => {
+    app.set(control.key, v);
+    sync();
+    onChange();
+  };
+  function pick(kind) {
+    if (kind !== 'colour') return set(kind);
+    set(yours);
+    picker.showPicker ? picker.showPicker() : picker.click();
+  }
+  picker.addEventListener('input', () => {
+    yours = picker.value.toLowerCase();
+    try { localStorage.setItem(EDGE_KEY, yours); } catch {}
+    set(yours);
+  });
+  const kindOf = (v) => (v === 'white' || v === 'off' ? v : 'colour');
+  function sync() {
+    const v = app.state[control.key];
+    const on = kindOf(v);
+    for (const [kind, o] of Object.entries(orbs)) {
+      o.setAttribute('aria-checked', String(kind === on));
+      o.tabIndex = kind === on ? 0 : -1;
+    }
+    orbs.colour.firstChild.style.setProperty('--edge', on === 'colour' ? (v === 'red' ? '#d1051b' : v) : yours);
+  }
+  // Arrows move along the orbs, as in any group of choices (the picker opens only with a click).
+  function step(e, kind) {
+    const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+    if (!d) return;
+    e.preventDefault();
+    const kinds = Object.keys(orbs);
+    const next = kinds[(kinds.indexOf(kind) + d + kinds.length) % kinds.length];
+    orbs[next].focus();
+    set(next === 'colour' ? yours : next);
+  }
+  const el = h('div', { class: 'row' },
+    h('span', { class: 'row-label' }, control.label),
+    h('div', { class: 'edge-orbs', role: 'radiogroup', 'aria-label': control.label }, orbs.white, orbs.colour, orbs.off, picker));
+  return { el, sync };
+}
+
 export function createUI(app) {
   const panel = document.querySelector('.panel');
   const reopen = document.querySelector('.reopen');
@@ -385,15 +442,23 @@ export function createUI(app) {
   // Controls. The everyday path comes first: a look, a colour, then save or share. The rest waits one
   // level deeper under Fine-tune, so a first visit asks for three choices instead of twenty.
   const field = (control, bare = false) => {
-    const f = control.type === 'choice' ? choice(control, app, refresh, bare) : slider(control, app, refresh);
+    const f = control.type === 'choice' ? choice(control, app, refresh, bare)
+      : control.type === 'edge' ? edgeField(control, app, refresh) : slider(control, app, refresh);
     fields.push({ ...f, control });
     return f.el;
   };
   const byKey = (key) => controls.find((c) => c.key === key);
   const section = (title, ...children) => h('section', {}, h('h2', { class: 'micro' }, title), ...children);
 
-  // Colour: an orb for each palette, filled with its own colours and lit like a sphere, and apart from
-  // them the image: + brings one (or drop one anywhere on the page), and it joins as an orb of its own
+  // A colour disc: the main shades, left to right from light, without near-black (the studio around a
+  // picture): a flat band of its colours, as the palettes' discs are drawn in style.css.
+  const discOf = (swatches) => {
+    const light = (c) => { const [r, g, b] = c.match(/\d+/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const shades = swatches.map((sw) => sw.color).filter((c) => light(c) > 60).sort((a, b) => light(b) - light(a));
+    return shades.length > 1 ? `linear-gradient(90deg, ${shades.join(', ')})` : shades[0] ?? swatches[0]?.color ?? '#2a2a2a';
+  };
+  // Colour: a flat disc for each palette, filled with its own colours, and apart from
+  // them the image: + brings one (or drop one anywhere on the page), and it joins as a disc of its own
   // picture (+ image, a drop anywhere, or a paste). The colour worn has a ring and its name by the title;
   // an image's main colours show below at the share of the picture each covers, the proportions the smoke
   // wears them in.
@@ -407,7 +472,6 @@ export function createUI(app) {
   const orbs = {};
   for (const value of ['white', 'dusk', 'pearl', 'image']) {
     const fill = h('i', { class: 'orb-fill', 'aria-hidden': 'true' });
-    if (app.bundled[value]) fill.style.setProperty('--picture', `url("${app.bundled[value]}")`);
     orbs[value] = h('button', {
       type: 'button', role: 'radio', class: `orb orb-${value}`, 'aria-label': value, title: value,
       onclick: () => wearColour(value), onkeydown: (e) => stepColour(e, value),
@@ -495,7 +559,7 @@ export function createUI(app) {
   // becomes its orb, and the strip shows its main colours at the share of the picture each one covers.
   function showColours(picked) {
     if (app.state.colour === 'image' && picked) {
-      orbs.image.querySelector('.orb-fill').style.setProperty('--picture', `url("${picked.thumbnail}")`);
+      orbs.image.querySelector('.orb-fill').style.background = discOf(picked.swatches);
       orbs.image.hidden = false;
       orbs.image.setAttribute('aria-label', picked.name);
       orbs.image.title = picked.name;
