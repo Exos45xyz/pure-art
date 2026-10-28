@@ -12,6 +12,9 @@ const h = (tag, attrs = {}, ...children) => {
 };
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
+// Past an edge, the further something is pulled the less it follows (Apple's rubber band): a soft limit,
+// never a hard stop.
+const rubberband = (over, size, c = 0.55) => (over * size * c) / (size + c * over);
 
 // A button's face: an optional mark, a check (shown while the button says it's done) and its words.
 const TICK = '<svg viewBox="0 0 10 10" width="10" height="10"><path d="M1.6 5.3 4 7.6 8.4 2.7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -1008,12 +1011,14 @@ export function createUI(app) {
     }
 
     // A drag follows the hand along the bar, 1:1, off it too; 28 px above or below it, the pin lets go.
+    // The pin keeps the place under the hand where it was taken, instead of jumping its point there.
     function grab(stop, pin, e) {
       pin.setPointerCapture(e.pointerId);
       const box = bar.getBoundingClientRect();
+      const offset = atPointer(e) - stop.at;
       const move = (ev) => {
         if (!pin.hasPointerCapture(ev.pointerId)) return;
-        stop.at = Math.round(atPointer(ev));
+        stop.at = Math.round(Math.min(100, Math.max(0, atPointer(ev) - offset)));
         leaving = stops.length > 2 && (ev.clientY < box.top - 28 || ev.clientY > box.bottom + 28) ? stop : null;
         changed();
       };
@@ -1064,16 +1069,19 @@ export function createUI(app) {
         changed();
       };
       const next = () => sorted()[sorted().indexOf(stop) + 1];
+      let offset = 0; // where on the diamond the hand took it
       diamond.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
         e.preventDefault();
         diamond.focus({ preventScroll: true });
         diamond.setPointerCapture(e.pointerId);
+        const b = next();
+        offset = b ? atPointer(e) - midOf(stop, b) : 0;
       });
       diamond.addEventListener('pointermove', (e) => {
         const b = next();
         if (!diamond.hasPointerCapture(e.pointerId) || !b) return;
-        setMid((atPointer(e) - stop.at) / (b.at - stop.at || 1));
+        setMid((atPointer(e) - offset - stop.at) / (b.at - stop.at || 1));
       });
       diamond.addEventListener('dblclick', () => setMid(0.5));
       diamond.addEventListener('keydown', (e) => {
@@ -1271,7 +1279,8 @@ export function createUI(app) {
   }
   showFace(dieFace);
 
-  panel.append(head, quick, look, colour, share, tuneSection,
+  const grabber = h('i', { class: 'grabber', 'aria-hidden': 'true' });
+  panel.append(grabber, head, quick, look, colour, share, tuneSection,
     h('p', { class: 'micro keys' }, 'Space pause · R randomize · H hide'));
   fields.forEach((f) => f.sync());
   refresh();
@@ -1534,6 +1543,44 @@ export function createUI(app) {
     placeChrome();
   }
   reopen.addEventListener('click', () => setOpen(true));
+
+  // On a phone the panel is a sheet, and it goes away as a sheet does: drag its head (or the grabber) down
+  // and it follows the finger 1:1; let go past half its height, or flick it, and it goes, the flick's speed
+  // projected to where it would come to rest (iOS's v·0.998 / (1 − 0.998)); otherwise it settles back.
+  // Pulled up, it resists more the further it goes. The panel's own transitions (style.css) carry it on
+  // from wherever the finger left it. A touch that hasn't moved 6 px is still a tap.
+  const sheetDrag = { id: null, y: 0, dy: 0, moving: false, samples: [] };
+  panel.addEventListener('pointerdown', (e) => {
+    if (!phone() || e.button !== 0 || recordOpen || panel.hasAttribute('data-hidden')) return;
+    if (!e.target.closest('.panel-head, .grabber') || e.target.closest('button')) return;
+    Object.assign(sheetDrag, { id: e.pointerId, y: e.clientY, dy: 0, moving: false, samples: [[e.timeStamp, e.clientY]] });
+    panel.setPointerCapture(e.pointerId);
+  });
+  panel.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== sheetDrag.id) return;
+    const dy = e.clientY - sheetDrag.y;
+    if (!sheetDrag.moving && Math.abs(dy) < 6) return;
+    sheetDrag.moving = true;
+    sheetDrag.samples.push([e.timeStamp, e.clientY]);
+    if (sheetDrag.samples.length > 5) sheetDrag.samples.shift();
+    sheetDrag.dy = dy >= 0 ? dy : -rubberband(-dy, panel.offsetHeight);
+    panel.style.transition = 'none';
+    panel.style.transform = `translateY(${sheetDrag.dy}px)`;
+  });
+  const letGo = (e) => {
+    if (e.pointerId !== sheetDrag.id) return;
+    sheetDrag.id = null;
+    if (!sheetDrag.moving) return;
+    const [t0, y0] = sheetDrag.samples[0];
+    const [t1, y1] = sheetDrag.samples[sheetDrag.samples.length - 1];
+    const speed = t1 > t0 ? ((y1 - y0) / (t1 - t0)) * 1000 : 0; // px a second, down positive
+    const rest = sheetDrag.dy + (speed / 1000) * (0.998 / (1 - 0.998));
+    panel.style.transition = '';
+    panel.style.transform = '';
+    if (rest > panel.offsetHeight / 2) setOpen(false);
+  };
+  panel.addEventListener('pointerup', letGo);
+  panel.addEventListener('pointercancel', letGo);
 
   const shownPanel = () => (recordOpen ? recordPanel : panel.hasAttribute('data-hidden') ? null : panel);
   const phone = () => matchMedia('(max-width: 720px)').matches;

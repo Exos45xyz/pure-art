@@ -319,6 +319,8 @@ canvas:active { cursor: grabbing; }
   transition: clip-path 220ms var(--ease-out);
 }
 .choice-lit span { min-width: 0; text-align: center; }
+/* The press answers at once, under the finger, before the choice moves on release */
+.choice-option:active { background: rgba(255, 255, 255, 0.05); }
 /* The only control in its section: the section's title names it, so the options take the whole row. */
 .row.bare { grid-template-columns: 1fr; padding-left: 0; }
 
@@ -853,6 +855,30 @@ canvas:active { cursor: grabbing; }
   .brand { top: max(16px, env(safe-area-inset-top)); left: 16px; }
   .reopen { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform-origin: bottom right; }
   .toast { bottom: calc(var(--sheet, 0px) + max(8px, env(safe-area-inset-bottom)) + 12px); left: 50%; }
+  /* The sheet's grabber, and its head takes the finger (ui.js: drag down to put the sheet away) */
+  .panel .grabber { display: block; }
+  .panel-head { touch-action: none; }
+}
+.grabber {
+  display: none;
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* Glass only where the system wants it: frosted solid with reduced transparency, and edges and words that
+   stand out with more contrast. */
+@media (prefers-reduced-transparency: reduce) {
+  .panel, .picker { background: #0d0d0d; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  :root { --text: #d0d0d0; --muted: #a8a8a8; --line: rgba(255, 255, 255, 0.22); }
+  .panel, .picker { background: #0b0b0b; box-shadow: var(--lift), inset 0 0 0 1px rgba(255, 255, 255, 0.3); }
 }
 
 @media (prefers-reduced-motion: reduce) {
