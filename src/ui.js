@@ -261,7 +261,13 @@ export function createUI(app) {
   // (aura, or one of yours) wears it, and takes it off again when a look without one follows, unless the
   // colour was changed by hand in between. Randomize keeps whatever colour is on.
   let worn = null;
+  // Changes made by hand (the look's sliders and choices) that a look, reset or randomize would replace,
+  // when they are not kept anywhere: the toast offers them back.
+  let handMade = false;
+  const kept = () => matchingPreset(app.state) !== undefined || mine.some((m) => sameLook(valuesOf(m), app.state));
   const applyLook = (values, name, instant = false) => {
+    const before = handMade && !kept() ? lookOf(app.state) : null;
+    handMade = false;
     app.apply(values, name);
     if (name && values.colour) {
       worn = { colour: values.colour, before: worn?.before ?? app.state.colour };
@@ -271,6 +277,13 @@ export function createUI(app) {
       worn = null;
     }
     syncAll(instant);
+    if (before) {
+      toast('your changes were replaced', { instant, action: { label: 'undo', run: () => {
+        app.apply(before);
+        syncAll(true);
+        handMade = true;
+      } } });
+    }
   };
 
   // Looks: chips with a small radius, each with a line icon of its shape, drawn like the die: a thin
@@ -381,11 +394,19 @@ export function createUI(app) {
     });
     field.addEventListener('blur', () => finish(true));
   }
+  // Removing one of yours can be undone for a few seconds (Sonner's action toast): it comes back in its place.
   function forget(m) {
+    const at = mine.indexOf(m);
     mine = mine.filter((x) => x !== m);
     keepMine();
     drawMine();
     (saveChip.hidden ? looksRow.querySelector('button') : saveChip).focus({ preventScroll: true });
+    toast(`${m.name} removed`, { action: { label: 'undo', run: () => {
+      if (mine.includes(m) || mine.length >= MAX_MINE) return;
+      mine.splice(Math.min(at, mine.length), 0, m);
+      keepMine();
+      drawMine();
+    } } });
   }
   // Your looks travel as a file: download keeps them all (a small JSON file), upload brings a file of them
   // back, here or in another browser, or drop it anywhere on the page. Uploading only adds: a look you
@@ -407,7 +428,7 @@ export function createUI(app) {
   async function uploadLooks(file) {
     let looks = null;
     try { looks = JSON.parse(await file.text())?.looks; } catch {}
-    if (!Array.isArray(looks)) return toast('that file has no Pure Smoke looks');
+    if (!Array.isArray(looks)) return toast('that file has no Pure Smoke looks', { error: true });
     let added = 0;
     let full = false;
     for (const l of looks) {
@@ -441,9 +462,15 @@ export function createUI(app) {
 
   // Controls. The everyday path comes first: a look, a colour, then save or share. The rest waits one
   // level deeper under Fine-tune, so a first visit asks for three choices instead of twenty.
+  // A look's own controls mark the look as made by hand (see applyLook); the output's don't.
+  const touched = () => {
+    handMade = true;
+    refresh();
+  };
   const field = (control, bare = false) => {
-    const f = control.type === 'choice' ? choice(control, app, refresh, bare)
-      : control.type === 'edge' ? edgeField(control, app, refresh) : slider(control, app, refresh);
+    const onChange = control.look === false ? refresh : touched;
+    const f = control.type === 'choice' ? choice(control, app, onChange, bare)
+      : control.type === 'edge' ? edgeField(control, app, onChange) : slider(control, app, onChange);
     fields.push({ ...f, control });
     return f.el;
   };
@@ -576,7 +603,7 @@ export function createUI(app) {
   }
 
   async function loadImage(file) {
-    if (!file.type.startsWith('image/')) return toast('that file is not an image');
+    if (!file.type.startsWith('image/')) return toast('that file is not an image', { error: true });
     try {
       await app.useImage(file);
       fields.forEach((f) => f.sync());
@@ -584,7 +611,7 @@ export function createUI(app) {
       // The orb and its strip say it where the panel shows; with the panel away, a toast does.
       if (panel.hasAttribute('data-hidden') || recordOpen) toast('image colours · same proportions');
     } catch (e) {
-      toast(e.message);
+      toast(e.message, { error: !/cancelled/.test(e.message) });
     }
   }
 
@@ -666,36 +693,103 @@ export function createUI(app) {
 
   // Toast, with Sonner's manners: it stays long enough to read (a longer message, longer), its clock
   // stops while the page is hidden (a video can finish while you are in another tab), and a message
-  // that replaces one on screen blurs across instead of snapping.
-  // instant: raised by a key, so it appears at once (it still fades out when it leaves).
+  // that replaces one on screen blurs across instead of snapping. One with an action (undo) stays 5 s,
+  // holds while the pointer is on it, and swipes down to go; an error carries a small mark.
+  // opts: true (raised by a key: appears at once, still fades out), or { instant, error, action: { label, run } }.
   let toastTimer;
   let toastLeft = 0;
   let toastSince = 0;
-  function toast(message, instant = false) {
-    const text = h('span', {}, message);
+  let toastTicking = false;
+  let toastHovered = false;
+  let undoable = null; // the action of the toast on screen, for ⌘Z
+
+  function toast(message, opts = {}) {
+    const { instant = false, error = false, action = null } = typeof opts === 'boolean' ? { instant: opts } : opts;
+    const body = h('span', { class: 'toast-body' },
+      error ? h('i', { class: 'toast-mark', 'aria-hidden': 'true' }, '!') : [],
+      h('span', {}, message),
+      action ? h('button', { type: 'button', class: 'toast-action', onclick: () => { action.run(); hideToast(); } }, action.label) : []);
     const replacing = toastEl.classList.contains('show') && !instant;
-    toastEl.replaceChildren(text);
+    toastEl.replaceChildren(body);
     if (replacing) {
-      text.animate([{ opacity: 0, filter: 'blur(2px)' }, { opacity: 1, filter: 'blur(0)' }],
+      body.animate([{ opacity: 0, filter: 'blur(2px)' }, { opacity: 1, filter: 'blur(0)' }],
         { duration: 180, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
     }
+    toastEl.style.transform = '';
     toastEl.classList.toggle('instant', instant);
+    toastEl.classList.toggle('actionable', !!action);
+    undoable = action?.run ?? null;
     toastEl.classList.add('show');
-    toastLeft = Math.max(2000, 1200 + message.length * 45);
+    if (!action) toastHovered = false;
+    toastLeft = action ? 5000 : Math.max(2000, 1200 + message.length * 45);
     runToastClock();
+  }
+  function hideToast() {
+    undoable = null;
+    clearTimeout(toastTimer);
+    toastTicking = false;
+    toastEl.classList.remove('show', 'instant', 'actionable');
   }
   function runToastClock() {
     clearTimeout(toastTimer);
-    if (document.hidden) return;
+    toastTicking = false;
+    if (document.hidden || toastHovered) return;
+    toastTicking = true;
     toastSince = performance.now();
-    toastTimer = setTimeout(() => toastEl.classList.remove('show', 'instant'), toastLeft);
+    toastTimer = setTimeout(hideToast, toastLeft);
+  }
+  function holdToastClock() {
+    if (!toastTicking) return;
+    clearTimeout(toastTimer);
+    toastTicking = false;
+    toastLeft -= performance.now() - toastSince;
   }
   document.addEventListener('visibilitychange', () => {
     if (!toastEl.classList.contains('show')) return;
-    if (!document.hidden) return runToastClock();
-    clearTimeout(toastTimer);
-    toastLeft -= performance.now() - toastSince;
+    if (document.hidden) holdToastClock();
+    else runToastClock();
   });
+  // Only a toast with an action takes the pointer: it holds while the pointer is on it, and a swipe down
+  // (far enough, or quick enough: a flick) sends it away; a short one springs back.
+  toastEl.addEventListener('pointerenter', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    toastHovered = true;
+    holdToastClock();
+  });
+  toastEl.addEventListener('pointerleave', () => {
+    toastHovered = false;
+    if (toastEl.classList.contains('show')) runToastClock();
+  });
+  let swipe = null;
+  toastEl.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.toast-action')) return;
+    toastEl.setPointerCapture(e.pointerId);
+    swipe = { y: e.clientY, t: performance.now(), dy: 0 };
+    toastEl.style.transition = 'none';
+    holdToastClock();
+  });
+  toastEl.addEventListener('pointermove', (e) => {
+    if (!swipe) return;
+    const dy = e.clientY - swipe.y;
+    // Upward it resists (there is nowhere to go), downward it follows the hand.
+    swipe.dy = dy > 0 ? dy : dy / (1 + Math.abs(dy) / 12);
+    toastEl.style.transform = `translate(-50%, ${swipe.dy}px)`;
+  });
+  const endSwipe = () => {
+    if (!swipe) return;
+    const { dy, t } = swipe;
+    swipe = null;
+    toastEl.style.transition = '';
+    if (dy > 30 || dy / (performance.now() - t) > 0.11) {
+      toastEl.style.transform = `translate(-50%, ${dy + 24}px)`;
+      hideToast();
+    } else {
+      toastEl.style.transform = '';
+      runToastClock();
+    }
+  };
+  toastEl.addEventListener('pointerup', endSwipe);
+  toastEl.addEventListener('pointercancel', endSwipe);
 
   // A button says what it just did in its own place, where the eye already is, then its own words again
   // after 1.5 s. The words crossfade through a slight blur, so one reads as turning into the next; from
@@ -736,7 +830,7 @@ export function createUI(app) {
       }
     } catch (e) {
       words.textContent = 'save image';
-      toast(e.message);
+      toast(e.message, { error: true });
     } finally {
       save.disabled = false;
       save.removeAttribute('aria-busy');
@@ -817,7 +911,7 @@ export function createUI(app) {
       const ext = await app.recordVideo(show);
       saved = `${app.canLoop && loop === 'loop' ? 'loop' : 'video'} saved · ${ext}`;
     } catch (e) {
-      toast(e.message);
+      toast(e.message, { error: !/cancelled/.test(e.message) });
     } finally {
       status.hidden = true;
       startLabel.textContent = 'start recording';
@@ -836,7 +930,7 @@ export function createUI(app) {
       await navigator.clipboard.writeText(lookCode(app.state));
       sayIn(copy, 'copied', 'copy code', instant);
     } catch {
-      toast('this browser blocked the clipboard');
+      toast('this browser blocked the clipboard', { error: true });
     }
   }
 
@@ -892,6 +986,13 @@ export function createUI(app) {
   placeChrome();
 
   addEventListener('keydown', (e) => {
+    // ⌘Z (Ctrl+Z) does what the undo toast on screen offers.
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && undoable && !e.target.closest('input, textarea')) {
+      e.preventDefault();
+      undoable();
+      hideToast();
+      return;
+    }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     // While recording, keys only cancel: Escape. In the record window, Escape goes back.
     if (app.recording) {

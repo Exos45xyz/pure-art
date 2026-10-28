@@ -606,7 +606,7 @@ const app = {
       if (bundled[value] && !palettes[value]) {
         loadBundled(value)
           .then(() => { if (state.colour === value) wear(value); })
-          .catch(() => ui.toast('those colours did not load'));
+          .catch(() => ui.toast('those colours did not load', { error: true }));
       }
     }
     if (key === 'particles') {

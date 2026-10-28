@@ -449,6 +449,7 @@ canvas:active { cursor: grabbing; }
   .pill-primary:hover { background: #fff; }
   .pill-primary.recording:hover { background: #222; }
   .text-button:hover { color: var(--strong); }
+  .toast-action:hover { background: #363636; }
   .foot a:hover, .designed:hover { opacity: 0.7; }
 }
 
@@ -589,6 +590,31 @@ canvas:active { cursor: grabbing; }
   transition: opacity 200ms var(--ease-out), transform 240ms var(--ease-out);
 }
 .toast.show.instant { transition: none; }
+.toast-body { display: flex; align-items: center; gap: 8px; }
+/* An error: a small ring with ! in the app's one red (the record dot's), so it doesn't read as a confirmation */
+.toast-mark {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  font: 600 9px/1 var(--sans);
+  font-style: normal;
+  color: #e5262b;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+/* A toast with an action takes the pointer (to hold it, press undo, or swipe it away); others never do */
+.toast.actionable { pointer-events: auto; touch-action: none; padding-right: 5px; }
+.toast-action {
+  height: 20px;
+  padding: 0 9px;
+  border-radius: 10px;
+  background: #2c2c2c;
+  color: var(--strong);
+  text-transform: lowercase;
+  transition: transform 160ms var(--ease-pill);
+}
+.toast-action:active { transform: scale(0.95); }
 
 .fallback { display: none; }
 .no-webgl .fallback {
