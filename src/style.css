@@ -192,8 +192,8 @@ canvas:active { cursor: grabbing; }
   display: grid;
   gap: 6px;
 }
-/* Each hint has the gesture's icon, in the panel's line style. They light while you do what they say:
-   at once when the hand starts, gently back when it stops. */
+/* Each hint has the gesture's icon, in the panel's line style. The first few times you do what one says,
+   it lights: at once when the hand starts, gently back when it stops (ui.js lightHints). */
 .hint [data-hint] { display: inline-flex; align-items: center; gap: 5px; vertical-align: top; transition: color 400ms ease; }
 .hint svg { width: 10px; height: 10px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
 .hint [data-hint].lit { color: var(--strong); transition-duration: 100ms; }
@@ -214,7 +214,7 @@ canvas:active { cursor: grabbing; }
 /* After the first entrance they answer at UI speed (the footer leaves and returns around a render). */
 .settled .brand, .settled .foot, .settled .credit { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
 /* A link pressed by a finger dims as it does under the pointer */
-.ready .credit a:active { opacity: 0.7; }
+.ready .credit a:active { opacity: 0.7; transition-duration: 100ms; }
 
 /* ---- Panel --------------------------------------------------------------------------------- */
 
@@ -244,15 +244,16 @@ canvas:active { cursor: grabbing; }
   transition: opacity 600ms var(--ease-out) 180ms, transform 600ms var(--ease-out) 180ms;
 }
 /* Hidden, it folds into the corner its pill comes out of (and grows back out of the pill), rather than
-   carrying a pane of glass across the screen: one place for it to go and come back from. */
+   carrying a pane of glass across the screen: one place for it to go and come back from. It fades on
+   the fold's own curve, so the fold is seen rather than lost in a quick fade. */
 .ready .panel[data-hidden] {
   opacity: 0;
   transform: scale(0.95);
   pointer-events: none;
-  transition: opacity 180ms var(--ease-out), transform 240ms var(--ease-drawer);
+  transition: opacity 240ms var(--ease-drawer), transform 240ms var(--ease-drawer);
 }
 .settled .panel { transition: opacity 200ms var(--ease-out), transform 260ms var(--ease-drawer); }
-.settled .panel[data-hidden] { transition: opacity 160ms var(--ease-out), transform 220ms var(--ease-drawer); }
+.settled .panel[data-hidden] { transition: opacity 220ms var(--ease-drawer), transform 220ms var(--ease-drawer); }
 .ready .panel:not([data-hidden]).instant,
 .ready .panel[data-hidden].instant { transition: none; }
 /* The record window is a level below the parameters: it turns in from the right as they leave to
@@ -539,9 +540,15 @@ canvas:active { cursor: grabbing; }
   transform: scale(0.95);
   transform-origin: top right;
   pointer-events: none;
-  transition: opacity 180ms var(--ease-out), transform 200ms var(--ease-out);
+  /* Pressed, it gives way at once: the panel grows out of its place, so the two never show together */
+  transition: none;
 }
-.reopen[data-shown] { opacity: 1; transform: none; pointer-events: auto; transition-delay: 80ms; }
+.reopen[data-shown] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition: opacity 180ms var(--ease-out) 80ms, transform 200ms var(--ease-out) 80ms;
+}
 .reopen.instant { transition: none; }
 
 /* A format (or the record window) makes the canvas the frame of the file, placed by main.js in the

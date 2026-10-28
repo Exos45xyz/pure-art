@@ -1676,13 +1676,26 @@ export function createUI(app) {
     setTimeout(() => { if (!touched) toast('drag to turn the cube'); }, 3500);
   }
 
-  // The footer's hints: each lights while the hand does what it says (main.js asks every frame; the
-  // page is only touched when one changes).
+  // The footer's hints: each lights while the hand does what it says, the first few times in a visit,
+  // then stays still (stirring happens on every move of the mouse; a light that kept answering it would
+  // flicker at the edge of the eye). main.js asks every frame; the page is only touched when one changes.
   const hintEls = Object.fromEntries([...document.querySelectorAll('.hint [data-hint]')].map((el) => [el.dataset.hint, el]));
   const hintLit = {};
+  const hintShown = {};
+  const hintAt = {};
+  const HINT_LESSONS = 3;
+  // A pause this short is still the same gesture (a stirring mouse slows between strokes).
+  const HINT_PAUSE = 300;
   function lightHints(now) {
-    for (const [name, on] of Object.entries(now)) {
-      if (hintLit[name] === on || !hintEls[name]) continue;
+    const t = performance.now();
+    for (const [name, doing] of Object.entries(now)) {
+      if (!hintEls[name]) continue;
+      if (doing) hintAt[name] = t;
+      const going = doing || t - (hintAt[name] ?? -Infinity) < HINT_PAUSE;
+      // A gesture under way keeps its light; a new one gets one only while there are lessons left.
+      const on = going && (hintLit[name] || (hintShown[name] ?? 0) < HINT_LESSONS);
+      if (on === !!hintLit[name]) continue;
+      if (on) hintShown[name] = (hintShown[name] ?? 0) + 1;
       hintLit[name] = on;
       hintEls[name].classList.toggle('lit', on);
     }
