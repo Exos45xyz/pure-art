@@ -15,20 +15,21 @@
     <meta property="og:description" content="Particle smoke in a glass cube. Free and open source, made with three.js by Pure Studio." />
     <meta property="og:image" content="/og.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.png" type="image/png" sizes="64x64" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   </head>
   <body>
     <!-- Loading: in the page itself, so it is there from the first paint. The name, and a bar that
          fills as the smoke really loads (src/loader.js). -->
     <div class="loader" aria-hidden="true">
-      <p class="wordmark">Pure <span class="dim">Smoke</span></p>
+      <p class="wordmark logo"><span class="sr">Pure Smoke</span><i class="pure-art" aria-hidden="true"></i></p>
       <div class="bar"><i></i></div>
     </div>
 
     <canvas aria-label="Particle smoke inside a turning glass cube. Drag to turn it, hover to stir the smoke."></canvas>
 
     <header class="brand">
-      <h1 class="wordmark">Pure <span class="dim">Smoke</span></h1>
+      <h1 class="wordmark logo"><span class="sr">Pure Smoke</span><i class="pure-art" aria-hidden="true"></i></h1>
     </header>
     <!-- The studio's credit: centred at the foot of the free space (on a phone, under the name) -->
     <a class="designed credit micro" href="https://www.purestudio.art/" target="_blank" rel="noopener" aria-label="Designed by Pure Studio">
@@ -49,7 +50,7 @@
     <div class="dropzone" aria-hidden="true"><p class="micro"><b>Drop an image</b> to colour the smoke</p></div>
 
     <div class="fallback">
-      <p class="wordmark">Pure <span class="dim">Smoke</span></p>
+      <p class="wordmark logo"><span class="sr">Pure Smoke</span><i class="pure-art" aria-hidden="true"></i></p>
       <p class="micro">This needs WebGL 2. Try a recent Chrome, Safari or Firefox with hardware acceleration on.</p>
     </div>
 

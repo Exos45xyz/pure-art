@@ -2,10 +2,9 @@
    (Imported from the code instead, the dev server put it on the page only once the code had loaded,
    and the bare page showed until then.) */
 @import '@fontsource-variable/archivo/wdth.css';
-@import '@fontsource-variable/inter';
 
 /* Type and voice from Pure Studio's Enact concept, turned to black:
-   Archivo Expanded for the wordmark and uppercase micro labels, a neutral sans in lowercase for controls. */
+   Archivo Expanded for the wordmark and uppercase micro labels, Archivo at its normal width in lowercase for controls. */
 
 :root {
   --page: #000;
@@ -21,7 +20,7 @@
   --line: rgba(255, 255, 255, 0.06);
 
   --display: 'Archivo Variable', Archivo, 'Helvetica Neue', Arial, sans-serif;
-  --sans: 'Inter Variable', Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --sans: 'Archivo Variable', Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-pill: cubic-bezier(0.16, 1, 0.3, 1);
@@ -78,6 +77,19 @@ canvas:active { cursor: grabbing; }
   color: var(--strong);
 }
 .wordmark .dim { color: var(--muted); }
+/* The Pure Art logo (the dragon) in the name's place, drawn in the interface's own white; the name stays
+   for screen readers */
+.logo { line-height: 0; }
+.pure-art {
+  display: block;
+  height: 40px;
+  aspect-ratio: 1200 / 372;
+  background: var(--strong);
+  -webkit-mask: url(/pure-art.png) no-repeat center / contain;
+  mask: url(/pure-art.png) no-repeat center / contain;
+}
+.loader .pure-art { height: 48px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 .micro {
   margin: 0;
@@ -200,6 +212,7 @@ canvas:active { cursor: grabbing; }
   backdrop-filter: blur(20px) saturate(140%);
   border-radius: 16px;
   box-shadow: var(--lift);
+  transform-origin: top right;
 }
 .panel::-webkit-scrollbar { display: none; }
 .ready .panel {
@@ -207,9 +220,11 @@ canvas:active { cursor: grabbing; }
   transform: none;
   transition: opacity 600ms var(--ease-out) 180ms, transform 600ms var(--ease-out) 180ms;
 }
+/* Hidden, it folds into the corner its pill comes out of (and grows back out of the pill), rather than
+   carrying a pane of glass across the screen: one place for it to go and come back from. */
 .ready .panel[data-hidden] {
   opacity: 0;
-  transform: translateX(calc(100% + 24px));
+  transform: scale(0.95);
   pointer-events: none;
   transition: opacity 180ms var(--ease-out), transform 240ms var(--ease-drawer);
 }
@@ -863,7 +878,8 @@ canvas:active { cursor: grabbing; }
   .foot, .keys { display: none; }
   .brand { top: max(16px, env(safe-area-inset-top)); left: 16px; }
   /* The sheet has the foot of a phone: the credit sits under the name instead */
-  .credit { top: calc(max(16px, env(safe-area-inset-top)) + 32px); bottom: auto; left: 16px; right: auto; margin: 0; }
+  .credit { top: calc(max(16px, env(safe-area-inset-top)) + 52px); bottom: auto; left: 16px; right: auto; margin: 0; }
+  .brand .pure-art { height: 36px; }
   .reopen { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform-origin: bottom right; }
   .toast { bottom: calc(var(--sheet, 0px) + max(8px, env(safe-area-inset-bottom)) + 12px); left: 50%; }
   /* The sheet's grabber, and its head takes the finger (ui.js: drag down to put the sheet away) */

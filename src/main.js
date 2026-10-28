@@ -261,7 +261,19 @@ const bufferSize = new Vector2();
 // What the renderer draws into: the screen, or for a moment an export size.
 const output = { width: 0, height: 0, ratio: 1, offsetX: 0, offsetY: 0 };
 // The cube sits in the middle of the space the panel leaves free.
-const pan = { x: 0, y: 0, targetX: 0, targetY: 0 };
+const pan = { x: 0, y: 0, vx: 0, vy: 0, targetX: 0, targetY: 0 };
+// It glides there on a critically damped spring (Apple's reposition: damping 1, response 0.4 s): it starts
+// from rest, never overshoots, and a click while it moves turns it round without a jolt. Exact per step.
+const panW = (2 * Math.PI) / 0.4;
+function springPan(dt) {
+  const e = Math.exp(-panW * dt);
+  for (const [at, speed, target] of [['x', 'vx', 'targetX'], ['y', 'vy', 'targetY']]) {
+    const off = pan[at] - pan[target];
+    const c = pan[speed] + panW * off;
+    pan[at] = pan[target] + (off + c * dt) * e;
+    pan[speed] = (pan[speed] - panW * c * dt) * e;
+  }
+}
 let exporting = false;
 // While an image is encoded the loop holds still: the screen keeps the frame being saved, and the
 // browser's PNG encoder gets the idle time it waits for (with the loop running it took 5 to 10 s).
@@ -501,9 +513,7 @@ function tick(now) {
   live.colourMix += ((state.colour !== 'white' && colours ? 1 : 0) - live.colourMix) * (1 - Math.exp(-dt * 6));
 
   if (!exporting) {
-    const panK = 1 - Math.exp(-dt * 9);
-    pan.x += (pan.targetX - pan.x) * panK;
-    pan.y += (pan.targetY - pan.y) * panK;
+    springPan(dt);
     if (Math.abs(pan.x - output.offsetX) + Math.abs(pan.y - output.offsetY) > 0.01) {
       output.offsetX = pan.x;
       output.offsetY = pan.y;
@@ -709,8 +719,7 @@ const app = {
     if (framed) instant = true;
     // With reduced motion the scene moves to its new centre at once instead of sliding.
     if (instant || reducedMotion()) {
-      pan.x = pan.targetX;
-      pan.y = pan.targetY;
+      Object.assign(pan, { x: pan.targetX, y: pan.targetY, vx: 0, vy: 0 });
     }
   },
   // What you see: the chosen frame in the record window, the screen everywhere else (the S key).

@@ -29,9 +29,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## Fonts — SIL Open Font License 1.1
 
 - **Archivo**: Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo)
-- **Inter**: Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
 
-Bundled through Fontsource (`@fontsource-variable/archivo`, `@fontsource-variable/inter`). This Font Software is licensed under the SIL Open Font License, Version 1.1:
+Bundled through Fontsource (`@fontsource-variable/archivo`). This Font Software is licensed under the SIL Open Font License, Version 1.1:
 
 ```
 -----------------------------------------------------------

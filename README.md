@@ -10,7 +10,7 @@ Drag to turn the cube, hover to stir the smoke, scroll to zoom. Change the look 
 
 ## Controls
 
-The panel shows the everyday choices first: a look, a colour, then save or share. The icon at its top right hides it (or H); **parameters** brings it back. Everything else sits under **Fine-tune**, in short groups by what it changes (**Motion**, **Rhythm**, **Glass**, **Light**, **Particles**, **Camera**), each control saying what it does when you hover it; it stays open or closed as you left it.
+The panel shows the everyday choices first: a look, a colour, then save or share. The icon at its top right hides it (or H): it folds into its corner, the cube glides into the room it leaves, and **parameters** brings it back out of the same corner. Everything else sits under **Fine-tune**, in short groups by what it changes (**Motion**, **Rhythm**, **Glass**, **Light**, **Particles**, **Camera**), each control saying what it does when you hover it; it stays open or closed as you left it.
 
 | Group | Control | What it does |
 | --- | --- | --- |
@@ -86,11 +86,11 @@ All of it is in `src/`. Start with `settings.js` for the controls and looks, and
 - [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) by Vanilagy, for the loop's MP4 (MIT)
 - Simplex noise with gradients from [webgl-noise](https://github.com/stegu/webgl-noise) by Ian McEwan and Stefan Gustavson (MIT)
 - Hash without Sine by Dave Hoskins (MIT)
-- [Archivo](https://fonts.google.com/specimen/Archivo) and [Inter](https://rsms.me/inter/) (SIL Open Font License)
+- [Archivo](https://fonts.google.com/specimen/Archivo) (SIL Open Font License)
 
 ## License
 
-[MIT](LICENSE): use it, change it, ship it. That covers the code and the two bundled colours, dusk and pearl. The Pure Studio name and logo are the studio's own and aren't part of the licence. The libraries, the noise code and the fonts keep their own licences, listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+[MIT](LICENSE): use it, change it, ship it. That covers the code and the two bundled colours, dusk and pearl. The Pure Studio name and logo, and the Pure Art logo (the dragon, also the tab's icon), are the studio's own and aren't part of the licence. The libraries, the noise code and the fonts keep their own licences, listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ---
 
