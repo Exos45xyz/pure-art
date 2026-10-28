@@ -274,7 +274,8 @@ canvas:active { cursor: grabbing; }
 .row {
   height: 28px;
   display: grid;
-  grid-template-columns: 76px 1fr;
+  /* The labels are short words (count, lens, edges): the options get the rest */
+  grid-template-columns: 56px 1fr;
   align-items: center;
   padding-left: 10px;
   border-radius: 7px;
@@ -295,11 +296,13 @@ canvas:active { cursor: grabbing; }
   border-radius: 5px;
   background: var(--thumb);
   box-shadow: inset 0 1px 0 0 #ffffff0d;
-  transition: transform 220ms var(--ease-out);
+  /* It moves and takes the next option's width together (one small absolute box: no other layout moves) */
+  transition: transform 220ms var(--ease-out), width 220ms var(--ease-out);
 }
 .choice-option {
   position: relative;
-  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
   border-radius: 5px;
   color: var(--muted);
   transition: color 200ms ease, transform 160ms var(--ease-pill);
@@ -596,6 +599,10 @@ canvas:active { cursor: grabbing; }
   cursor: crosshair;
   touch-action: none;
 }
+/* One column the popover's width: a field's own width (the hex, in 16 px type on a phone) never widens it */
+.picker, .picker-colour { grid-template-columns: minmax(0, 1fr); }
+.picker-colour { display: grid; gap: 12px; }
+.picker .section-head { padding: 0; }
 .picker-row { display: flex; align-items: center; gap: 10px; }
 .picker-drop {
   flex: none;
@@ -652,6 +659,41 @@ canvas:active { cursor: grabbing; }
 @media (hover: hover) and (pointer: fine) {
   .picker-drop:hover { color: var(--strong); background: var(--row-hover); }
 }
+/* Your gradient's bar (ui.js gradientEditor): its colours and a knob for each, 10 px in from the round
+   ends; the chosen knob has the worn disc's ring, and one dragged off the bar fades before it goes. */
+.grad-bar {
+  position: relative;
+  height: 20px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.12);
+  cursor: copy;
+  touch-action: none;
+}
+.grad-stop {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--stop);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 2.5px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.5);
+  cursor: grab;
+  touch-action: none;
+  transition: opacity 120ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.grad-stop::before { content: ''; position: absolute; inset: -6px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--strong); opacity: 0; }
+.grad-stop.chosen { z-index: 1; }
+.grad-stop.chosen::before { opacity: 1; }
+.grad-stop.leaving { opacity: 0.35; transform: scale(0.85); }
+.grad-stop:focus-visible { outline-offset: 6px; }
+.chip-add[hidden] { display: none; }
+@media (pointer: coarse) {
+  .grad-bar { height: 24px; border-radius: 12px; }
+  .grad-stop { width: 18px; height: 18px; margin: -9px 0 0 -9px; }
+}
+/* A short phone: the square gives up some height so the editor stays above the sheet */
+@media (max-height: 640px) { .picker-square { height: 128px; } }
 /* A phone zooms the page into a field with smaller type */
 @media (pointer: coarse) { .picker-hex { font-size: 16px; } .picker-hue { height: 16px; border-radius: 8px; } }
 .swatches[hidden] { display: none; }
@@ -770,5 +812,5 @@ canvas:active { cursor: grabbing; }
   /* Movement goes; opacity and colour stay. The die doesn't turn; it still lands on a new face. */
   .die { transform: none !important; }
   .choice-thumb, .gliding .slider-fill, .slider.jump .slider-fill, .chevron { transition: none; }
-  .tune, .mine, .picker { transform: none !important; }
+  .tune, .mine, .picker, .grad-stop { transform: none !important; }
 }

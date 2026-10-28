@@ -67,12 +67,12 @@ const pure = {
   grain: 0.4, blur: 0, focus: 0.5, spin: 0.13, lens: 'depth', edges: 'white',
 };
 
-// A look may bring a colour (one of the bundled palettes); the others leave the colour as it is.
+// A look sets the smoke, its light and its form. The colour is yours: no look changes it.
 export const presets = {
   pure,
-  // aura: pure's breath a little softer and brighter, so the colour reads across a rounder, glowing
-  // body, worn in dusk (chosen against pearl and pure's own settings by rendering each at 5 and 15 s).
-  aura: { ...pure, turbulence: 0.42, gather: 0.9, brightness: 0.55, shadows: 0.48, glow: 0.4, grain: 0.36, colour: 'dusk' },
+  // aura: pure's breath a little softer and brighter, so a colour reads across a rounder, glowing body
+  // (chosen in dusk against pure's own settings by rendering each at 5 and 15 s).
+  aura: { ...pure, turbulence: 0.42, gather: 0.9, brightness: 0.55, shadows: 0.48, glow: 0.4, grain: 0.36 },
   original,
   // Two other shapes for the original's camera and breath, chosen from ten by rendering
   // each over 30 s and scoring it (crisp strands, smooth motion), and each its own shape the whole time.
@@ -101,13 +101,8 @@ export function lookOf(state) {
 }
 export const sameLook = (a, b) => lookKeys.every((key) => a[key] === b[key]);
 
-// The look on screen, if it is one of the presets (one that brings a colour only while it's worn).
-export function matchingPreset(state) {
-  return Object.keys(presets).find((name) => {
-    const look = presetValues(name);
-    return sameLook(look, state) && (!look.colour || look.colour === state.colour);
-  });
-}
+// The look on screen, if it is one of the presets.
+export const matchingPreset = (state) => Object.keys(presets).find((name) => sameLook(presetValues(name), state));
 
 // Randomize: every roll is one of the smoke's beautiful families, varied only inside the ranges where it
 // stays beautiful. Found by rendering rolls and scoring them (crisp strands, shapes with air around
@@ -145,8 +140,6 @@ export function lookCode(state) {
   const value = (v) => (typeof v === 'string' ? `'${v}'` : String(v));
   const keys = controls.filter((c) => c.look !== false).map((c) => c.key);
   const lines = [];
-  // A bundled palette travels with the look; white is every look's own, and an upload stays in this browser.
-  if (state.colour !== 'white' && state.colour !== 'image') keys.push('colour');
   for (let i = 0; i < keys.length; i += 6) lines.push('    ' + keys.slice(i, i + 6).map((k) => `${k}: ${value(state[k])}`).join(', ') + ',');
   return `  // A Pure Smoke look: paste it into presets in src/settings.js.\n  mine: {\n${lines.join('\n')}\n  },\n`;
 }
@@ -154,16 +147,32 @@ export function lookCode(state) {
 // An edge colour: white, off, a colour of your own (#rrggbb), or red (the clip's, in older links and looks).
 export const isEdge = (v) => typeof v === 'string' && (['white', 'off', 'red'].includes(v) || /^#[0-9a-f]{6}$/i.test(v));
 
+// Your gradient as a colour: g: and its stops, two to eight, each a colour and where it sits on the bar
+// (0–100), in order: g:ffc6a5@0,ff6b8b@50,7b6cff@100 (the panel keeps it in this browser).
+const STOP = /^([0-9a-f]{6})@(\d{1,3})$/;
+export function readGradient(v) {
+  if (typeof v !== 'string' || !v.startsWith('g:')) return null;
+  const stops = v.slice(2).split(',').map((s) => STOP.exec(s)).map((m) => m && { colour: `#${m[1]}`, at: Number(m[2]) });
+  if (stops.length < 2 || stops.length > 8 || stops.some((s) => !s || s.at > 100)) return null;
+  return stops.every((s, i) => i === 0 || s.at >= stops[i - 1].at) ? stops : null;
+}
+export const isGradient = (v) => readGradient(v) !== null;
+export const gradientValue = (stops) =>
+  `g:${[...stops].sort((a, b) => a.at - b.at).map((s) => `${s.colour.slice(1).toLowerCase()}@${Math.round(s.at)}`).join(',')}`;
+// Peach, rose and violet: unlike the two palettes, and bright enough to read as colour in the smoke.
+export const DEFAULT_GRADIENT = 'g:ffc6a5@0,ff6b8b@50,7b6cff@100';
+
 // A look from outside (a file of looks): only the look controls, each a real value (a slider 0–1, a
-// choice one of its options, a colour one of the bundled ones or white). null when nothing is usable.
+// choice one of its options). A colour in an older file is left out: looks don't change the colour.
+// null when nothing is usable.
 export function cleanLook(values) {
   if (!values || typeof values !== 'object') return null;
   const look = {};
   for (const c of controls) {
-    if ((c.look === false && c.key !== 'colour') || !(c.key in values)) continue;
+    if (c.look === false || !(c.key in values)) continue;
     const v = values[c.key];
     if (c.type === 'choice') {
-      if (c.options.some(([o]) => o === v) && v !== 'image') look[c.key] = v;
+      if (c.options.some(([o]) => o === v)) look[c.key] = v;
     } else if (c.type === 'edge') {
       if (isEdge(v)) look[c.key] = v.toLowerCase();
     } else if (typeof v === 'number' && Number.isFinite(v)) look[c.key] = Math.min(1, Math.max(0, v));

@@ -1,5 +1,5 @@
 import { download, stamp } from './capture.js';
-import { cleanLook, controls, defaults, lookCode, lookOf, matchingPreset, presets, presetValues, sameLook, shuffled } from './settings.js';
+import { DEFAULT_GRADIENT, cleanLook, controls, defaults, gradientValue, isGradient, lookCode, lookOf, matchingPreset, presets, presetValues, readGradient, sameLook, shuffled } from './settings.js';
 
 const h = (tag, attrs = {}, ...children) => {
   const el = document.createElement(tag);
@@ -135,11 +135,14 @@ function slider(control, app, onChange) {
 // row that is the only control in its section (the section's title already names it).
 function choice(control, app, onChange, bare = false) {
   const thumb = h('div', { class: 'choice-thumb' });
-  // One option's share of the row inside its 3 px padding, so the last one ends at the padding too.
-  thumb.style.width = `calc((100% - 6px) / ${control.options.length})`;
+  // Each option's share of the row follows its words, with the same air (two letters' worth) around
+  // each: a long one like 262k gets the room it needs and a short one like 1m doesn't float in a wide
+  // slot. The thumb takes the chosen option's share, inside the row's 3 px padding.
+  const weights = control.options.map(([, label]) => String(label).length + 2);
+  const total = weights.reduce((a, b) => a + b, 0);
   const buttons = control.options.map(([value, label], i) =>
     h('button', {
-      type: 'button', role: 'radio', class: 'choice-option',
+      type: 'button', role: 'radio', class: 'choice-option', style: `flex: ${weights[i]} 1 0`,
       onclick: () => {
         app.set(control.key, value);
         sync();
@@ -163,7 +166,9 @@ function choice(control, app, onChange, bare = false) {
 
   function sync() {
     const index = control.options.findIndex(([value]) => value === app.state[control.key]);
-    thumb.style.transform = `translateX(${index * 100}%)`;
+    const before = weights.slice(0, index).reduce((a, b) => a + b, 0);
+    thumb.style.width = `calc((100% - 6px) * ${weights[index] / total})`;
+    thumb.style.transform = `translateX(${(before / weights[index]) * 100}%)`;
     buttons.forEach((b, i) => {
       b.setAttribute('aria-checked', String(i === index));
       b.tabIndex = i === index ? 0 : -1;
@@ -197,14 +202,11 @@ const readHex = (text, short = true) => {
 // The eyedropper, drawn upright like the look icons and turned to lie on its side: bulb, collar, tube.
 const PIPETTE = '<svg viewBox="0 0 12 12" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(45 6 6)"><rect x="4.6" y="0.8" width="2.8" height="3.8" rx="1.4"/><path d="M3.5 4.9h5M5 4.9v4.3L6 11l1-1.8V4.9"/></g></svg>';
 
-// A colour picker like Figma's, opened by a control and set beside it: a square of saturation (across) and
-// brightness (down), a hue bar, an eyedropper where the browser has one, and the hex. A press puts the
-// knob where it lands and a drag follows the hand 1:1, off the square too (pointer capture); the colour
-// changes live. It grows out of its control, closes on Escape, a press outside or its control again, and
-// from a key it opens and closes at once. One picker serves the page; it is made the first time it opens.
-let thePicker = null;
-function colourPicker() {
-  if (thePicker) return thePicker;
+// The colour controls Figma has: a square of saturation (across) and brightness (down), a hue bar, an
+// eyedropper where the browser has one, and the hex. A press puts the knob where it lands and a drag
+// follows the hand 1:1, off the square too (pointer capture). set(hex) shows a colour; onPick(hex) hears
+// every change as it happens.
+function colourControls() {
   const knob = () => h('i', { class: 'picker-knob', 'aria-hidden': 'true' });
   const square = h('div', { class: 'picker-square', role: 'slider', tabindex: 0, 'aria-label': 'saturation and brightness' }, knob());
   const hue = h('div', { class: 'picker-hue', role: 'slider', tabindex: 0, 'aria-label': 'hue', 'aria-valuemin': 0, 'aria-valuemax': 360 }, knob());
@@ -212,17 +214,13 @@ function colourPicker() {
   drop.innerHTML = PIPETTE;
   drop.hidden = !('EyeDropper' in window);
   const hex = h('input', { class: 'picker-hex', 'aria-label': 'hex', spellcheck: 'false', autocomplete: 'off', autocapitalize: 'characters', maxlength: 7 });
-  const el = h('div', { class: 'picker', role: 'dialog', hidden: true },
+  const el = h('div', { class: 'picker-colour' },
     square,
     h('div', { class: 'picker-row' }, drop, hue),
     h('label', { class: 'picker-field' }, h('span', { class: 'micro' }, 'hex'), hex));
-  document.body.append(el);
 
   let hsv = { h: 0, s: 0, v: 1 };
-  let anchor = null;
-  let onPick = null;
-  let onDone = null;
-  let hiding = 0;
+  const api = { el, onPick: null, set, focus: () => square.focus({ preventScroll: true }) };
   // Greys have no hue of their own: the square keeps the one it had instead of jumping to red.
   const keepHue = (next) => (next.s === 0 ? { ...next, h: hsv.h } : next);
 
@@ -239,9 +237,13 @@ function colourPicker() {
     if (document.activeElement !== hex) hex.value = now.slice(1).toUpperCase();
     return now;
   }
+  function set(colour) {
+    hsv = keepHue(hexToHsv(readHex(colour) ?? '#ffffff'));
+    draw();
+  }
   const change = (next) => {
     hsv = { ...hsv, ...next };
-    onPick?.(draw());
+    api.onPick?.(draw());
   };
 
   function drag(area, at) {
@@ -295,8 +297,19 @@ function colourPicker() {
       if (v) change(keepHue(hexToHsv(v)));
     } catch {} // Escape put the eyedropper away
   });
+  return api;
+}
 
-  // Beside the panel, level with its control; on a phone, above the sheet over its control.
+// A popover opened by a control and set beside it: beside the panel, level with the control; on a phone,
+// above the sheet over it. It grows out of its control, closes on Escape, a press outside or its control
+// again, or when the panel goes away, and from a key it opens and closes at once.
+function popover() {
+  const el = h('div', { class: 'picker', role: 'dialog', hidden: true });
+  document.body.append(el);
+  let anchor = null;
+  let onDone = null;
+  let hiding = 0;
+
   function place() {
     const w = el.offsetWidth;
     const ht = el.offsetHeight;
@@ -328,16 +341,15 @@ function colourPicker() {
   };
   const resized = () => close({ instant: true });
   const moved = () => anchor && place();
-  // The panel hides (H) or turns into the record window: the picker goes with it.
+  // The panel hides (H) or turns into the record window: the popover goes with it.
   const watch = new MutationObserver(() => { if (anchor?.closest('[data-hidden]')) close({ instant: true }); });
 
-  function open(trigger, colour, { label, pick, done, instant = false }) {
+  // focus: where keyboard focus goes when it opens from a key; from a press it stays on the control, so
+  // the next press closes it.
+  function open(trigger, { label, done, instant = false, focus = null }) {
     if (anchor) close({ instant: true });
     anchor = trigger;
-    onPick = pick;
     onDone = done;
-    hsv = hexToHsv(readHex(colour) ?? '#ffffff');
-    draw();
     el.setAttribute('aria-label', label);
     clearTimeout(hiding);
     el.hidden = false;
@@ -349,11 +361,10 @@ function colourPicker() {
     document.addEventListener('pointerdown', outside, true);
     document.addEventListener('keydown', keys);
     addEventListener('resize', resized);
-    trigger.closest('.panel')?.addEventListener('scroll', moved, { passive: true });
     const panel = trigger.closest('.panel');
+    panel?.addEventListener('scroll', moved, { passive: true });
     if (panel) watch.observe(panel, { attributes: true, attributeFilter: ['data-hidden'] });
-    // From a key, focus goes in with it; from a press it stays on the disc, so the next press closes it.
-    if (instant) square.focus({ preventScroll: true });
+    if (instant) focus?.();
   }
   function close({ instant = false, focus = false } = {}) {
     if (!anchor) return;
@@ -370,12 +381,21 @@ function colourPicker() {
     was.closest('.panel')?.removeEventListener('scroll', moved);
     watch.disconnect();
     const done = onDone;
-    onPick = onDone = null;
+    onDone = null;
     done?.();
     if (focus || el.contains(document.activeElement)) was.focus({ preventScroll: true });
   }
-  thePicker = { open, close, isOpenOn: (trigger) => anchor === trigger };
-  return thePicker;
+  return { el, open, close, isOpenOn: (trigger) => anchor === trigger, place: () => anchor && place() };
+}
+
+// The edges' colour picker: the colour controls in a popover, made the first time it opens.
+let edgePicker = null;
+function edgeColours() {
+  if (!edgePicker) {
+    edgePicker = { ...popover(), controls: colourControls() };
+    edgePicker.el.append(edgePicker.controls.el);
+  }
+  return edgePicker;
 }
 
 // The cube's edges: white, a colour of your own, or off, as small discs in their row. Your colour opens the
@@ -404,21 +424,23 @@ function edgeField(control, app, onChange) {
   // closes it again.
   function pick(kind, instant) {
     if (kind !== 'colour') {
-      thePicker?.close({ instant: true });
+      edgePicker?.close({ instant: true });
       return set(kind);
     }
-    const picker = colourPicker();
+    const picker = edgeColours();
     if (picker.isOpenOn(orbs.colour)) return picker.close({ instant, focus: instant });
     const worn = readHex(app.state[control.key], false);
     if (worn) yours = worn;
     set(yours);
-    picker.open(orbs.colour, yours, {
+    picker.controls.set(yours);
+    picker.controls.onPick = (hex) => {
+      yours = hex;
+      set(yours);
+    };
+    picker.open(orbs.colour, {
       label: 'edge colour',
       instant,
-      pick: (hex) => {
-        yours = hex;
-        set(yours);
-      },
+      focus: picker.controls.focus,
       done: () => { try { localStorage.setItem(EDGE_KEY, yours); } catch {} },
     });
   }
@@ -440,7 +462,7 @@ function edgeField(control, app, onChange) {
     const kinds = Object.keys(orbs);
     const next = kinds[(kinds.indexOf(kind) + d + kinds.length) % kinds.length];
     orbs[next].focus();
-    if (next !== 'colour') thePicker?.close({ instant: true });
+    if (next !== 'colour') edgePicker?.close({ instant: true });
     set(next === 'colour' ? yours : next);
   }
   const el = h('div', { class: 'row' },
@@ -477,10 +499,8 @@ export function createUI(app) {
     refresh();
     glideTimer = setTimeout(() => panel.classList.remove('gliding'), 260);
   };
-  // instant: from the keyboard, where an animation would only feel slow. A look that brings a colour
-  // (aura, or one of yours) wears it, and takes it off again when a look without one follows, unless the
-  // colour was changed by hand in between. Randomize keeps whatever colour is on.
-  let worn = null;
+  // instant: from the keyboard, where an animation would only feel slow. No look changes the colour:
+  // it stays whatever you chose, through looks, reset and randomize.
   // Changes made by hand (the look's sliders and choices) that a look, reset or randomize would replace,
   // when they are not kept anywhere: the toast offers them back.
   let handMade = false;
@@ -489,13 +509,6 @@ export function createUI(app) {
     const before = handMade && !kept() ? lookOf(app.state) : null;
     handMade = false;
     app.apply(values, name);
-    if (name && values.colour) {
-      worn = { colour: values.colour, before: worn?.before ?? app.state.colour };
-      app.set('colour', values.colour);
-    } else if (name && worn) {
-      if (app.state.colour === worn.colour) app.set('colour', worn.before);
-      worn = null;
-    }
     syncAll(instant);
     if (before) {
       toast('your changes were replaced', { instant, action: { label: 'undo', run: () => {
@@ -518,6 +531,7 @@ export function createUI(app) {
     smoke: '<path d="M3.4 9.3h5.3a2.1 2.1 0 0 0 .3-4.2 2.9 2.9 0 0 0-5.5.7 1.8 1.8 0 0 0-.1 3.5z"/>',
     mine: '<path d="M6 1.4 7 5l3.6 1L7 7l-1 3.6L5 7 1.4 6 5 5z"/>',
     save: '<path d="M6 2.4v7.2M2.4 6h7.2"/>',
+    minus: '<path d="M2.4 6h7.2"/>',
     // The heads' buttons, in the same hand: a file out of or into its tray, the panel put away (to the
     // side on a computer, down on a phone), and back.
     download: '<path d="M6 1.6v6.2M3.5 5.4 6 7.9l2.5-2.5M1.8 9.2v.5c0 .7.5 1.2 1.2 1.2h6c.7 0 1.2-.5 1.2-1.2v-.5"/>',
@@ -571,7 +585,7 @@ export function createUI(app) {
   function showMine() {
     let found = false;
     for (const { m, chip, remove } of mineChips) {
-      const on = !found && sameLook(valuesOf(m), app.state) && (!m.values.colour || m.values.colour === app.state.colour);
+      const on = !found && sameLook(valuesOf(m), app.state);
       found ||= on;
       chip.setAttribute('aria-pressed', String(on));
       remove.hidden = !on;
@@ -582,8 +596,8 @@ export function createUI(app) {
     saveChip.title = mine.length >= MAX_MINE ? 'Six looks kept: remove one to keep another' : 'Keep this look as a chip, in this browser';
   }
   function saveLook(keyboard) {
-    // A saved look keeps its colour, but not an uploaded image (it's gone once the page closes).
-    const m = { name: nextName(), values: { ...lookOf(app.state), ...(app.state.colour !== 'image' && { colour: app.state.colour }) } };
+    // A look is the smoke, its light and its form: the colour stays out of it, as it does for the presets.
+    const m = { name: nextName(), values: lookOf(app.state) };
     mine.push(m);
     keepMine();
     drawMine();
@@ -665,7 +679,7 @@ export function createUI(app) {
       const values = cleanLook(l?.values);
       if (!values) continue;
       const m = { name: '', values };
-      if (mine.some((x) => sameLook(valuesOf(x), valuesOf(m)) && x.values.colour === values.colour)) continue;
+      if (mine.some((x) => sameLook(valuesOf(x), valuesOf(m)))) continue;
       if (mine.length >= MAX_MINE) { full = true; break; }
       const given = typeof l.name === 'string' ? l.name.trim().slice(0, 24) : '';
       m.name = given && !mine.some((x) => x.name === given) && !presets[given] ? given : nextName();
@@ -714,11 +728,11 @@ export function createUI(app) {
     const shades = swatches.map((sw) => sw.color).filter((c) => light(c) > 60).sort((a, b) => light(b) - light(a));
     return shades.length > 1 ? `linear-gradient(90deg, ${shades.join(', ')})` : shades[0] ?? swatches[0]?.color ?? '#2a2a2a';
   };
-  // Colour: a flat disc for each palette, filled with its own colours, and apart from
-  // them the image: + brings one (or drop one anywhere on the page), and it joins as a disc of its own
-  // picture (+ image, a drop anywhere, or a paste). The colour worn has a ring and its name by the title;
-  // an image's main colours show below at the share of the picture each covers, the proportions the smoke
-  // wears them in.
+  // Colour: a flat disc for each palette, filled with its own colours, and apart from them yours: your
+  // gradient, and an image (+ image brings one, as do a drop or a paste anywhere on the page; it joins as
+  // a disc of its own picture). Yours, pressed again while worn, open again: the gradient its editor, the
+  // image the choice of another. The colour worn has a ring and its name by the title; an image's main
+  // colours show below at the share of the picture each covers, the proportions the smoke wears them in.
   const fileInput = h('input', {
     type: 'file', accept: 'image/*', hidden: true,
     onchange: () => {
@@ -727,14 +741,28 @@ export function createUI(app) {
     },
   });
   const orbs = {};
-  for (const value of ['white', 'dusk', 'pearl', 'image']) {
+  for (const value of ['white', 'dusk', 'pearl', 'gradient', 'image']) {
     const fill = h('i', { class: 'orb-fill', 'aria-hidden': 'true' });
     orbs[value] = h('button', {
       type: 'button', role: 'radio', class: `orb orb-${value}`, 'aria-label': value, title: value,
-      onclick: () => wearColour(value), onkeydown: (e) => stepColour(e, value),
+      onclick: (e) => pressColour(value, e.detail === 0), onkeydown: (e) => stepColour(e, value),
     }, fill);
   }
+  orbs.gradient.title = 'Your gradient (click to edit it)';
+  orbs.gradient.setAttribute('aria-label', 'your gradient');
+  orbs.gradient.setAttribute('aria-haspopup', 'dialog');
+  orbs.gradient.setAttribute('aria-expanded', 'false');
   orbs.image.hidden = true;
+  // Your gradient: kept in this browser, and the one a look brings becomes yours to edit.
+  const GRADIENT_KEY = 'pure-smoke-gradient';
+  let gradient = DEFAULT_GRADIENT;
+  try {
+    const kept = localStorage.getItem(GRADIENT_KEY);
+    if (isGradient(kept)) gradient = kept;
+  } catch {}
+  const cssGradient = (value) => `linear-gradient(90deg, ${readGradient(value).map((s) => `${s.colour} ${s.at}%`).join(', ')})`;
+  const colourKind = (v) => (isGradient(v) ? 'gradient' : v);
+  const colourValue = (kind) => (kind === 'gradient' ? gradient : kind);
   const addImage = h('button', {
     type: 'button', class: 'chip chip-add',
     title: 'Colour the smoke from an image: choose one, drop one anywhere, or paste one', onclick: () => fileInput.click(),
@@ -746,10 +774,14 @@ export function createUI(app) {
     control: byKey('colour'),
     el: h('div', { class: 'colour-row' },
       h('div', { class: 'orbs', role: 'radiogroup', 'aria-label': 'Colour' },
-        orbs.white, orbs.dusk, orbs.pearl, h('i', { class: 'orb-split', 'aria-hidden': 'true' }), orbs.image),
+        orbs.white, orbs.dusk, orbs.pearl, h('i', { class: 'orb-split', 'aria-hidden': 'true' }), orbs.gradient, orbs.image),
       addImage),
     sync() {
-      const on = app.state.colour;
+      const on = colourKind(app.state.colour);
+      if (on === 'gradient') gradient = app.state.colour;
+      orbs.gradient.firstChild.style.background = cssGradient(gradient);
+      // Once there is an image its disc takes the place of + image (pressed again, it asks for another).
+      addImage.hidden = !orbs.image.hidden;
       for (const [value, o] of Object.entries(orbs)) {
         o.setAttribute('aria-checked', String(value === on));
         o.tabIndex = value === on ? 0 : -1;
@@ -760,10 +792,16 @@ export function createUI(app) {
     },
   };
   fields.push(colourField);
-  function wearColour(value) {
-    app.set('colour', value);
+  function wearColour(kind) {
+    app.set('colour', colourValue(kind));
     colourField.sync();
     refresh();
+  }
+  function pressColour(kind, instant) {
+    if (kind === 'gradient') return editGradient(instant);
+    if (kind === 'image' && app.state.colour === 'image') return fileInput.click();
+    editor?.close({ instant: true });
+    wearColour(kind);
   }
   // Arrows move along the orbs (and wear each one), as in any group of choices.
   function stepColour(e, value) {
@@ -773,7 +811,197 @@ export function createUI(app) {
     const shown = Object.keys(orbs).filter((v) => !orbs[v].hidden);
     const next = shown[(shown.indexOf(value) + d + shown.length) % shown.length];
     orbs[next].focus();
+    if (next !== 'gradient') editor?.close({ instant: true });
     wearColour(next);
+  }
+
+  // Your gradient's editor, as in Paper or Figma: a bar with a knob on it for each colour. Press a knob
+  // to choose it and drag it along; drag it well off the bar and let go to take it away. Press the bar to
+  // add a colour there, in the colour the gradient already has at that place, so nothing changes until you
+  // change it. The chosen colour is set below with the colour controls; + adds one in the widest gap and −
+  // takes the chosen one away (two to eight). The smoke follows as you go, and every stretch of the bar
+  // colours its share of the smoke. Made the first time it opens; kept in this browser when it closes.
+  let editor = null;
+  function gradientEditor() {
+    if (editor) return editor;
+    const pop = popover();
+    const controls = colourControls();
+    const bar = h('div', { class: 'grad-bar', title: 'Press to add a colour here' });
+    const add = h('button', { type: 'button', class: 'text-button micro icon-button', 'aria-label': 'add a colour', title: 'Add a colour' }, icon('save'));
+    const remove = h('button', { type: 'button', class: 'text-button micro icon-button', 'aria-label': 'remove this colour', title: 'Remove this colour' }, icon('minus'));
+    pop.el.append(
+      h('div', { class: 'section-head' }, h('span', { class: 'micro micro-strong' }, 'Gradient'), h('span', { class: 'head-actions' }, add, remove)),
+      bar, controls.el);
+
+    let stops = [];
+    let chosen = null;
+    let leaving = null; // a knob dragged off the bar: it goes if the hand lets go there
+    const knobs = new Map();
+    const kept = () => stops.filter((s) => s !== leaving);
+    const sorted = () => kept().sort((a, b) => a.at - b.at);
+    // The knobs sit 10 px in from the bar's round ends, and its colours follow them there.
+    const place = (at) => `calc(10px + ${at / 100} * (100% - 20px))`;
+    const atPointer = (e) => {
+      const box = bar.getBoundingClientRect();
+      return Math.round(clamp01((e.clientX - box.left - 10) / (box.width - 20)) * 100);
+    };
+    // The colour the gradient has at a place (0–100), as the bar draws it.
+    function colourAt(at) {
+      const s = sorted();
+      if (at <= s[0].at) return s[0].colour;
+      if (at >= s[s.length - 1].at) return s[s.length - 1].colour;
+      const i = s.findIndex((x) => x.at >= at);
+      const [a, b] = [s[i - 1], s[i]];
+      const t = (at - a.at) / (b.at - a.at || 1);
+      const [x, y] = [a.colour, b.colour].map((c) => [1, 3, 5].map((k) => parseInt(c.slice(k, k + 2), 16)));
+      return `#${x.map((v, k) => Math.round(v + (y[k] - v) * t).toString(16).padStart(2, '0')).join('')}`;
+    }
+
+    function draw() {
+      bar.style.background = `linear-gradient(90deg, ${sorted().map((s) => `${s.colour} ${place(s.at)}`).join(', ')})`;
+      for (const stop of stops) {
+        let knob = knobs.get(stop);
+        if (!knob) {
+          knob = makeKnob(stop);
+          knobs.set(stop, knob);
+          bar.append(knob);
+        }
+        knob.style.left = place(stop.at);
+        knob.style.setProperty('--stop', stop.colour);
+        knob.classList.toggle('chosen', stop === chosen);
+        knob.classList.toggle('leaving', stop === leaving);
+        knob.setAttribute('aria-valuenow', Math.round(stop.at));
+        knob.setAttribute('aria-valuetext', `${stop.colour.slice(1).toUpperCase()} at ${Math.round(stop.at)}%`);
+      }
+      for (const [stop, knob] of knobs) {
+        if (stops.includes(stop)) continue;
+        knob.remove();
+        knobs.delete(stop);
+      }
+      add.disabled = stops.length >= 8;
+      remove.disabled = stops.length <= 2;
+    }
+    function changed() {
+      gradient = gradientValue(kept());
+      app.set('colour', gradient);
+      colourField.sync();
+      refresh();
+      draw();
+    }
+    function choose(stop) {
+      chosen = stop;
+      controls.set(stop.colour);
+      draw();
+    }
+    function drop(stop) {
+      const at = stop.at;
+      stops = stops.filter((s) => s !== stop);
+      leaving = null;
+      const nearest = [...stops].sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0];
+      choose(nearest);
+      changed();
+      return nearest;
+    }
+    controls.onPick = (hex) => {
+      chosen.colour = hex;
+      changed();
+    };
+
+    // A drag follows the hand along the bar, 1:1, off it too; 28 px above or below it, the knob lets go.
+    function grab(stop, knob, e) {
+      knob.setPointerCapture(e.pointerId);
+      const box = bar.getBoundingClientRect();
+      const move = (ev) => {
+        if (!knob.hasPointerCapture(ev.pointerId)) return;
+        stop.at = atPointer(ev);
+        leaving = stops.length > 2 && (ev.clientY < box.top - 28 || ev.clientY > box.bottom + 28) ? stop : null;
+        changed();
+      };
+      const end = () => {
+        knob.removeEventListener('pointermove', move);
+        knob.removeEventListener('lostpointercapture', end);
+        if (leaving === stop) knobs.get(drop(stop))?.focus({ preventScroll: true });
+      };
+      knob.addEventListener('pointermove', move);
+      knob.addEventListener('lostpointercapture', end);
+    }
+    function makeKnob(stop) {
+      const knob = h('button', {
+        type: 'button', class: 'grad-stop', role: 'slider', 'aria-label': 'colour on the gradient', 'aria-valuemin': 0, 'aria-valuemax': 100,
+      });
+      knob.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        knob.focus({ preventScroll: true });
+        choose(stop);
+        grab(stop, knob, e);
+      });
+      knob.addEventListener('focus', () => { if (chosen !== stop) choose(stop); });
+      // Arrows move it by 1% (Shift: 10); Delete or Backspace takes it away. From a key, at once.
+      knob.addEventListener('keydown', (e) => {
+        const d = e.shiftKey ? 10 : 1;
+        const to = { ArrowLeft: stop.at - d, ArrowDown: stop.at - d, ArrowRight: stop.at + d, ArrowUp: stop.at + d, Home: 0, End: 100 }[e.key];
+        if (to != null) {
+          e.preventDefault();
+          stop.at = Math.min(100, Math.max(0, to));
+          changed();
+        } else if ((e.key === 'Delete' || e.key === 'Backspace') && stops.length > 2) {
+          e.preventDefault();
+          knobs.get(drop(stop))?.focus({ preventScroll: true });
+        }
+      });
+      return knob;
+    }
+    bar.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || e.target !== bar || stops.length >= 8) return;
+      e.preventDefault();
+      const at = atPointer(e);
+      const stop = { colour: colourAt(at), at };
+      stops.push(stop);
+      choose(stop);
+      changed();
+      const knob = knobs.get(stop);
+      knob.focus({ preventScroll: true });
+      grab(stop, knob, e);
+    });
+    // + in the middle of the widest gap, in the colour already there.
+    add.addEventListener('click', () => {
+      const s = sorted();
+      let best = 0;
+      for (let i = 1; i < s.length - 1; i++) if (s[i + 1].at - s[i].at > s[best + 1].at - s[best].at) best = i;
+      const at = Math.round((s[best].at + s[best + 1].at) / 2);
+      const stop = { colour: colourAt(at), at };
+      stops.push(stop);
+      choose(stop);
+      changed();
+    });
+    remove.addEventListener('click', () => drop(chosen));
+
+    editor = {
+      ...pop,
+      load(value) {
+        stops = readGradient(value).map((s) => ({ ...s }));
+        leaving = null;
+        knobs.forEach((knob) => knob.remove());
+        knobs.clear();
+        choose(stops[0]);
+      },
+      focus: () => knobs.get(chosen)?.focus({ preventScroll: true }),
+    };
+    return editor;
+  }
+  // The gradient's disc wears your gradient and opens its editor; pressed again, it closes it.
+  function editGradient(instant) {
+    const ed = gradientEditor();
+    if (ed.isOpenOn(orbs.gradient)) return ed.close({ instant, focus: instant });
+    if (colourKind(app.state.colour) !== 'gradient') wearColour('gradient');
+    ed.load(gradient);
+    ed.open(orbs.gradient, {
+      label: 'your gradient',
+      instant,
+      focus: ed.focus,
+      done: () => { try { localStorage.setItem(GRADIENT_KEY, gradient); } catch {} },
+    });
   }
   const colour = h('section', {},
     h('div', { class: 'section-head' }, h('h2', { class: 'micro' }, 'Colour'), colourName),
@@ -820,7 +1048,7 @@ export function createUI(app) {
       orbs.image.querySelector('.orb-fill').style.background = discOf(picked.swatches);
       orbs.image.hidden = false;
       orbs.image.setAttribute('aria-label', picked.name);
-      orbs.image.title = picked.name;
+      orbs.image.title = `${picked.name} (press it again to choose another image)`;
       imageLabel = picked.name;
     }
     colourField.sync();

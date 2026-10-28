@@ -17,7 +17,7 @@ import { compileAhead } from './compile.js';
 import { createCube } from './cube.js';
 import { GradeShader } from './grade.js';
 import { createSimulation } from './simulation.js';
-import { ORIGINAL_PULSE, breathAt, clipLooks, readHash, spinRate, writeHash } from './settings.js';
+import { ORIGINAL_PULSE, breathAt, clipLooks, isGradient, readGradient, readHash, spinRate, writeHash } from './settings.js';
 import { createLighting, createSmoke } from './smoke.js';
 import { createUI } from './ui.js';
 import { createView } from './view.js';
@@ -72,21 +72,61 @@ const cube = createCube(lighting);
 
 let simulation;
 let smoke;
-// The colours the grains wear: white, a palette that ships with the app, or an uploaded image. Each is
-// read once into its colour map (palette.js).
+// The colours the grains wear: white, a palette that ships with the app, your gradient or an uploaded
+// image. Each is read into its colour map (palette.js): a palette once, your gradient each time it changes.
 const bundled = {
   dusk: new URL('./colours/dusk.webp', import.meta.url).href,
   pearl: new URL('./colours/pearl.webp', import.meta.url).href,
 };
-const palettes = {}; // colour choice → { image, map }
+const palettes = {}; // colour choice → { image, map } (your gradient: under 'gradient', with its value)
 let colours = null; // the palette the grains wear now, or null for white
-let retired = null; // a replaced upload's colour map, freed once no grain is turning from it
+let retired = []; // replaced colour maps (an upload, an earlier gradient), freed once no grain turns from them
 // Lifts dark images so the smoke keeps about the brightness it has in white.
 const colourGain = (image) => Math.min(2.5, Math.max(1, 0.7 / Math.max(image.meanLuminance, 0.01)));
-function wear(choice) {
-  colours = palettes[choice] ?? null;
-  if (colours) smoke.setColours(colours.map, colourGain(colours.image), true);
+const slotOf = (choice) => (isGradient(choice) ? 'gradient' : choice);
+// turn: the grains turn to the new colours over about half a second; a gradient being edited changes at
+// once instead, so the smoke answers the hand.
+function wear(choice, turn = true) {
+  colours = palettes[slotOf(choice)] ?? null;
+  if (colours) smoke.setColours(colours.map, colourGain(colours.image), turn);
   ui.showColours(colours?.image ?? null);
+}
+// Your gradient as a picture: a band 256 px across, each stop's colour where it sits, so every colour
+// colours the share of the smoke its stretch of the gradient covers, as a picture's colours do.
+async function gradientPalette(value) {
+  const canvas = new OffscreenCanvas(256, 4);
+  const ctx = canvas.getContext('2d');
+  const fill = ctx.createLinearGradient(0, 0, 256, 0);
+  for (const stop of readGradient(value)) fill.addColorStop(stop.at / 100, stop.colour);
+  ctx.fillStyle = fill;
+  ctx.fillRect(0, 0, 256, 4);
+  const image = await readImage(canvas, 'gradient');
+  URL.revokeObjectURL(image.thumbnail);
+  return { image, map: colourMap(image), value };
+}
+// A drag changes the gradient every frame: it is read again as soon as the last reading is done, always
+// the newest one, so the smoke follows as fast as the readings go (a few milliseconds each).
+let gradientWanted = null;
+let gradientTurn = false;
+let gradientBusy = false;
+async function useGradient(value, turn) {
+  gradientWanted = value;
+  gradientTurn ||= turn;
+  if (gradientBusy) return;
+  gradientBusy = true;
+  try {
+    while (palettes.gradient?.value !== gradientWanted) {
+      const next = await gradientPalette(gradientWanted);
+      if (palettes.gradient) retired.push(palettes.gradient.map.texture);
+      palettes.gradient = next;
+    }
+    if (state.colour === gradientWanted) wear(gradientWanted, gradientTurn);
+    gradientTurn = false;
+  } catch {
+    ui.toast('that gradient is too dark to colour the smoke', { error: true });
+  } finally {
+    gradientBusy = false;
+  }
 }
 async function loadBundled(choice) {
   if (palettes[choice]) return;
@@ -383,9 +423,9 @@ function render(dt) {
   smoke.setOutline(cubeOutline(camera, output.width * output.ratio, output.height * output.ratio));
   smoke.colourMix = live.colourMix;
   smoke.turnColours(dt);
-  if (retired && !smoke.turning) {
-    retired.dispose();
-    retired = null;
+  if (retired.length && !smoke.turning) {
+    for (const texture of retired) texture.dispose();
+    retired = [];
   }
   lighting.update(camera, live.shadows);
   smoke.renderShadow(renderer);
@@ -599,8 +639,10 @@ const app = {
       ui.pickImage();
       return;
     }
+    const was = state[key];
     state[key] = value;
-    if (key === 'colour') {
+    if (key === 'colour' && isGradient(value)) useGradient(value, !isGradient(was));
+    else if (key === 'colour') {
       wear(value);
       // A bundled palette is read the first time it is chosen; the smoke turns to it once it is ready.
       if (bundled[value] && !palettes[value]) {
@@ -632,8 +674,7 @@ const app = {
   // Colour the grains from an image file, in the image's own proportions.
   async useImage(file) {
     const image = await readImage(file);
-    retired?.dispose();
-    retired = palettes.image?.map.texture ?? null;
+    if (palettes.image) retired.push(palettes.image.map.texture);
     palettes.image = { image, map: colourMap(image) };
     state.colour = 'image';
     wear('image');
