@@ -518,9 +518,16 @@ export function createUI(app) {
     smoke: '<path d="M3.4 9.3h5.3a2.1 2.1 0 0 0 .3-4.2 2.9 2.9 0 0 0-5.5.7 1.8 1.8 0 0 0-.1 3.5z"/>',
     mine: '<path d="M6 1.4 7 5l3.6 1L7 7l-1 3.6L5 7 1.4 6 5 5z"/>',
     save: '<path d="M6 2.4v7.2M2.4 6h7.2"/>',
+    // The heads' buttons, in the same hand: a file out of or into its tray, the panel put away (to the
+    // side on a computer, down on a phone), and back.
+    download: '<path d="M6 1.6v6.2M3.5 5.4 6 7.9l2.5-2.5M1.8 9.2v.5c0 .7.5 1.2 1.2 1.2h6c.7 0 1.2-.5 1.2-1.2v-.5"/>',
+    upload: '<path d="M6 7.9V1.7M3.5 4.2 6 1.7l2.5 2.5M1.8 9.2v.5c0 .7.5 1.2 1.2 1.2h6c.7 0 1.2-.5 1.2-1.2v-.5"/>',
+    hide: '<rect x="1.3" y="2.1" width="9.4" height="7.8" rx="2"/><path d="M7.4 2.1v7.8"/>',
+    lower: '<path d="M2.6 4.4 6 7.8l3.4-3.4"/>',
+    back: '<path d="M7.6 2.6 4.2 6l3.4 3.4"/>',
   };
-  const icon = (name) => {
-    const i = h('i', { class: 'look-icon', 'aria-hidden': 'true' });
+  const icon = (name, place = '') => {
+    const i = h('i', { class: `look-icon ${place}`.trim(), 'aria-hidden': 'true' });
     i.innerHTML = `<svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
     return i;
   };
@@ -640,12 +647,13 @@ export function createUI(app) {
       looksFile.value = '';
     },
   });
-  const downloadButton = h('button', { type: 'button', class: 'text-button micro', title: 'Download your looks as a file', onclick: () => downloadLooks() }, face('download'));
-  const uploadButton = h('button', { type: 'button', class: 'text-button micro', title: 'Upload a file of looks you downloaded', onclick: () => looksFile.click() }, face('upload'));
+  // Icons, so they don't read as labels beside the section's title; each says what it did in words.
+  const downloadButton = h('button', { type: 'button', class: 'text-button micro icon-button', title: 'Download your looks as a file', 'aria-label': 'download your looks', onclick: () => downloadLooks() }, face('', icon('download')));
+  const uploadButton = h('button', { type: 'button', class: 'text-button micro icon-button', title: 'Upload a file of looks you downloaded', 'aria-label': 'upload looks', onclick: () => looksFile.click() }, face('', icon('upload')));
   function downloadLooks() {
     const blob = new Blob([JSON.stringify({ app: 'pure-smoke', looks: mine }, null, 2)], { type: 'application/json' });
     download(blob, `pure-smoke-looks-${stamp()}.json`);
-    sayIn(downloadButton, 'downloaded', 'download');
+    sayIn(downloadButton, 'downloaded', '');
   }
   async function uploadLooks(file) {
     let looks = null;
@@ -666,7 +674,7 @@ export function createUI(app) {
     }
     keepMine();
     drawMine();
-    if (added) sayIn(uploadButton, `${added} added`, 'upload');
+    if (added) sayIn(uploadButton, `${added} added`, '');
     else toast(full ? 'six looks kept: remove one to add more' : 'those looks are already here');
   }
   const look = h('section', {},
@@ -874,7 +882,10 @@ export function createUI(app) {
 
   const head = h('div', { class: 'panel-head' },
     h('span', { class: 'micro micro-strong' }, 'Parameters'),
-    h('button', { type: 'button', class: 'text-button micro', onclick: () => setOpen(false), 'aria-label': 'Hide parameters (H)', 'aria-keyshortcuts': 'H' }, 'Hide'));
+    h('button', {
+      type: 'button', class: 'text-button micro icon-button', onclick: () => setOpen(false),
+      'aria-label': 'Hide parameters (H)', title: 'Hide parameters (H)', 'aria-keyshortcuts': 'H',
+    }, icon('hide', 'on-wide'), icon('lower', 'on-phone')));
   // The two buttons people reach for first: a new random look, or back to the default look. Randomize
   // carries its key (R) where the eye already is, for anyone with a keyboard.
   const die = h('span', { class: 'die', 'aria-hidden': 'true' });
@@ -1073,11 +1084,14 @@ export function createUI(app) {
   const status = h('div', { class: 'record-status', hidden: true },
     h('p', { class: 'micro', 'aria-hidden': 'true' }, statusText),
     statusBar);
-  const back = h('button', { type: 'button', class: 'text-button micro', onclick: (e) => openRecord(false, { keyboard: e.detail === 0 }) }, 'Back');
+  const back = h('button', {
+    type: 'button', class: 'text-button micro icon-button', 'aria-label': 'Back to parameters (Esc)', title: 'Back to parameters (Esc)',
+    onclick: (e) => openRecord(false, { keyboard: e.detail === 0 }),
+  }, icon('back'));
   const frameRow = h('div', { class: 'rows' }, field(byKey('format'), true));
   const recordRows = h('div', { class: 'rows' }, ['length', 'loop', 'fps'].map((key) => field(byKey(key), true)));
   const recordPanel = h('aside', { class: 'panel record-panel', 'aria-label': 'Record', 'data-hidden': true, tabindex: -1 },
-    h('div', { class: 'panel-head' }, h('span', { class: 'micro micro-strong' }, 'Record'), back),
+    h('div', { class: 'panel-head' }, h('span', { class: 'head-title' }, back, h('span', { class: 'micro micro-strong' }, 'Record'))),
     section('Frame', frameRow, save),
     section('Video', recordRows, start, status),
     h('p', { class: 'micro keys' }, 'Esc back · cancel'));

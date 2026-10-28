@@ -344,8 +344,19 @@ canvas:active { cursor: grabbing; }
 .chip[aria-pressed='true'] .look-icon { opacity: 1; }
 /* A look of yours being named: the chip as a field, in its selected colours */
 .chip-name { border: 0; outline: none; font: inherit; background: var(--strong); color: #0b0b0b; text-transform: lowercase; cursor: text; }
-.head-actions { display: flex; gap: 12px; }
+/* Wide enough apart that the icons' hit margins (8 px, 12 px for a finger) only meet */
+.head-actions { display: flex; gap: 16px; }
+@media (pointer: coarse) { .head-actions { gap: 24px; } }
 .text-button .face { gap: 4px; }
+/* The heads' icon buttons (ui.js: hide, back, download, upload): a 12 px line icon in the muted colour, the
+   hit margin of .text-button around it. While one says what it did, its check and words take the icon's place. */
+.icon-button { display: inline-grid; place-items: center; min-width: 12px; height: 12px; }
+.icon-button .look-icon { opacity: 1; }
+.icon-button.done .look-icon { display: none; }
+.words:empty { display: none; }
+.head-title { display: flex; align-items: center; gap: 8px; }
+.on-phone { display: none; }
+@media (max-width: 720px) { .look-icon.on-wide { display: none; } .look-icon.on-phone { display: block; } }
 .text-button .tick { width: 8px; height: 8px; }
 .text-button .tick svg { width: 8px; height: 8px; }
 .chip:disabled { opacity: 0.4; cursor: default; }
@@ -498,7 +509,7 @@ canvas:active { cursor: grabbing; }
 
 /* Colour: a flat disc per palette, filled with its own colours, then the image apart
    (ui.js). The worn one has a ring; its name sits by the section title. */
-.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 2px; min-width: 0; }
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 2px; min-width: 0; }
 .panel .section-head h2 { padding: 0; }
 .colour-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .colour-row { display: flex; align-items: center; gap: 10px; padding: 3px 2px; }
@@ -534,10 +545,16 @@ canvas:active { cursor: grabbing; }
   box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.16);
 }
 .orb-white .orb-fill, .orb-edge-white .orb-fill { background: #f2f2f2; }
-/* Each palette's main shades (palette.js reads them for the strip), left to right from light, without the
-   black of its picture's studio: a flat band of its colours, not a lit ball */
-.orb-dusk .orb-fill { background: linear-gradient(90deg, rgb(217, 196, 182), rgb(207, 161, 176), rgb(202, 132, 139), rgb(187, 106, 99), rgb(158, 80, 61)); }
-.orb-pearl .orb-fill { background: linear-gradient(90deg, rgb(242, 239, 246), rgb(219, 214, 232), rgb(193, 185, 217), rgb(164, 156, 194), rgb(135, 127, 165)); }
+/* Each disc is its picture's colours where the picture has them, sampled from src/colours, flat (no light or
+   shade added). Dusk top to bottom: the dark crown, pink, lilac white and pale mint down its middle, the
+   cream of its sides at the left and right. Pearl along its light from the top left: white to violet grey,
+   without the shadow side of the orb. */
+.orb-dusk .orb-fill {
+  background:
+    linear-gradient(90deg, rgba(222, 201, 171, 0.7), rgba(222, 201, 171, 0) 24%, rgba(222, 201, 171, 0) 76%, rgba(222, 201, 171, 0.7)),
+    linear-gradient(180deg, rgb(51, 22, 15), rgb(145, 77, 72) 12%, rgb(197, 137, 160) 25%, rgb(202, 174, 193) 38%, rgb(202, 193, 201) 50%, rgb(202, 202, 205) 62%, rgb(202, 206, 206) 75%, rgb(198, 208, 208) 88%, rgb(191, 208, 209));
+}
+.orb-pearl .orb-fill { background: linear-gradient(142deg, rgb(247, 244, 249), rgb(249, 248, 251) 17%, rgb(240, 238, 245) 33%, rgb(223, 218, 236) 50%, rgb(202, 193, 227) 67%, rgb(171, 162, 202) 83%, rgb(134, 125, 166)); }
 .orb-split { width: 1px; height: 16px; background: rgba(255, 255, 255, 0.12); }
 /* The cube's edges in Fine-tune (ui.js edgeField): white, yours, off, as small orbs in their row */
 .edge-orbs { position: relative; display: flex; align-items: center; gap: 12px; padding-left: 4px; }
