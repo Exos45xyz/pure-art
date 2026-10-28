@@ -1275,8 +1275,11 @@ export function createUI(app) {
   showFace(dieFace);
 
   const grabber = h('i', { class: 'grabber', 'aria-hidden': 'true' });
+  // On a phone the sheet is the page's foot, so the studio's credit closes it, centred (style.css shows it
+  // there and hides the page's own).
+  const sheetCredit = h('div', { class: 'sheet-credit' }, document.querySelector('.credit .designed').cloneNode(true));
   panel.append(grabber, head, quick, look, colour, share, tuneSection,
-    h('p', { class: 'micro keys' }, 'Space pause · R randomize · H hide'));
+    h('p', { class: 'micro keys' }, 'Space pause · R randomize · H hide'), sheetCredit);
   fields.forEach((f) => f.sync());
   refresh();
 
@@ -1582,22 +1585,28 @@ export function createUI(app) {
   const brandEl = document.querySelector('.brand');
   const footEl = document.querySelector('.foot');
   const creditEl = document.querySelector('.credit');
-  // What the cube's room starts under: the name, and on a phone the credit under it.
-  const topChrome = () => (phone() ? creditEl : brandEl);
 
   function reserve() {
     const shown = shownPanel();
     if (!shown) return { x: 0, y: 0 };
     // On a phone the cube sits in the band between the title and the sheet, clear of both.
-    if (phone()) return { x: 0, y: shown.offsetHeight + 8 - (topChrome().offsetTop + topChrome().offsetHeight) };
+    if (phone()) return { x: 0, y: shown.offsetHeight + 8 - (brandEl.offsetTop + brandEl.offsetHeight) };
     return { x: shown.offsetWidth + 16, y: 0 };
+  }
+
+  // The height the cube has to itself: on a phone with the sheet up, the room between the name and the
+  // sheet (it keeps to about three quarters of it: view.js); everywhere else the whole screen.
+  function room() {
+    const shown = shownPanel();
+    if (!shown || !phone()) return innerHeight;
+    return Math.max(120, shown.offsetTop - 8 - (brandEl.offsetTop + brandEl.offsetHeight));
   }
 
   // The frame a file is recorded in, in page pixels: the format's shape, as large as fits in the free
   // space between the title, the footer and the panel. aspect: width / height.
   function frameBox(aspect) {
     const shown = shownPanel();
-    const top = topChrome().offsetTop + topChrome().offsetHeight + (phone() ? 16 : 24);
+    const top = brandEl.offsetTop + brandEl.offsetHeight + (phone() ? 16 : 24);
     let left = phone() ? 16 : 24;
     let right = innerWidth - (phone() ? 16 : 24);
     // Above the footer, and above the credit when it stacks over the footer (a narrow window).
@@ -1701,5 +1710,5 @@ export function createUI(app) {
     }
   }
 
-  return { reserve, frameBox, get recordOpen() { return recordOpen; }, toast, lightHints, showColours, pickImage: () => fileInput.click(), sync: () => fields.forEach((f) => f.sync()) };
+  return { reserve, room, frameBox, get recordOpen() { return recordOpen; }, toast, lightHints, showColours, pickImage: () => fileInput.click(), sync: () => fields.forEach((f) => f.sync()) };
 }

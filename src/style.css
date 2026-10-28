@@ -173,6 +173,8 @@ canvas:active { cursor: grabbing; }
   pointer-events: none;
 }
 .credit a { pointer-events: auto; transition: opacity 200ms ease; }
+.sheet-credit { display: none; }
+.sheet-credit a { transition: opacity 200ms ease; }
 .designed { display: inline-flex; align-items: center; gap: 8px; }
 /* A narrow window: over the footer's line, on the left (ui.js placeChrome) */
 .credit-stacked .credit { left: max(20px, env(safe-area-inset-left)); right: auto; margin: 0; justify-items: start; bottom: calc(max(20px, env(safe-area-inset-bottom)) + 26px); }
@@ -214,7 +216,7 @@ canvas:active { cursor: grabbing; }
 /* After the first entrance they answer at UI speed (the footer leaves and returns around a render). */
 .settled .brand, .settled .foot, .settled .credit { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
 /* A link pressed by a finger dims as it does under the pointer */
-.ready .credit a:active { opacity: 0.7; transition-duration: 100ms; }
+.ready .credit a:active, .sheet-credit a:active { opacity: 0.7; transition-duration: 100ms; }
 
 /* ---- Panel --------------------------------------------------------------------------------- */
 
@@ -527,7 +529,7 @@ canvas:active { cursor: grabbing; }
   .pill-primary.recording:hover { background: #222; }
   .text-button:hover { color: var(--strong); }
   .toast-action:hover { background: #363636; }
-  .credit a:hover { opacity: 0.7; }
+  .credit a:hover, .sheet-credit a:hover { opacity: 0.7; }
   .out:hover svg { transform: translate(1px, -1px); }
 }
 
@@ -910,11 +912,11 @@ canvas:active { cursor: grabbing; }
   /* The record window holds its start button in view on the smallest phones (the frame takes the rest) */
   .record-panel { max-height: 64%; }
   .foot, .keys { display: none; }
-  .brand { top: max(16px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); }
-  /* The sheet has the foot of a phone: the credit sits under the name instead */
-  .credit { top: calc(max(16px, env(safe-area-inset-top)) + 52px); bottom: auto; left: max(16px, env(safe-area-inset-left)); right: auto; margin: 0; justify-items: start; }
-  .credit .source { display: none; }
+  /* The name in the middle at the top; the sheet is the phone's foot, so the credit closes the sheet */
+  .brand { top: max(16px, env(safe-area-inset-top)); left: 0; right: 0; justify-items: center; }
   .brand .pure-art { height: 36px; }
+  .credit { display: none; }
+  .sheet-credit { display: flex; justify-content: center; padding: 2px 0 2px; }
   .reopen { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform-origin: bottom right; }
   .toast { bottom: calc(var(--sheet, 0px) + max(8px, env(safe-area-inset-bottom)) + 12px); left: 50%; }
   /* The sheet's grabber, and its head takes the finger (ui.js: drag down to put the sheet away) */

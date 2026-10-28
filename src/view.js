@@ -8,6 +8,11 @@ const DISTANCE = 11.5;
 // Narrower than 9:16, the lens widens so the cube stays in frame. At 9:16 and wider, the cube
 // keeps the same share of the frame's height, so any export format frames it the same way.
 const NARROWEST = 9 / 16;
+// On a phone the cube lives in the room between the name and the sheet. It draws about 0.48 of the
+// frame's height unwidened; the lens widens so it keeps to about three quarters of a short room
+// (0.48 / 0.75). A room as tall as the frame never widens it: the desktop is framed as before.
+const ROOM_FILL = 0.64;
+const widenFor = (width, height, room) => Math.max(1, NARROWEST / (width / height), (ROOM_FILL * height) / room);
 
 export function createView(canvas) {
   const depth = new PerspectiveCamera(26, 1, 0.1, 100);
@@ -121,13 +126,14 @@ export function createView(canvas) {
       }
     },
     // How large the scene draws in a frame this size, up to a constant (both lenses fit it the same way).
-    scale(width, height) {
-      return height / Math.max(1, NARROWEST / (width / height));
+    scale(width, height, room = height) {
+      return height / widenFor(width, height, room);
     },
     // Fit both lenses to an output of width × height, shifted by the panel's offset.
-    frame(width, height, offsetX = 0, offsetY = 0) {
+    // room: the height the cube has to itself (the whole frame but on a phone with its sheet up).
+    frame(width, height, offsetX = 0, offsetY = 0, room = height) {
       const aspect = width / height;
-      const widen = Math.max(1, NARROWEST / aspect);
+      const widen = widenFor(width, height, room);
       depth.aspect = aspect;
       depth.fov = (2 * Math.atan(Math.tan((13 * Math.PI) / 180) * widen) * 180) / Math.PI;
       const half = ORIGINAL_CAMERA.halfHeight * widen;

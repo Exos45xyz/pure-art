@@ -259,15 +259,15 @@ const bufferSize = new Vector2();
 // ---- Output --------------------------------------------------------------------------------
 
 // What the renderer draws into: the screen, or for a moment an export size.
-const output = { width: 0, height: 0, ratio: 1, offsetX: 0, offsetY: 0 };
-// The cube sits in the middle of the space the panel leaves free.
-const pan = { x: 0, y: 0, vx: 0, vy: 0, targetX: 0, targetY: 0 };
+const output = { width: 0, height: 0, ratio: 1, offsetX: 0, offsetY: 0, room: 0 };
+// The cube sits in the middle of the space the panel leaves free, and on a phone keeps to its height (room).
+const pan = { x: 0, y: 0, vx: 0, vy: 0, targetX: 0, targetY: 0, room: 0, vroom: 0, targetRoom: 0 };
 // It glides there on a critically damped spring (Apple's reposition: damping 1, response 0.4 s): it starts
 // from rest, never overshoots, and a click while it moves turns it round without a jolt. Exact per step.
 const panW = (2 * Math.PI) / 0.4;
 function springPan(dt) {
   const e = Math.exp(-panW * dt);
-  for (const [at, speed, target] of [['x', 'vx', 'targetX'], ['y', 'vy', 'targetY']]) {
+  for (const [at, speed, target] of [['x', 'vx', 'targetX'], ['y', 'vy', 'targetY'], ['room', 'vroom', 'targetRoom']]) {
     const off = pan[at] - pan[target];
     const c = pan[speed] + panW * off;
     pan[at] = pan[target] + (off + c * dt) * e;
@@ -296,7 +296,7 @@ function applyFrame() {
   // and never thinner than one screen point, so the stroke always reads.
   const lineWidth = ((view.lens === 'flat' ? 2.8 : 2.4) * pixelsHigh) / 1280;
   cube.setOutput(output.width * output.ratio, pixelsHigh, Math.max(output.ratio, lineWidth));
-  view.frame(output.width, output.height, output.offsetX, output.offsetY);
+  view.frame(output.width, output.height, output.offsetX, output.offsetY, output.room || output.height);
   grade.uniforms.uAspect.value = output.width / output.height;
   grade.uniforms.uCenter.value = [0.5 - output.offsetX / output.width, 0.5 + output.offsetY / output.height];
 }
@@ -316,13 +316,13 @@ function fitScreen(instant = false) {
   if (framed) {
     const box = ui.frameBox(aspects[state.format] ?? innerWidth / innerHeight);
     Object.assign(canvas.style, { left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px` });
-    Object.assign(output, { width: box.w, height: box.h, ratio, offsetX: 0, offsetY: 0 });
+    Object.assign(output, { width: box.w, height: box.h, ratio, offsetX: 0, offsetY: 0, room: box.h });
   } else {
     Object.assign(canvas.style, { left: '', top: '', width: '', height: '' });
     Object.assign(output, { width: innerWidth, height: innerHeight, ratio });
   }
   app.layoutChanged(instant);
-  if (!framed) Object.assign(output, { offsetX: pan.x, offsetY: pan.y });
+  if (!framed) Object.assign(output, { offsetX: pan.x, offsetY: pan.y, room: pan.room });
   applyOutput();
 }
 
@@ -334,7 +334,7 @@ function cubeOnPage() {
   return {
     x: box.left + (output.width / 2 - output.offsetX) * s,
     y: box.top + (output.height / 2 - output.offsetY) * s,
-    size: view.scale(output.width, output.height) * s,
+    size: view.scale(output.width, output.height, output.room || output.height) * s,
   };
 }
 
@@ -514,9 +514,10 @@ function tick(now) {
 
   if (!exporting) {
     springPan(dt);
-    if (Math.abs(pan.x - output.offsetX) + Math.abs(pan.y - output.offsetY) > 0.01) {
+    if (Math.abs(pan.x - output.offsetX) + Math.abs(pan.y - output.offsetY) + Math.abs(pan.room - output.room) > 0.01) {
       output.offsetX = pan.x;
       output.offsetY = pan.y;
+      output.room = pan.room;
       applyFrame();
     }
   }
@@ -641,7 +642,7 @@ async function renderVideo(job, { length, loop, fps }) {
 
 async function atSize(width, height, ratio, task) {
   exporting = true;
-  Object.assign(output, { width, height, ratio, offsetX: 0, offsetY: 0 });
+  Object.assign(output, { width, height, ratio, offsetX: 0, offsetY: 0, room: height });
   applyOutput();
   try {
     return await task();
@@ -717,10 +718,11 @@ const app = {
     const reserve = app.recording || framed ? { x: 0, y: 0 } : ui.reserve();
     pan.targetX = reserve.x / 2;
     pan.targetY = reserve.y / 2;
+    pan.targetRoom = app.recording || framed ? output.height : ui.room();
     if (framed) instant = true;
-    // With reduced motion the scene moves to its new centre at once instead of sliding.
+    // With reduced motion the scene moves to its new centre (and size) at once instead of sliding.
     if (instant || reducedMotion()) {
-      Object.assign(pan, { x: pan.targetX, y: pan.targetY, vx: 0, vy: 0 });
+      Object.assign(pan, { x: pan.targetX, y: pan.targetY, vx: 0, vy: 0, room: pan.targetRoom, vroom: 0 });
     }
   },
   // What you see: the chosen frame in the record window, the screen everywhere else (the S key).
@@ -794,8 +796,10 @@ if (import.meta.env.DEV) {
 fitScreen();
 pan.x = pan.targetX;
 pan.y = pan.targetY;
+pan.room = pan.targetRoom;
 output.offsetX = pan.x;
 output.offsetY = pan.y;
+output.room = pan.room;
 applyFrame();
 addEventListener('resize', fitScreen);
 
