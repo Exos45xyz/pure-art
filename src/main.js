@@ -693,7 +693,11 @@ const app = {
   },
 };
 
+// Dev only: worst-case data for the panel and its switch (src/dev-data.js); production never loads it.
+const dev = import.meta.env.DEV ? await import('./dev-data.js') : null;
+app.devLooks = dev?.devLooks() ?? null;
 const ui = createUI(app);
+dev?.mountDataToggle();
 
 if (import.meta.env.DEV) {
   window.pureSmoke = {

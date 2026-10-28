@@ -314,9 +314,11 @@ export function createUI(app) {
   const MAX_MINE = 6;
   let mine = [];
   try { mine = JSON.parse(localStorage.getItem(MINE_KEY)) ?? []; } catch {}
+  // Dev only: a worst-case set in their place (src/dev-data.js), never written over the kept ones.
+  if (app.devLooks) mine = app.devLooks;
   if (!Array.isArray(mine)) mine = [];
   mine = mine.filter((m) => typeof m?.name === 'string' && m.values && typeof m.values === 'object').slice(0, MAX_MINE);
-  const keepMine = () => { try { localStorage.setItem(MINE_KEY, JSON.stringify(mine)); } catch {} };
+  const keepMine = () => { if (app.devLooks) return; try { localStorage.setItem(MINE_KEY, JSON.stringify(mine)); } catch {} };
   const valuesOf = (m) => ({ ...presetValues('smoke'), ...m.values });
   // Numbered after the highest kept, so the chips read in the order they were made.
   const nextName = () => `mine ${Math.max(0, ...mine.map((m) => Number(m.name.match(/\d+$/)?.[0]) || 0)) + 1}`;
@@ -508,7 +510,7 @@ export function createUI(app) {
   const addImage = h('button', {
     type: 'button', class: 'chip chip-add',
     title: 'Colour the smoke from an image: choose one, drop one anywhere, or paste one', onclick: () => fileInput.click(),
-  }, '+ image');
+  }, icon('save'), h('span', {}, 'image'));
   const colourName = h('span', { class: 'micro colour-name' });
   const strip = h('div', { class: 'swatches', 'aria-hidden': 'true', hidden: true });
   let imageLabel = 'image';
@@ -525,6 +527,7 @@ export function createUI(app) {
         o.tabIndex = value === on ? 0 : -1;
       }
       colourName.textContent = on === 'image' ? imageLabel : on;
+      colourName.title = on === 'image' ? imageLabel : '';
       strip.hidden = on !== 'image';
     },
   };

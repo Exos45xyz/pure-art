@@ -27,7 +27,9 @@ export function step(name) {
   setTimeout(loaded, 300);
 }
 
-// This module running means the code has arrived. The empty bar is laid out first, so the creep
-// starts from it.
+// This module running means the code has arrived. Until now the stylesheet has crept the bar on its own
+// (style.css, .loader .bar i), so a slow line still sees it move; take it over from where it is.
+bar.style.transform = getComputedStyle(bar).transform;
+bar.style.animation = 'none';
 getComputedStyle(bar).transform;
 step('code');
