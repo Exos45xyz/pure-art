@@ -222,7 +222,7 @@ function colourControls() {
   const drop = h('button', { type: 'button', class: 'picker-drop', title: 'Pick a colour from the screen', 'aria-label': 'pick a colour from the screen' });
   drop.innerHTML = PIPETTE;
   drop.hidden = !('EyeDropper' in window);
-  const hex = h('input', { class: 'picker-hex', 'aria-label': 'hex', spellcheck: 'false', autocomplete: 'off', autocapitalize: 'characters', maxlength: 7 });
+  const hex = h('input', { class: 'picker-hex', 'aria-label': 'hex', spellcheck: 'false', autocomplete: 'off', autocorrect: 'off', autocapitalize: 'characters', enterkeyhint: 'done', maxlength: 7 });
   const el = h('div', { class: 'picker-colour' },
     square,
     h('div', { class: 'picker-row' }, drop, hue),
@@ -622,7 +622,7 @@ export function createUI(app) {
   function rename(m, chip) {
     const field = h('input', {
       class: 'chip chip-look chip-name', value: m.name, maxlength: 24, size: Math.max(4, m.name.length + 1),
-      spellcheck: 'false', autocomplete: 'off', 'aria-label': `Name for ${m.name}`,
+      spellcheck: 'false', autocomplete: 'off', autocorrect: 'off', enterkeyhint: 'done', 'aria-label': `Name for ${m.name}`,
     });
     chip.replaceWith(field);
     field.focus();
@@ -1665,6 +1665,9 @@ export function createUI(app) {
     else if (key === 's') saveImage();
     else if (key === 'h') setOpen(panel.hasAttribute('data-hidden'), true);
   });
+
+  // iOS Safari shows :active (every control's press feedback) only on a page that listens for touches.
+  document.addEventListener('touchstart', () => {}, { passive: true });
 
   // Phones have no footer hint: if nobody has touched the cube a few seconds in, say what it does.
   if (matchMedia('(pointer: coarse)').matches) {
