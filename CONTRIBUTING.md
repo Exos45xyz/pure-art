@@ -21,4 +21,4 @@ Open http://127.0.0.1:5321. No build step beyond Vite, no framework: plain JavaS
 
 ## Licence
 
-By contributing you agree that your work is shared under the [MIT licence](LICENSE). The Pure Studio and Pure Art names and logos are not part of it.
+By contributing you agree that your work is shared under the [MIT licence](LICENSE), like everything else here.

@@ -130,7 +130,7 @@ Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) fi
 
 ## License
 
-[MIT](LICENSE): use it, change it, ship it. That covers the code and the two bundled colours, dusk and pearl. The Pure Studio name and logo, and the Pure Art logo (the dragon, also the tab's icon), are the studio's own and aren't part of the licence. The libraries, the noise code and the fonts keep their own licences, listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+[MIT](LICENSE): use it, change it, ship it. That covers everything in this repository made by Pure Studio: the code, the two bundled colours (dusk and pearl), and the Pure Studio and Pure Art logos (the dragon, also the tab's icon). The libraries, the noise code and the fonts keep their own licences, listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ---
 
