@@ -95,7 +95,7 @@ canvas:active { cursor: grabbing; }
 .pure-art {
   display: block;
   height: 40px;
-  aspect-ratio: 1200 / 375;
+  aspect-ratio: 1200 / 363;
   background: var(--strong);
   -webkit-mask: url(/pure-art.png) no-repeat center / contain;
   mask: url(/pure-art.png) no-repeat center / contain;
@@ -111,12 +111,12 @@ canvas:active { cursor: grabbing; }
 .flight i {
   position: absolute;
   left: 0;
-  width: calc(var(--h) * 1200 / 375);
+  width: calc(var(--h) * 1200 / 363);
   top: calc(var(--i) * var(--h) / 24);
   height: calc(var(--h) / 24 + 0.5px);
   background: var(--strong);
-  -webkit-mask: url(/pure-art-dragon.png) no-repeat 0 calc(var(--i) * var(--h) / -24) / calc(var(--h) * 1200 / 375) var(--h);
-  mask: url(/pure-art-dragon.png) no-repeat 0 calc(var(--i) * var(--h) / -24) / calc(var(--h) * 1200 / 375) var(--h);
+  -webkit-mask: url(/pure-art-dragon.png) no-repeat 0 calc(var(--i) * var(--h) / -24) / calc(var(--h) * 1200 / 363) var(--h);
+  mask: url(/pure-art-dragon.png) no-repeat 0 calc(var(--i) * var(--h) / -24) / calc(var(--h) * 1200 / 363) var(--h);
   animation: sway 1.4s ease-in-out infinite alternate;
   animation-delay: calc(var(--i) * 0.11s - 6s);
 }
