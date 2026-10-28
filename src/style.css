@@ -4,7 +4,8 @@
 @import '@fontsource-variable/archivo/wdth.css';
 
 /* Type and voice from Pure Studio's Enact concept, turned to black:
-   Archivo Expanded for the wordmark and uppercase micro labels, Archivo at its normal width in lowercase for controls. */
+   Archivo Expanded for the uppercase micro labels, Helvetica Neue in lowercase for controls (the system's own on a
+   Mac and an iPhone; Arial where it isn't installed). */
 
 :root {
   --page: #000;
@@ -20,7 +21,7 @@
   --line: rgba(255, 255, 255, 0.06);
 
   --display: 'Archivo Variable', Archivo, 'Helvetica Neue', Arial, sans-serif;
-  --sans: 'Archivo Variable', Archivo, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-pill: cubic-bezier(0.16, 1, 0.3, 1);
