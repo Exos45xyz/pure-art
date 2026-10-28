@@ -46,7 +46,7 @@ Fork it, change it, ship it. Three places to start:
 
 ## Controls
 
-The panel shows the everyday choices first: a look, a colour, then save or share. The icon at its top right hides it (or H): it folds into its corner, the cube glides into the room it leaves, and **parameters** brings it back out of the same corner. Everything else sits under **Fine-tune**, in short groups by what it changes (**Motion**, **Rhythm**, **Glass**, **Light**, **Particles**, **Camera**), each control saying what it does when you hover it; it stays open or closed as you left it.
+The panel shows the everyday choices first: a look, a colour, then save or share. The icon at its top right hides it (or H): it folds into its corner, the cube glides into the room it leaves, and **parameters** brings it back out of the same corner. Everything else sits under **Fine-tune**, always open below them, in short groups by what it changes (**Motion**, **Rhythm**, **Glass**, **Light**, **Particles**, **Camera**), each control saying what it does when you hover it.
 
 | Group | Control | What it does |
 | --- | --- | --- |

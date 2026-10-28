@@ -1205,31 +1205,10 @@ export function createUI(app) {
     h('section', {},
       h('h3', { class: 'micro' }, group),
       h('div', { class: 'rows' }, controls.filter((c) => c.group === group && !c.hidden).map((c) => field(c))))));
-  const tuneButton = h('button', {
-    type: 'button', class: 'disclosure micro', 'aria-controls': 'fine-tune', onclick: () => setTune(tune.hidden),
-  }, 'Fine-tune', h('i', { class: 'chevron', 'aria-hidden': 'true' }));
-  const tuneSection = h('section', {}, tuneButton, tune);
-
-  // Fine-tune stays open or closed as each visitor left it (kept in this browser only).
-  const TUNE_KEY = 'pure-smoke-fine-tune';
-  const showTune = (open) => {
-    tune.hidden = !open;
-    tuneButton.setAttribute('aria-expanded', String(open));
-  };
-  function setTune(open) {
-    showTune(open);
-    try { localStorage.setItem(TUNE_KEY, open ? 'open' : 'closed'); } catch {}
-    // On a phone the sheet grows or shrinks, so the cube (or its frame) re-centres in the space left.
-    app.reframe();
-    placeChrome();
-    if (open && panel.scrollHeight > panel.clientHeight) {
-      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-      tuneButton.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
-    }
-  }
-  let remembered = null;
-  try { remembered = localStorage.getItem(TUNE_KEY); } catch {}
-  showTune(remembered === 'open');
+  // Fine-tune is always open: every other control, under its own title after the everyday ones.
+  const tuneSection = section('Fine-tune', tune);
+  tuneSection.classList.add('tune-section');
+  try { localStorage.removeItem('pure-smoke-fine-tune'); } catch {} // when it folded, it remembered how
 
   // The colours in use (a bundled palette or an uploaded image), or none for white. An uploaded image
   // becomes its orb, and the strip shows its main colours at the share of the picture each one covers.

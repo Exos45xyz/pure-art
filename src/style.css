@@ -94,7 +94,7 @@ canvas:active { cursor: grabbing; }
 .logo { line-height: 0; }
 .pure-art {
   display: block;
-  height: 40px;
+  height: 30px;
   aspect-ratio: 1200 / 363;
   background: var(--strong);
   -webkit-mask: url(/pure-art.png) no-repeat center / contain;
@@ -542,37 +542,10 @@ canvas:active { cursor: grabbing; }
 
 .keys { padding: 0 2px; color: #555; }
 
-/* Fine-tune: every other control, one level deeper */
-.disclosure {
-  height: 28px;
-  padding: 0 12px 0 10px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-radius: 7px;
-  background: var(--row);
-  color: var(--text);
-  transition: transform 160ms var(--ease-pill);
-}
-.disclosure:active { transform: scale(0.98); }
-.chevron {
-  width: 6px;
-  height: 6px;
-  border-right: 1.3px solid currentColor;
-  border-bottom: 1.3px solid currentColor;
-  transform: translateY(-2px) rotate(45deg);
-  transition: transform 200ms var(--ease-out);
-}
-.disclosure[aria-expanded='true'] .chevron { transform: translateY(1px) rotate(225deg); }
-.tune {
-  display: grid;
-  gap: 18px;
-  padding-top: 10px;
-  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
-}
-.tune[hidden] { display: none; }
-/* Fine-tune's rows fade in a few pixels above their place as it opens */
-@starting-style { .tune { opacity: 0; transform: translateY(-4px); } }
+/* Fine-tune: every other control, always open under its title, in short groups; a hairline above it
+   parts it from the everyday choices, so its title reads over its groups' */
+.tune-section { padding-top: 16px; border-top: 1px solid var(--line); }
+.tune { display: grid; gap: 18px; padding-top: 6px; }
 .panel h3 { padding: 0 2px; }
 /* A control waiting on another (focus needs blur) */
 .slider.resting { opacity: 0.4; pointer-events: none; }
@@ -586,7 +559,6 @@ canvas:active { cursor: grabbing; }
   .chip:hover { color: var(--strong); background: #1c1c1c; }
   .chip[aria-pressed='true']:hover, .mine .chip-get:hover { background: #fff; color: #0b0b0b; }
   .pill:hover { background: #222; }
-  .disclosure:hover { background: var(--row-hover); color: var(--strong); }
   .pill-randomize:hover { background: rgba(255, 255, 255, 0.06); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
   .pill-primary:hover { background: #fff; }
   .pill-primary.recording:hover { background: #222; }
@@ -977,7 +949,7 @@ canvas:active { cursor: grabbing; }
   .foot, .keys { display: none; }
   /* The name in the middle at the top; the sheet is the phone's foot, so the credit closes the sheet */
   .brand { top: max(16px, env(safe-area-inset-top)); left: 0; right: 0; justify-items: center; }
-  .brand .pure-art { height: 36px; }
+  .brand .pure-art { height: 28px; }
   .credit { display: none; }
   .sheet-credit { display: flex; justify-content: center; padding: 2px 0 2px; }
   .reopen { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform-origin: bottom right; }
@@ -1014,6 +986,6 @@ canvas:active { cursor: grabbing; }
   .flight, .flight i { animation: none; }
   /* Movement goes; opacity and colour stay. The die doesn't turn; it still lands on a new face. */
   .die { transform: none !important; }
-  .choice-lit, .gliding .slider-fill, .slider.jump .slider-fill, .chevron { transition: none; }
-  .tune, .mine, .picker, .grad-stop, .tip { transform: none !important; }
+  .choice-lit, .gliding .slider-fill, .slider.jump .slider-fill { transition: none; }
+  .mine, .picker, .grad-stop, .tip { transform: none !important; }
 }
