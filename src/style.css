@@ -301,7 +301,8 @@ canvas:active { cursor: grabbing; }
 /* The only control in its section: the section's title names it, so the options take the whole row. */
 .row.bare { grid-template-columns: 1fr; padding-left: 0; }
 
-/* Chips and action pills: Enact's pill, lowercase */
+/* Look chips and action pills: Enact's pill, lowercase */
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip, .pill {
   height: 24px;
   padding: 0 9px;
@@ -317,55 +318,23 @@ canvas:active { cursor: grabbing; }
 }
 .chip[aria-pressed='true'] { background: var(--strong); color: #0b0b0b; }
 .chip:active, .pill:active { transform: scale(0.97); }
-/* Looks: a list in two columns, in the panel's row style (ui.js). The look on screen is brighter, with a
-   check; yours follow, the one on screen with × to remove it; save this look closes the list only when
-   the look on screen is new. Download and upload sit quietly under it. */
-.looks-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
-.look-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 7px;
-  background: var(--row);
-  color: var(--text);
-  text-align: left;
-  text-transform: lowercase;
-  transition: transform 160ms var(--ease-pill);
-}
-.look-item:active { transform: scale(0.985); }
-.look-item[aria-pressed='true'] { background: #262626; color: var(--strong); }
-.look-item[aria-pressed='true'] .tick { display: block; }
-.look-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mine { position: relative; transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out); }
-@starting-style { .mine { opacity: 0; transform: translateY(-4px); } }
-.mine .look-item { padding-right: 34px; }
-.mine .look-item[aria-pressed='true'] .tick { display: none; }
-.look-remove {
-  position: absolute;
-  top: 2px;
-  right: 3px;
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-}
-.look-remove[hidden] { display: none; }
-.look-save { grid-column: 1 / -1; background: transparent; color: var(--strong); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22); }
-.look-save[hidden] { display: none; }
-.look-save:disabled { opacity: 0.45; cursor: default; }
-.looks-foot { display: flex; gap: 14px; padding: 2px 2px 0; }
-.looks-list[hidden], .looks-foot[hidden] { display: none; }
-/* Yours, before any is kept: one line saying how */
-.looks-empty { padding: 4px 2px; font: 400 11px/1.4 var(--sans); color: #5f5f5f; }
-.looks-foot .text-button { color: #5a5a5a; }
+/* Your own looks (ui.js): each chip with its remove button beside it while it's the look on screen, and
+   + save at the end. A new one grows in where it lands. */
+.mine { display: inline-flex; gap: 2px; transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out); }
+@starting-style { .mine { opacity: 0; transform: scale(0.95); } }
+.chip-remove { padding: 0 7px; }
+.chip-remove[hidden] { display: none; }
 /* + save and + image: actions among choices, drawn as an outline */
-.chip-add { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+.chip-save, .chip-add { background: transparent; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+/* Look chips: a small radius, like the panel's rows, and a line icon of the look's shape before the name */
+.chip-look { border-radius: 6px; gap: 6px; padding: 0 9px 0 7px; }
+.chip-look.chip-remove { padding: 0 7px; }
+.chip-save { color: var(--strong); }
+.chip-save[hidden] { display: none; }
+.look-icon { display: block; flex: none; width: 12px; height: 12px; opacity: 0.75; }
+.look-icon svg { display: block; }
+.chip[aria-pressed='true'] .look-icon { opacity: 1; }
+.head-actions { display: flex; gap: 12px; }
 .text-button .face { gap: 4px; }
 .text-button .tick { width: 8px; height: 8px; }
 .text-button .tick svg { width: 8px; height: 8px; }
@@ -473,11 +442,6 @@ canvas:active { cursor: grabbing; }
   .pill-primary:hover { background: #fff; }
   .pill-primary.recording:hover { background: #222; }
   .text-button:hover { color: var(--strong); }
-  .look-item:hover { background: var(--row-hover); }
-  .look-item[aria-pressed='true']:hover { background: #262626; }
-  .look-save:not(:disabled):hover { background: transparent; color: var(--strong); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
-  .mine:hover .look-remove[hidden] { display: grid; }
-  .look-remove:hover { color: var(--strong); background: var(--row-hover); }
   .foot a:hover, .designed:hover { opacity: 0.7; }
 }
 

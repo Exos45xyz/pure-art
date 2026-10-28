@@ -15,13 +15,10 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
 // A button's face: an optional mark, a check (shown while the button says it's done) and its words.
 const TICK = '<svg viewBox="0 0 10 10" width="10" height="10"><path d="M1.6 5.3 4 7.6 8.4 2.7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-function tickMark() {
+function face(words, ...marks) {
   const tick = h('i', { class: 'tick', 'aria-hidden': 'true' });
   tick.innerHTML = TICK;
-  return tick;
-}
-function face(words, ...marks) {
-  return h('span', { class: 'face' }, ...marks, tickMark(), h('span', { class: 'words', 'aria-live': 'polite' }, words));
+  return h('span', { class: 'face' }, ...marks, tick, h('span', { class: 'words', 'aria-live': 'polite' }, words));
 }
 
 // A full-width row you drag anywhere on. Click jumps, drag scrubs, Shift is fine, double-click resets,
@@ -190,13 +187,29 @@ export function createUI(app) {
     syncAll(instant);
   };
 
-  // Looks: a list in two columns, in the panel's row style; the look on screen is brighter, with a check.
-  const lookItem = (name, onclick) => h('button', { type: 'button', class: 'look-item', onclick }, h('span', { class: 'look-name' }, name), tickMark());
-  for (const name of Object.keys(presets)) chips[name] = lookItem(name, () => applyLook(presetValues(name), name));
+  // Looks: chips with a small radius, each with a line icon of its shape, drawn like the die: a thin
+  // 12 px diagram in the current colour. pure breathes (two rings), aura glows (a ring in a dotted halo),
+  // original is the clip's cube, ribbon a band, veil stacked sheets, smoke a soft cloud; yours a spark.
+  const ICONS = {
+    pure: '<circle cx="6" cy="6" r="4.6"/><circle cx="6" cy="6" r="2"/>',
+    aura: '<circle cx="6" cy="6" r="2.3"/><circle cx="6" cy="6" r="4.8" stroke-dasharray="1.1 1.5"/>',
+    original: '<path d="M6 1.3 10.2 3.7v4.6L6 10.7 1.8 8.3V3.7zM1.8 3.7 6 6.1l4.2-2.4M6 6.1v4.6"/>',
+    ribbon: '<path d="M1.3 4.4c1.9-2.3 3.4 2.3 4.7 0s2.8-2.3 4.7 0M1.3 7.9c1.9-2.3 3.4 2.3 4.7 0s2.8-2.3 4.7 0"/>',
+    veil: '<path d="M1.5 3.4q4.5-2.2 9 0M1.5 6.2q4.5-2.2 9 0M1.5 9q4.5-2.2 9 0"/>',
+    smoke: '<path d="M3.4 9.3h5.3a2.1 2.1 0 0 0 .3-4.2 2.9 2.9 0 0 0-5.5.7 1.8 1.8 0 0 0-.1 3.5z"/>',
+    mine: '<path d="M6 1.4 7 5l3.6 1L7 7l-1 3.6L5 7 1.4 6 5 5z"/>',
+    save: '<path d="M6 2.4v7.2M2.4 6h7.2"/>',
+  };
+  const icon = (name) => {
+    const i = h('i', { class: 'look-icon', 'aria-hidden': 'true' });
+    i.innerHTML = `<svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
+    return i;
+  };
+  const lookChip = (name, iconName, onclick) => h('button', { type: 'button', class: 'chip chip-look', onclick }, icon(iconName), h('span', {}, name));
+  for (const name of Object.keys(presets)) chips[name] = lookChip(name, name, () => applyLook(presetValues(name), name));
   const shuffle = (instant = false) => applyLook(shuffled(app.state), undefined, instant);
-  // Your own looks follow the others. Save this look appears only when the look on screen is new (which also
-  // says it isn't kept yet) and keeps it (mine 1, mine 2…) in this browser. The one on screen shows × to
-  // remove it (any of them under a mouse). Copy code turns any look into a preset for src/settings.js,
+  // Your own looks: + save appears when the look on screen is new (which also says it isn't kept yet) and
+  // keeps it as a chip (mine 1, mine 2…), in this browser. The one on screen shows × beside it to remove it. Copy code turns any look into a preset for src/settings.js,
   // and the address bar link shares it with anyone.
   const MINE_KEY = 'pure-smoke-looks';
   const MAX_MINE = 6;
@@ -206,60 +219,21 @@ export function createUI(app) {
   mine = mine.filter((m) => typeof m?.name === 'string' && m.values && typeof m.values === 'object').slice(0, MAX_MINE);
   const keepMine = () => { try { localStorage.setItem(MINE_KEY, JSON.stringify(mine)); } catch {} };
   const valuesOf = (m) => ({ ...presetValues('smoke'), ...m.values });
-  // Numbered after the highest kept, so they read in the order they were made.
+  // Numbered after the highest kept, so the chips read in the order they were made.
   const nextName = () => `mine ${Math.max(0, ...mine.map((m) => Number(m.name.match(/\d+$/)?.[0]) || 0)) + 1}`;
-  const saveChip = h('button', { type: 'button', class: 'look-item look-save', onclick: (e) => saveLook(e.detail === 0) }, '+ save this look');
-  const looksRow = h('div', { class: 'looks-list', role: 'group', 'aria-label': 'Looks' });
-  const mineRow = h('div', { class: 'looks-list', role: 'group', 'aria-label': 'Your looks' });
-  const mineEmpty = h('p', { class: 'looks-empty' }, 'Change a look, then save it here.');
-  // A toggle between the looks that come with the app and yours, in the sliding style of the other
-  // choices. Clicks glide the thumb; from a key it moves at once.
-  const tabThumb = h('div', { class: 'choice-thumb' });
-  tabThumb.style.width = 'calc((100% - 6px) / 2)';
-  const tabNames = ['looks', 'yours'];
-  const tabButtons = tabNames.map((tab, i) => h('button', {
-    type: 'button', role: 'radio', class: 'choice-option',
-    onclick: () => showTab(tab),
-    onkeydown: (e) => {
-      const d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
-      if (!d) return;
-      e.preventDefault();
-      const next = tabNames[(i + d + 2) % 2];
-      tabThumb.style.transition = 'none';
-      showTab(next);
-      tabButtons[tabNames.indexOf(next)].focus();
-      requestAnimationFrame(() => requestAnimationFrame(() => { tabThumb.style.transition = ''; }));
-    },
-  }, tab));
-  const lookTabs = h('div', { class: 'row bare' }, h('div', { class: 'choice', role: 'radiogroup', 'aria-label': 'Looks' }, tabThumb, tabButtons));
-  let lookTab = 'looks';
-  function showTab(tab) {
-    lookTab = tab;
-    const i = tabNames.indexOf(tab);
-    tabThumb.style.transform = `translateX(${i * 100}%)`;
-    tabButtons.forEach((b, j) => {
-      b.setAttribute('aria-checked', String(j === i));
-      b.tabIndex = j === i ? 0 : -1;
-    });
-    looksRow.hidden = tab !== 'looks';
-    mineRow.hidden = tab !== 'yours' || !mine.length;
-    mineEmpty.hidden = tab !== 'yours' || mine.length > 0;
-    looksFoot.hidden = tab !== 'yours';
-  }
+  const saveChip = h('button', { type: 'button', class: 'chip chip-look chip-save', onclick: (e) => saveLook(e.detail === 0) }, icon('save'), h('span', {}, 'save'));
+  const looksRow = h('div', { class: 'chips', role: 'group', 'aria-label': 'Look' });
   let mineChips = [];
   function drawMine() {
     mineChips = mine.map((m) => {
-      const chip = lookItem(m.name, () => applyLook(valuesOf(m), m.name));
+      const chip = lookChip(m.name, 'mine', () => applyLook(valuesOf(m), m.name));
       const remove = h('button', {
-        type: 'button', class: 'look-remove', 'aria-label': `Remove ${m.name}`, title: `Remove ${m.name}`, hidden: true,
+        type: 'button', class: 'chip chip-look chip-remove', 'aria-label': `Remove ${m.name}`, title: `Remove ${m.name}`, hidden: true,
         onclick: () => forget(m),
       }, '×');
-      return { m, chip, remove, el: h('div', { class: 'mine' }, chip, remove) };
+      return { m, chip, remove, el: h('span', { class: 'mine' }, chip, remove) };
     });
-    looksRow.replaceChildren(...Object.values(chips));
-    mineRow.replaceChildren(...mineChips.map((c) => c.el));
-    tabButtons[1].textContent = mine.length ? `yours · ${mine.length}` : 'yours';
-    showTab(lookTab);
+    looksRow.replaceChildren(...Object.values(chips), ...mineChips.map((c) => c.el), saveChip);
     downloadButton.hidden = !mine.length;
     showMine();
   }
@@ -275,7 +249,7 @@ export function createUI(app) {
     const known = found || matchingPreset(app.state) !== undefined;
     saveChip.hidden = known;
     saveChip.disabled = mine.length >= MAX_MINE;
-    saveChip.title = mine.length >= MAX_MINE ? 'Six looks kept: remove one to keep another' : 'Keep this look in the list, in this browser';
+    saveChip.title = mine.length >= MAX_MINE ? 'Six looks kept: remove one to keep another' : 'Keep this look as a chip, in this browser';
   }
   function saveLook(keyboard) {
     // A saved look keeps its colour, but not an uploaded image (it's gone once the page closes).
@@ -283,20 +257,18 @@ export function createUI(app) {
     mine.push(m);
     keepMine();
     drawMine();
-    // It went into yours: the toggle turns there, to show it. Save is now gone (this look is kept), so
-    // keyboard focus goes to the new row.
-    showTab('yours');
+    // + save is now gone (this look is a chip): keyboard focus goes to the new chip.
     if (keyboard) mineChips.at(-1).chip.focus();
   }
   function forget(m) {
     mine = mine.filter((x) => x !== m);
     keepMine();
     drawMine();
-    (saveChip.hidden ? (mineRow.querySelector('button') ?? tabButtons[1]) : saveChip).focus({ preventScroll: true });
+    (saveChip.hidden ? looksRow.querySelector('button') : saveChip).focus({ preventScroll: true });
   }
-  // Your looks travel as a file, in a quiet line under the list: download keeps them all (a small JSON
-  // file), upload brings a file of them back, here or in another browser, or drop it anywhere on the page.
-  // Uploading only adds: a look you already have is kept once, and six at most.
+  // Your looks travel as a file: download keeps them all (a small JSON file), upload brings a file of them
+  // back, here or in another browser, or drop it anywhere on the page. Uploading only adds: a look you
+  // already have is kept once, and six at most.
   const looksFile = h('input', {
     type: 'file', accept: '.json,application/json', hidden: true,
     onchange: () => {
@@ -330,14 +302,12 @@ export function createUI(app) {
     }
     keepMine();
     drawMine();
-    if (added) {
-      showTab('yours');
-      sayIn(uploadButton, `${added} added`, 'upload');
-    }
+    if (added) sayIn(uploadButton, `${added} added`, 'upload');
     else toast(full ? 'six looks kept: remove one to add more' : 'those looks are already here');
   }
-  const looksFoot = h('div', { class: 'looks-foot' }, downloadButton, uploadButton);
-  const look = h('section', {}, h('h2', { class: 'micro' }, 'Look'), lookTabs, looksRow, mineRow, mineEmpty, saveChip, looksFoot, looksFile);
+  const look = h('section', {},
+    h('div', { class: 'section-head' }, h('h2', { class: 'micro' }, 'Look'), h('span', { class: 'head-actions' }, downloadButton, uploadButton)),
+    looksRow, looksFile);
   drawMine();
 
   // Actions
