@@ -1,6 +1,6 @@
 # Third-party notices
 
-Pure Smoke is MIT licensed (see [LICENSE](LICENSE)). It ships with the work below, each under its own licence.
+Pure Art is MIT licensed (see [LICENSE](LICENSE)). It ships with the work below, each under its own licence.
 
 ## three.js — MIT
 

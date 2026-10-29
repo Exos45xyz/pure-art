@@ -43,7 +43,7 @@ const accumulate = renderer.extensions.has('EXT_color_buffer_float') && renderer
 
 // ---- State ---------------------------------------------------------------------------------
 
-// Opening a link opens the look it holds; reloading the page starts again from pure. (The address bar
+// Opening a link opens the look it holds; reloading the page starts again from the original look. (The address bar
 // keeps a link to the look on screen as you go, so the look can still be shared.)
 if (performance.getEntriesByType('navigation')[0]?.type === 'reload') history.replaceState(null, '', location.pathname + location.search);
 const state = readHash();
@@ -57,7 +57,7 @@ if (embedded) {
   back.href = `${location.origin}/${location.hash}`;
   back.target = '_blank';
   back.rel = 'noopener';
-  back.innerHTML = '<b>Pure Smoke</b><svg viewBox="0 0 8 8" aria-hidden="true"><path d="M2 6 6 2M2.8 2H6v3.2"/></svg>';
+  back.innerHTML = '<b>Pure Art</b><svg viewBox="0 0 8 8" aria-hidden="true"><path d="M2 6 6 2M2.8 2H6v3.2"/></svg>';
   document.body.append(back);
 }
 // Phones start light. Computers start at a million grains and step down if they can't keep up.
@@ -672,7 +672,7 @@ async function renderVideo(job, { length, loop, fps }) {
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
     const blob = await encoder.finish();
-    const name = `pure-smoke-${loop ? 'loop' : 'video'}-${canvas.width}x${canvas.height}-${Math.round(seconds)}s-${fps}fps-${stamp()}.mp4`;
+    const name = `pure-art-${loop ? 'loop' : 'video'}-${canvas.width}x${canvas.height}-${Math.round(seconds)}s-${fps}fps-${stamp()}.mp4`;
     download(blob, name);
     return 'mp4';
   } catch (e) {

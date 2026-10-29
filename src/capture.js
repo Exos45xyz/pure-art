@@ -39,7 +39,7 @@ export function saveImage({ canvas, render, width, height }) {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (!blob) return reject(new Error('Could not read the image.'));
-      download(blob, `pure-smoke-${width}x${height}-${stamp()}.png`);
+      download(blob, `pure-art-${width}x${height}-${stamp()}.png`);
       resolve(`${width} × ${height}`);
     }, 'image/png');
   });
@@ -75,6 +75,6 @@ export async function recordVideo(ctx) {
   stream.getTracks().forEach((track) => track.stop());
 
   const extension = type.startsWith('video/mp4') ? 'mp4' : 'webm';
-  download(new Blob(chunks, { type: type.split(';')[0] }), `pure-smoke-${canvas.width}x${canvas.height}-${stamp()}.${extension}`);
+  download(new Blob(chunks, { type: type.split(';')[0] }), `pure-art-${canvas.width}x${canvas.height}-${stamp()}.${extension}`);
   return extension;
 }

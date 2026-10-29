@@ -413,6 +413,7 @@ function edgeColours() {
 // The smoke's disc wears the gradient the edges would take, and shows only while the smoke has colours
 // (or the edges wear it). Your colour opens the colour picker beside it and the cube follows live as you
 // pick; it is remembered for next time.
+// Kept under the app's first name (Pure Smoke), so nobody loses what they kept.
 const EDGE_KEY = 'pure-smoke-edge-colour';
 function edgeField(control, app, onChange) {
   let yours = '#8ab4ff';
@@ -730,20 +731,20 @@ export function createUI(app) {
   // One of yours alone, in the same file as all of them, so upload takes it back anywhere.
   function downloadLook(m, button) {
     hideDownloadTip();
-    const blob = new Blob([JSON.stringify({ app: 'pure-smoke', looks: [m] }, null, 2)], { type: 'application/json' });
-    download(blob, `pure-smoke-${m.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'look'}.json`);
+    const blob = new Blob([JSON.stringify({ app: 'pure-art', looks: [m] }, null, 2)], { type: 'application/json' });
+    download(blob, `pure-art-${m.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'look'}.json`);
     sayIn(button, '', '');
   }
   function downloadLooks() {
     hideDownloadTip();
-    const blob = new Blob([JSON.stringify({ app: 'pure-smoke', looks: mine }, null, 2)], { type: 'application/json' });
-    download(blob, `pure-smoke-looks-${stamp()}.json`);
+    const blob = new Blob([JSON.stringify({ app: 'pure-art', looks: mine }, null, 2)], { type: 'application/json' });
+    download(blob, `pure-art-looks-${stamp()}.json`);
     sayIn(downloadButton, 'downloaded', '');
   }
   async function uploadLooks(file) {
     let looks = null;
     try { looks = JSON.parse(await file.text())?.looks; } catch {}
-    if (!Array.isArray(looks)) return toast('that file has no Pure Smoke looks', { error: true });
+    if (!Array.isArray(looks)) return toast('that file has no Pure Art looks', { error: true });
     let added = 0;
     let full = false;
     for (const l of looks) {
@@ -1295,7 +1296,7 @@ export function createUI(app) {
       type: 'button', class: 'pill pill-randomize', title: 'Randomize (R)', 'aria-keyshortcuts': 'R',
       onclick: (e) => { rollDie(e.detail === 0); shuffle(); },
     }, die, 'randomize', h('kbd', { class: 'key micro', 'aria-hidden': 'true' }, 'R')),
-    h('button', { type: 'button', class: 'pill', onclick: () => applyLook(presetValues('pure'), 'pure') }, 'reset'));
+    h('button', { type: 'button', class: 'pill', onclick: () => applyLook(presetValues('original'), 'original') }, 'reset'));
   // The die rolls: a quarter turn (a die looks the same each quarter) that lands on a new face, never the
   // one it showed, so the icon says a new random look came up. From a key: the new face, without the turn.
   const PIPS = [null,

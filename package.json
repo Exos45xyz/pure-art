@@ -1,5 +1,5 @@
 {
-  "name": "pure-smoke",
+  "name": "pure-art",
   "version": "1.0.0",
   "description": "Particle smoke in a glass cube. A free, open-source three.js toy by Pure Studio.",
   "type": "module",
@@ -8,10 +8,10 @@
   "homepage": "https://pureart-xyz.vercel.app",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Exos45xyz/pure-smoke.git"
+    "url": "git+https://github.com/Exos45xyz/pure-art.git"
   },
   "bugs": {
-    "url": "https://github.com/Exos45xyz/pure-smoke/issues"
+    "url": "https://github.com/Exos45xyz/pure-art/issues"
   },
   "keywords": [
     "three.js",

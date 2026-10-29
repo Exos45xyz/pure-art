@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for wanting to make Pure Smoke better. A few things keep it the way it is.
+Thanks for wanting to make Pure Art better. A few things keep it the way it is.
 
 ## Run it
 

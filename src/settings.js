@@ -115,7 +115,7 @@ export function presetValues(name) {
 // glacier blues, the deep blue under them and the charcoal of the rock they were sampled from (a picture of
 // ice on dark rock), which sinks into the black studio as the rock does in the picture.
 export const DEFAULT_GRADIENT = 'g:ffffff@0~90,5a89a1@48,3b637e@66,204058@84,2c2b2d@100';
-export const defaults = { ...presetValues('pure'), particles: 1024, format: 'screen', colour: DEFAULT_GRADIENT, length: 8, loop: 'loop', fps: 60 };
+export const defaults = { ...presetValues('original'), particles: 1024, format: 'screen', colour: DEFAULT_GRADIENT, length: 8, loop: 'loop', fps: 60 };
 for (const c of controls) c.default = defaults[c.key];
 
 const lookKeys = controls.filter((c) => c.look !== false).map((c) => c.key);
@@ -168,7 +168,7 @@ export function lookCode(state) {
   const keys = controls.filter((c) => c.look !== false).map((c) => c.key);
   const lines = [];
   for (let i = 0; i < keys.length; i += 6) lines.push('    ' + keys.slice(i, i + 6).map((k) => `${k}: ${value(state[k])}`).join(', ') + ',');
-  return `  // A Pure Smoke look: paste it into presets in src/settings.js.\n  mine: {\n${lines.join('\n')}\n  },\n`;
+  return `  // A Pure Art look: paste it into presets in src/settings.js.\n  mine: {\n${lines.join('\n')}\n  },\n`;
 }
 
 // An edge colour: white, off, a colour of your own (#rrggbb), or red (the clip's, in older links and looks).
