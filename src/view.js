@@ -61,6 +61,8 @@ export function createView(canvas) {
   canvas.addEventListener('lostpointercapture', release);
   let wheelAt = -Infinity;
   canvas.addEventListener('wheel', (e) => {
+    // Embedded in someone's page, the wheel scrolls their page.
+    if (document.body.classList.contains('embed')) return;
     e.preventDefault();
     wheelAt = performance.now();
     rig.zoomTarget = Math.min(2.2, Math.max(0.6, rig.zoomTarget * Math.exp(-e.deltaY * 0.0015)));

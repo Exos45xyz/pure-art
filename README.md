@@ -2,7 +2,7 @@
 
 Particle smoke in a glass cube. Free and open source under the [MIT licence](LICENSE), made with three.js.
 
-![Pure Smoke: blue and white particle smoke inside a wireframe glass cube, under the Pure Art logo](public/og.png)
+<p align="center"><img src="public/preview.webp" width="432" alt="Pure Smoke: blue and white particle smoke folding inside a wireframe glass cube, an 8 second seamless loop"></p>
 
 **Play with it:** https://pureart-xyz.vercel.app
 
@@ -13,6 +13,26 @@ A million grains move through a real flow, inside real glass, under one studio l
 You can turn it, stir it, give it your colours, and take it home as a 4K image or a loop that never shows its seam.
 
 Drag to turn the cube, hover to stir the smoke, scroll to zoom (the hints at the bottom light up while you do each one, the first few times; on a touch screen only the drag is listed).
+
+## Use it
+
+**Share a look.** The address bar is a link to the look on screen, colour included (an uploaded picture stays on your computer). Send it and it opens exactly that.
+
+**Embed it.** Drop the smoke into your own page, a hero section for instance:
+
+```html
+<iframe src="https://pureart-xyz.vercel.app/?embed" title="Pure Smoke" loading="lazy"
+  style="width: 100%; aspect-ratio: 16 / 9; border: 0; background: #000"></iframe>
+```
+
+To embed a look of yours, put its link's `#…` after `?embed`. Embedded, the panel and the titles stay away, the wheel and a vertical swipe scroll your page, and a small link leads back here.
+
+**Run it.**
+
+```bash
+npm install
+npm run dev
+```
 
 ## What's in it
 
@@ -50,7 +70,7 @@ The panel shows the everyday choices first: a look, a colour, then save or share
 
 | Group | Control | What it does |
 | --- | --- | --- |
-| Look | pure, aura, original, ribbon, veil, rebound, smoke | Starting points. **Pure** is the default: the clip's breath through a depth lens, with fine filaments, sharp grains and sealed glass. **Aura** is pure's breath a little softer and brighter, a rounder glowing body that suits a colour. No look changes the colour: it stays whatever you chose. **Original** is the reference clip's camera and breath; **ribbon** (bright bands around a breathing body) and **veil** (slow sheets that fill the glass) are two other shapes for the same camera, each chosen by rendering it over 30 s. **Rebound** is the clip as physics, on its camera: the smoke keeps its momentum, the clip's breath throws it at the glass on every beat, and the glass sends it back at the speed it came, so it slams into the faces, presses flat and slides over them, then springs back into a compact mass with strands, beat after beat for as long as it runs (the rebound slider sets how hard it is thrown). Measured on the clip's camera and clock frame by frame, its share of the frame swells and falls with the clip's over each beat (about 20% to 55%, the clip 26% to 52%). **Smoke** is the plain studio look. Changes you make by hand are never lost by surprise: when a look, reset or randomize replaces them before you kept them, the toast offers **undo**. Each look has a small line icon of its shape. **save** appears when the look on screen is new (so it also tells you it isn't kept yet) and keeps it as your own chip (mine 1, mine 2…, up to six, kept in this browser; like the presets, it leaves the colour as it is); the one on screen carries a **download** arrow joined to it (that look alone, as a file **upload** takes back) and shows **×** beside it to remove it (the toast offers **undo** for a few seconds), and clicking it again (or double-clicking one of yours) lets you type its name. **Download** (the arrow into a tray by the Look title) keeps all of yours as a small file, and **upload** (the arrow out of it, or dropping that file on the page) brings them back, here or in another browser; uploading only adds, a look you already have is kept once, and six at most. To share a look, send the link in the address bar; **copy code** turns it into a preset for `src/settings.js`. **Randomize** rolls one of the smoke's three beautiful families (breathing **masses** like pure, slow crisp **silk** sheets, crisp **ribbons** around a breathing body) and varies it only inside the ranges where it stays beautiful. Those ranges were found by rendering rolls and scoring each frame: crisp strands rather than fog, shapes with air around them, the glass touched, no glare or gloom, coherent motion; 34 of 40 rolls pass that strict test (the rest are borderline), against 10 of 40 before. No roll adds spread, opens the glass or blurs the grains. **Reset** goes back to pure. |
+| Look | pure, aura, original, ribbon, veil, rebound, smoke | Starting points. **Pure** is the default: the clip's breath through a depth lens, with fine filaments, sharp grains and sealed glass. **Aura** is pure's breath a little softer and brighter, a rounder glowing body that suits a colour. No look changes the colour: it stays whatever you chose. **Original** is the reference clip's camera and breath; **ribbon** (bright bands around a breathing body) and **veil** (slow sheets that fill the glass) are two other shapes for the same camera, each chosen by rendering it over 30 s. **Rebound** is the clip as physics, on its camera: the smoke keeps its momentum, the clip's breath throws it at the glass on every beat, and the glass sends it back at the speed it came, so it slams into the faces, presses flat and slides over them, then springs back into a compact mass with strands, beat after beat for as long as it runs (the rebound slider sets how hard it is thrown). Measured on the clip's camera and clock frame by frame, its share of the frame swells and falls with the clip's over each beat (about 20% to 55%, the clip 26% to 52%). **Smoke** is the plain studio look. Changes you make by hand are never lost by surprise: when a look, reset or randomize replaces them before you kept them, the toast offers **undo**. Each look has a small line icon of its shape. **save** appears when the look on screen is new (so it also tells you it isn't kept yet) and keeps it as your own chip (mine 1, mine 2…, up to six, kept in this browser; like the presets, it leaves the colour as it is); the one on screen carries a **download** arrow joined to it (that look alone, as a file **upload** takes back) and shows **×** beside it to remove it (the toast offers **undo** for a few seconds), and clicking it again (or double-clicking one of yours) lets you type its name. **Download** (the arrow into a tray by the Look title) keeps all of yours as a small file, and **upload** (the arrow out of it, or dropping that file on the page) brings them back, here or in another browser; uploading only adds, a look you already have is kept once, and six at most. To share a look, send the link in the address bar (it carries the colour too, but not an uploaded picture); **copy code** turns it into a preset for `src/settings.js`. **Randomize** rolls one of the smoke's three beautiful families (breathing **masses** like pure, slow crisp **silk** sheets, crisp **ribbons** around a breathing body) and varies it only inside the ranges where it stays beautiful. Those ranges were found by rendering rolls and scoring each frame: crisp strands rather than fog, shapes with air around them, the glass touched, no glare or gloom, coherent motion; 34 of 40 rolls pass that strict test (the rest are borderline), against 10 of 40 before. No roll adds spread, opens the glass or blurs the grains. **Reset** goes back to pure. |
 | Colour | white, dusk, pearl, yours, image | Two colours ship with the app, both by Pure Studio: **dusk**, a grain gradient (orange, pink, lilac, pale mint), and **pearl**, pearl orbs on black (pearl white, lilac, violet grey, with a blue and blush sheen). **Yours** is a plain colour or a gradient of your own, and the app opens in it: at first the gradient it ships with, white that holds most of the way into the glacier blues, deep blue and charcoal of a picture of ice on dark rock (the plain colour starts as its glacier blue); once you make your own, it opens in yours. Its disc wears it and opens an editor beside it, like Paper's: two tabs choose **plain** or **gradient**, and each keeps its own, so switching never loses the other. As in Paper, the gradient's bar has a pin under it for each colour (two to eight) and a diamond above it for each blend: press the bar to add a colour there (in the colour already there, so nothing changes until you change it), drag a pin along, or drag it well off the bar to take it away; drag a diamond to move where its blend is half done (double-click puts it back in the middle); arrows move the chosen pin and Delete takes it away. **−** at the top puts the editor away (as do Escape and a click outside). The colour (or the chosen pin's) is set with the same square, hue bar, eyedropper and hex as the edges' colour. The smoke follows as you go, and each stretch of the bar colours its share of the smoke. Yours is kept in this browser; saved looks and copy code leave it out like any colour. Each colour is a flat disc of its picture's colours where the picture has them (dusk top to bottom, pearl along its light from the top left); the one worn has a ring and its name by the title. **image** (+) brings your own (or drop or paste one anywhere on the page), which joins as a disc of its own picture in its place (press that disc again while it's worn to choose another), and the smoke takes its colours like pigment in a fluid: every pixel becomes part of the smoke, each region of the cube wears one neighbourhood of the picture's colours, the flow folds the regions into strands, and a colour that covers 30% of the picture colours 30% of the smoke at every moment. Black (under 8% brightness) is left out: the smoke is light on a black studio, so the black around a picture is the studio itself. Under the orbs, the image's main shades show at their real shares. Switching between two colours turns every grain from its old colour to its new one. |
 | Motion | speed | How fast the smoke's time runs, breath and all: 1.00× as it is, from 0.25× (slow motion) to 2×. The camera and the panel keep the clock. |
 | | flow | How fast the current moves. |
@@ -94,12 +114,7 @@ Use **9:16** to export in the clip's own frame.
 
 ## Run it locally
 
-```bash
-npm install
-npm run dev
-```
-
-Then open http://127.0.0.1:5321. `npm run build` writes a static site to `dist/` that any host can serve.
+After `npm install` and `npm run dev`, open http://127.0.0.1:5321. `npm run build` writes a static site to `dist/` that any host can serve.
 
 On the dev server, `?data=worst` puts hard test looks in place of yours: the longest name allowed, one letter, an emoji first, right to left, one long word, and markup that must show as text. `?data=empty`, `one` and `full` (six) are the other cases. With one of them in the address, a small switch at the bottom of the page flips between them; without, the dev server looks like the real page. None of it is in the build.
 

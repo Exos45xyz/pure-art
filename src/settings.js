@@ -241,7 +241,11 @@ export function readHash() {
   for (const c of controls) {
     if (!params.has(c.key)) continue;
     const raw = params.get(c.key);
-    if (c.type === 'choice') {
+    if (c.key === 'colour') {
+      // The colour travels too: white, a bundled palette, or a gradient or plain colour of your own. An
+      // uploaded picture can't (its pixels stay on the computer that chose it).
+      if (raw !== 'image' && (c.options.some(([value]) => value === raw) || isGradient(raw))) state.colour = raw;
+    } else if (c.type === 'choice') {
       const option = c.options.find(([value]) => String(value) === raw);
       if (option) state[c.key] = option[0];
     } else if (c.type === 'edge') {
@@ -268,7 +272,10 @@ export function writeHash(state) {
   hashWritten = performance.now();
   const params = new URLSearchParams();
   for (const c of controls) {
-    if (c.look === false) continue;
+    // The colour isn't part of a look, but it is part of what you see, so the link carries it (not an
+    // uploaded picture).
+    if (c.look === false && c.key !== 'colour') continue;
+    if (c.key === 'colour' && state.colour === 'image') continue;
     if (state[c.key] !== c.default) params.set(c.key, String(state[c.key]));
   }
   const hash = params.toString();

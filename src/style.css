@@ -931,6 +931,15 @@ canvas:active { cursor: grabbing; }
 }
 .no-webgl .panel, .no-webgl .brand, .no-webgl canvas { display: none; }
 
+/* ---- Embedded (?embed): the smoke alone in someone's page (main.js) ----------------------------- */
+
+.embed .panel, .embed .reopen, .embed .brand, .embed .credit, .embed .foot, .embed .toast, .embed .tip { display: none !important; }
+/* A vertical swipe scrolls their page; a sideways drag turns the cube */
+.embed canvas { touch-action: pan-y; }
+.embed-credit { position: fixed; right: 12px; bottom: 10px; z-index: 2; opacity: 0.6; transition: opacity 200ms ease; }
+.embed-credit:active { opacity: 1; }
+@media (hover: hover) and (pointer: fine) { .embed-credit:hover { opacity: 1; } }
+
 /* ---- Phones: the panel becomes a sheet at the bottom ---------------------------------------- */
 
 @media (max-width: 720px) {

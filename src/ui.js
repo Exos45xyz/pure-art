@@ -846,8 +846,12 @@ export function createUI(app) {
     try { localStorage.setItem(YOURS_KEY, JSON.stringify(kept)); } catch {}
   };
   const yoursValue = () => (yoursKind === 'plain' ? plain : gradient);
-  // The app opens in yours: the one you made here, or the gradient it ships with.
-  if (app.state.colour === DEFAULT_GRADIENT) app.state.colour = yoursValue();
+  // The app opens in yours: the one a link brought (worn, and kept here only once you change it), the one
+  // you made here, or the gradient it ships with.
+  if (/[#&]colour=/.test(location.hash) && isGradient(app.state.colour) && app.state.colour !== DEFAULT_GRADIENT) {
+    if (isPlain(app.state.colour)) { plain = app.state.colour; yoursKind = 'plain'; }
+    else { gradient = app.state.colour; yoursKind = 'gradient'; }
+  } else if (app.state.colour === DEFAULT_GRADIENT) app.state.colour = yoursValue();
   // As CSS: each colour where it sits, and where a blend's midpoint moved, a colour hint there.
   const cssGradient = (value) => {
     const stops = readGradient(value);
@@ -1584,6 +1588,13 @@ export function createUI(app) {
     placeChrome();
   }
   reopen.addEventListener('click', () => setOpen(true));
+  // Embedded in someone's page, the panel stays away (main.js). Put away directly: the page frames the
+  // cube once the panel is made.
+  const embedded = document.body.classList.contains('embed');
+  if (embedded) {
+    panel.toggleAttribute('data-hidden', true);
+    panel.inert = true;
+  }
 
   // On a phone the panel is a sheet, and it goes away as a sheet does: drag its head (or the grabber) down
   // and it follows the finger 1:1; let go past half its height, or flick it, and it goes, the flick's speed
@@ -1711,7 +1722,7 @@ export function createUI(app) {
       shuffle(true);
     }
     else if (key === 's') saveImage();
-    else if (key === 'h') setOpen(panel.hasAttribute('data-hidden'), true);
+    else if (key === 'h' && !embedded) setOpen(panel.hasAttribute('data-hidden'), true);
   });
 
   // iOS Safari shows :active (every control's press feedback) only on a page that listens for touches.

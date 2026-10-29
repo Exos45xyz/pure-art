@@ -47,6 +47,19 @@ const accumulate = renderer.extensions.has('EXT_color_buffer_float') && renderer
 // keeps a link to the look on screen as you go, so the look can still be shared.)
 if (performance.getEntriesByType('navigation')[0]?.type === 'reload') history.replaceState(null, '', location.pathname + location.search);
 const state = readHash();
+// ?embed: the smoke alone, for a page of your own (README › Embed it): no panel, title or credit lines,
+// the wheel and a vertical swipe left to the page, and a small link back here (with the look it shows).
+const embedded = new URLSearchParams(location.search).has('embed');
+if (embedded) {
+  document.body.classList.add('embed');
+  const back = document.createElement('a');
+  back.className = 'embed-credit micro out';
+  back.href = `${location.origin}/${location.hash}`;
+  back.target = '_blank';
+  back.rel = 'noopener';
+  back.innerHTML = '<b>Pure Smoke</b><svg viewBox="0 0 8 8" aria-hidden="true"><path d="M2 6 6 2M2.8 2H6v3.2"/></svg>';
+  document.body.append(back);
+}
 // Phones start light. Computers start at a million grains and step down if they can't keep up.
 state.particles = coarse ? 256 : 1024;
 let qualityCheck = coarse ? null : { frames: 0, time: 0 };
@@ -796,9 +809,14 @@ const ui = createUI(app);
 dev?.mountDataToggle();
 // The smoke opens in your colour (the panel chose it: the blue gradient the app ships with, or the one
 // you made in this browser), on from the first frame rather than faded in.
-if (state.colour !== 'white') {
+if (isGradient(state.colour)) {
   live.colourMix = 1;
   useGradient(state.colour, false);
+} else if (bundled[state.colour]) {
+  // A link in dusk or pearl: the palette is read first, then the smoke turns to it.
+  loadBundled(state.colour)
+    .then(() => { if (bundled[state.colour]) wear(state.colour); })
+    .catch(() => ui.toast('those colours did not load', { error: true }));
 }
 
 if (import.meta.env.DEV) {
