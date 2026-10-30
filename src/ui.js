@@ -1733,13 +1733,15 @@ export function createUI(app) {
   if (matchMedia('(pointer: coarse)').matches) {
     let touched = false;
     document.querySelector('canvas').addEventListener('pointerdown', () => { touched = true; }, { once: true });
-    setTimeout(() => { if (!touched) toast('drag to turn the cube'); }, 3500);
+    setTimeout(() => { if (!touched) toast('drag to turn, pinch to zoom'); }, 3500);
   }
 
   // The footer's hints: each lights while the hand does what it says, the first few times in a visit,
   // then stays still (stirring happens on every move of the mouse; a light that kept answering it would
   // flicker at the edge of the eye). main.js asks every frame; the page is only touched when one changes.
-  const hintEls = Object.fromEntries([...document.querySelectorAll('.hint [data-hint]')].map((el) => [el.dataset.hint, el]));
+  // (Zoom has two hints, the wheel's and the pinch's; only the one for this screen shows.)
+  const hintEls = {};
+  for (const el of document.querySelectorAll('.hint [data-hint]')) (hintEls[el.dataset.hint] ??= []).push(el);
   const hintLit = {};
   const hintShown = {};
   const hintAt = {};
@@ -1757,7 +1759,7 @@ export function createUI(app) {
       if (on === !!hintLit[name]) continue;
       if (on) hintShown[name] = (hintShown[name] ?? 0) + 1;
       hintLit[name] = on;
-      hintEls[name].classList.toggle('lit', on);
+      for (const el of hintEls[name]) el.classList.toggle('lit', on);
     }
   }
 

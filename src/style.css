@@ -219,8 +219,9 @@ canvas:active { cursor: grabbing; }
 .hint [data-hint] { display: inline-flex; align-items: center; gap: 5px; vertical-align: top; transition: color 400ms ease; }
 .hint svg { width: 10px; height: 10px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
 .hint [data-hint].lit { color: var(--strong); transition-duration: 100ms; }
-/* Without a mouse there is nothing to hover and no wheel: only the drag is true. */
-@media (hover: none) { .hint .by-mouse { display: none; } }
+/* Without a mouse there is nothing to hover and no wheel: the drag and the pinch are what's true. */
+.hint .by-touch { display: none; }
+@media (hover: none) { .hint .by-mouse { display: none; } .hint .by-touch { display: inline; } }
 /* A link that leaves the page says so: a small arrow out, which leans the way it goes under the pointer. */
 .out { display: inline-flex; align-items: center; gap: 3px; }
 .out svg { width: 7px; height: 7px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; color: var(--strong); transition: transform 160ms var(--ease-out); }

@@ -14,12 +14,22 @@ const NARROWEST = 9 / 16;
 const ROOM_FILL = 0.64;
 const widenFor = (width, height, room) => Math.max(1, NARROWEST / (width / height), (ROOM_FILL * height) / room);
 
+// How far the camera zooms, by the wheel or a pinch.
+const ZOOM_MIN = 0.6;
+const ZOOM_MAX = 2.2;
+const clampZoom = (z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+// Past a limit a pinch still follows, less the further it goes: the cube resists instead of stopping dead.
+const stretchZoom = (z) => (z > ZOOM_MAX ? ZOOM_MAX * (z / ZOOM_MAX) ** 0.3 : z < ZOOM_MIN ? ZOOM_MIN * (z / ZOOM_MIN) ** 0.3 : z);
+
 export function createView(canvas) {
   const depth = new PerspectiveCamera(26, 1, 0.1, 100);
   const flat = new OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
   const rig = { theta: 0, phi: 0, zoom: 1, zoomTarget: 1, vTheta: 0, vPhi: 0 };
   let lens = 'flat';
   let drag = null;
+  // Fingers on the cube, by pointer, and the pinch two of them make (its first spread and zoom).
+  const fingers = new Map();
+  let pinch = null;
 
   function original() {
     rig.theta = ORIGINAL_CAMERA.theta0;
@@ -29,14 +39,39 @@ export function createView(canvas) {
   }
   original();
 
-  canvas.addEventListener('pointerdown', (e) => {
-    // One hand turns the cube: a second finger landing mid-drag must not take it over.
-    if (e.button !== 0 || drag) return;
-    canvas.setPointerCapture(e.pointerId);
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() };
+  const spread = () => {
+    const [a, b] = [...fingers.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
+  const startDrag = (id, x, y) => {
+    drag = { id, x, y, t: performance.now() };
     rig.vTheta = rig.vPhi = 0;
+  };
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    if (e.pointerType !== 'mouse') fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    // Two fingers pinch: the turn stops where it is and the zoom follows the fingers' spread. A third
+    // finger changes nothing.
+    if (fingers.size === 2 && !pinch) {
+      canvas.setPointerCapture(e.pointerId);
+      drag = null;
+      rig.vTheta = rig.vPhi = 0;
+      pinch = { spread: Math.max(spread(), 1), zoom: rig.zoom };
+      return;
+    }
+    // One hand turns the cube: a second mouse button or pen mid-drag must not take it over.
+    if (drag || pinch) return;
+    canvas.setPointerCapture(e.pointerId);
+    startDrag(e.pointerId, e.clientX, e.clientY);
   });
   canvas.addEventListener('pointermove', (e) => {
+    if (fingers.has(e.pointerId)) fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch) {
+      if (fingers.size < 2) return;
+      // 1:1 with the fingers, inside the wheel's limits; past one it stretches and settles back on release.
+      rig.zoom = rig.zoomTarget = stretchZoom(pinch.zoom * (spread() / pinch.spread));
+      return;
+    }
     if (!drag || e.pointerId !== drag.id) return;
     const k = (2 * Math.PI * 0.5) / canvas.clientHeight;
     const dTheta = -(e.clientX - drag.x) * k;
@@ -51,6 +86,17 @@ export function createView(canvas) {
     Object.assign(drag, { x: e.clientX, y: e.clientY, t: now });
   });
   const release = (e) => {
+    fingers.delete(e.pointerId);
+    if (pinch) {
+      if (fingers.size >= 2) return;
+      pinch = null;
+      // Let go past a limit, the zoom glides back inside it.
+      rig.zoomTarget = clampZoom(rig.zoom);
+      // The finger still down turns the cube from where it is, without a jump.
+      const [left] = fingers.entries();
+      if (left) startDrag(left[0], left[1].x, left[1].y);
+      return;
+    }
     if (!drag || e.pointerId !== drag.id) return;
     if (performance.now() - drag.t > 80) rig.vTheta = rig.vPhi = 0;
     drag = null;
@@ -65,7 +111,8 @@ export function createView(canvas) {
     if (document.body.classList.contains('embed')) return;
     e.preventDefault();
     wheelAt = performance.now();
-    rig.zoomTarget = Math.min(2.2, Math.max(0.6, rig.zoomTarget * Math.exp(-e.deltaY * 0.0015)));
+    // A trackpad pinch arrives as a wheel with Ctrl held, in much smaller steps than a wheel's notches.
+    rig.zoomTarget = clampZoom(rig.zoomTarget * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)));
   }, { passive: false });
 
   const LIMIT = 0.12;
@@ -87,8 +134,8 @@ export function createView(canvas) {
   return {
     get camera() { return lens === 'flat' ? flat : depth; },
     get dragging() { return drag !== null; },
-    // The wheel is turning (its events come every frame or so while it does).
-    get zooming() { return performance.now() - wheelAt < 200; },
+    // The wheel is turning (its events come every frame or so while it does), or two fingers pinch.
+    get zooming() { return pinch !== null || performance.now() - wheelAt < 200; },
     get lens() { return lens; },
     setLens(name) { lens = name; },
     // The camera's turn around the cube, read and set exactly (the loop recording drives it).

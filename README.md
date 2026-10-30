@@ -12,7 +12,7 @@ A million grains move through a real flow, inside real glass, under one studio l
 
 You can turn it, stir it, give it your colours, and take it home as a 4K image or a loop that never shows its seam.
 
-Drag to turn the cube, hover to stir the smoke, scroll to zoom (the hints at the bottom light up while you do each one, the first few times; on a touch screen only the drag is listed).
+Drag to turn the cube, hover to stir the smoke, scroll to zoom (the hints at the bottom light up while you do each one, the first few times; on a touch screen: drag to turn, pinch to zoom).
 
 ## Use it
 
