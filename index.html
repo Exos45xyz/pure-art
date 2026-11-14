@@ -20,6 +20,16 @@
     <meta name="twitter:image" content="https://pureart-xyz.vercel.app/og.png?v=2" />
     <link rel="icon" href="/favicon.png" type="image/png" sizes="64x64" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- Vercel Web Analytics, on the live site only: a visit count served from this site's own address
+         (/_vercel/insights). No cookies, nothing stored in the browser. Local dev skips it. -->
+    <script>
+      if (!/^(localhost|127\.|\[::1\])/.test(location.hostname)) {
+        const s = document.createElement('script');
+        s.defer = true;
+        s.src = '/_vercel/insights/script.js';
+        document.head.appendChild(s);
+      }
+    </script>
   </head>
   <body>
     <!-- Loading: in the page itself, so it is there from the first paint. The name, its dragon flying
